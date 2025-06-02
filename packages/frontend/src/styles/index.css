@@ -1,0 +1,39 @@
+:root {
+  --primary-main: #3f51b5;
+  --primary-light: #757de8;
+  --primary-dark: #002984;
+  --secondary-main: #f50057;
+  --secondary-light: #ff5983;
+  --secondary-dark: #bb002f;
+  --background-default: #f5f5f5;
+  --background-paper: #ffffff;
+  --text-primary: rgba(0, 0, 0, 0.87);
+  --text-secondary: rgba(0, 0, 0, 0.6);
+  --text-disabled: rgba(0, 0, 0, 0.38);
+}
+
+body {
+  margin: 0;
+  font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--background-default);
+  color: var(--text-primary);
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+a {
+  text-decoration: none;
+  color: var(--primary-main);
+}
+
+a:hover {
+  text-decoration: underline;
+}

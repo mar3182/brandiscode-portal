@@ -1,0 +1,71 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      String   @default("user")
+  brands    Brand[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Brand {
+  id                    String   @id @default(uuid())
+  name                  String
+  description           String?
+  visionStatement       String?
+  missionStatement      String?
+  uniqueValueProposition String?
+  values                String[]
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pathways              InteractiveDecisionPathway[]
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model InteractiveDecisionPathway {
+  id        String       @id @default(uuid())
+  brandId   String
+  brand     Brand        @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  stages    Stage[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model Stage {
+  id          String                    @id @default(uuid())
+  name        String
+  description String
+  status      String                    @default("not-started")
+  order       Int
+  pathwayId   String
+  pathway     InteractiveDecisionPathway @relation(fields: [pathwayId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  status      String   @default("not-started")
+  order       Int
+  stageId     String
+  stage       Stage    @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
