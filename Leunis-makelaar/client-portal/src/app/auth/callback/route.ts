@@ -9,7 +9,9 @@ export async function GET(request: Request) {
     const supabase = createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      return NextResponse.redirect(`${origin}/dashboard`)
+      const { data: { user } } = await supabase.auth.getUser()
+      const isAdmin = user?.email === process.env.ADMIN_EMAIL
+      return NextResponse.redirect(`${origin}${isAdmin ? '/admin' : '/dashboard'}`)
     }
   }
 

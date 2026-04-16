@@ -22,7 +22,7 @@ INSERT INTO offertes (id, client_id, title, description, total_amount, status) V
 
 -- 3. Sprint 1
 INSERT INTO sprints (id, offerte_id, number, title, description, amount, status) VALUES (
-  's1000001-0000-0000-0000-000000000001',
+  'a1000001-0000-0000-0000-000000000001',
   'f1e2d3c4-b5a6-7890-abcd-ef1234567890',
   1,
   'Veilige AI-Omgeving & Woningbeschrijvingen',
@@ -33,15 +33,15 @@ INSERT INTO sprints (id, offerte_id, number, title, description, amount, status)
 
 -- Sprint 1 deliverables
 INSERT INTO deliverables (sprint_id, title, description, status) VALUES
-  ('s1000001-0000-0000-0000-000000000001', 'Beveiligde AI-omgeving', 'Veilig intern systeem met zakelijke licenties — AVG-compliant, data in EU', 'todo'),
-  ('s1000001-0000-0000-0000-000000000001', 'Woningbeschrijvingen-tool', 'Prompt-templates voor Funda-teksten, brochures en social media posts', 'todo'),
-  ('s1000001-0000-0000-0000-000000000001', 'Privacy-protocol', 'Documentatie voor klanten: zo gaan wij om met AI en data', 'todo'),
-  ('s1000001-0000-0000-0000-000000000001', 'Team-training', 'Hands-on sessie (2 uur) zodat iedereen het systeem zelfstandig kan gebruiken', 'todo'),
-  ('s1000001-0000-0000-0000-000000000001', 'Nazorg (1 week)', 'Ondersteuning via WhatsApp/e-mail na oplevering', 'todo');
+  ('a1000001-0000-0000-0000-000000000001', 'Beveiligde AI-omgeving', 'Veilig intern systeem met zakelijke licenties — AVG-compliant, data in EU', 'todo'),
+  ('a1000001-0000-0000-0000-000000000001', 'Woningbeschrijvingen-tool', 'Prompt-templates voor Funda-teksten, brochures en social media posts', 'todo'),
+  ('a1000001-0000-0000-0000-000000000001', 'Privacy-protocol', 'Documentatie voor klanten: zo gaan wij om met AI en data', 'todo'),
+  ('a1000001-0000-0000-0000-000000000001', 'Team-training', 'Hands-on sessie (2 uur) zodat iedereen het systeem zelfstandig kan gebruiken', 'todo'),
+  ('a1000001-0000-0000-0000-000000000001', 'Nazorg (1 week)', 'Ondersteuning via WhatsApp/e-mail na oplevering', 'todo');
 
 -- 4. Sprint 2
 INSERT INTO sprints (id, offerte_id, number, title, description, amount, status) VALUES (
-  's2000002-0000-0000-0000-000000000002',
+  'a2000002-0000-0000-0000-000000000002',
   'f1e2d3c4-b5a6-7890-abcd-ef1234567890',
   2,
   'AI voor Bedrijfsvoering',
@@ -52,15 +52,15 @@ INSERT INTO sprints (id, offerte_id, number, title, description, amount, status)
 
 -- Sprint 2 deliverables
 INSERT INTO deliverables (sprint_id, title, description, status) VALUES
-  ('s2000002-0000-0000-0000-000000000002', 'AI-besluitondersteuning', 'Marktdata-analyse, vergelijkend onderzoek, prijsadvies-ondersteuning', 'todo'),
-  ('s2000002-0000-0000-0000-000000000002', 'Workflow-automatisering', 'Vergadernotities, e-mail-templates, documentgeneratie', 'todo'),
-  ('s2000002-0000-0000-0000-000000000002', 'Contentplanning', 'AI-ondersteunde social media planning en contentkalender', 'todo'),
-  ('s2000002-0000-0000-0000-000000000002', 'Uitbreiding training', 'Team-sessie voor de nieuwe toepassingen', 'todo'),
-  ('s2000002-0000-0000-0000-000000000002', 'Nazorg (1 week)', 'Ondersteuning via WhatsApp/e-mail', 'todo');
+  ('a2000002-0000-0000-0000-000000000002', 'AI-besluitondersteuning', 'Marktdata-analyse, vergelijkend onderzoek, prijsadvies-ondersteuning', 'todo'),
+  ('a2000002-0000-0000-0000-000000000002', 'Workflow-automatisering', 'Vergadernotities, e-mail-templates, documentgeneratie', 'todo'),
+  ('a2000002-0000-0000-0000-000000000002', 'Contentplanning', 'AI-ondersteunde social media planning en contentkalender', 'todo'),
+  ('a2000002-0000-0000-0000-000000000002', 'Uitbreiding training', 'Team-sessie voor de nieuwe toepassingen', 'todo'),
+  ('a2000002-0000-0000-0000-000000000002', 'Nazorg (1 week)', 'Ondersteuning via WhatsApp/e-mail', 'todo');
 
 -- 5. Sprint 3
 INSERT INTO sprints (id, offerte_id, number, title, description, amount, status) VALUES (
-  's3000003-0000-0000-0000-000000000003',
+  'a3000003-0000-0000-0000-000000000003',
   'f1e2d3c4-b5a6-7890-abcd-ef1234567890',
   3,
   'Optimalisatie & Zelfstandigheid',
@@ -71,8 +71,8 @@ INSERT INTO sprints (id, offerte_id, number, title, description, amount, status)
 
 -- Sprint 3 deliverables
 INSERT INTO deliverables (sprint_id, title, description, status) VALUES
-  ('s3000003-0000-0000-0000-000000000003', 'Optimalisatie', 'Verfijning van alle tools op basis van praktijkervaring', 'todo'),
-  ('s3000003-0000-0000-0000-000000000003', 'Uitbreiding', 'Nieuwe toepassingen op basis van praktijkbehoeften', 'todo'),
-  ('s3000003-0000-0000-0000-000000000003', 'Handleidingen', 'Stap-voor-stap documentatie voor elke toepassing', 'todo'),
-  ('s3000003-0000-0000-0000-000000000003', 'AI-routekaart', 'Strategisch plan voor de komende 12 maanden', 'todo'),
-  ('s3000003-0000-0000-0000-000000000003', 'Overdracht', 'Eindgesprek + evaluatie — team is zelfstandig', 'todo');
+  ('a3000003-0000-0000-0000-000000000003', 'Optimalisatie', 'Verfijning van alle tools op basis van praktijkervaring', 'todo'),
+  ('a3000003-0000-0000-0000-000000000003', 'Uitbreiding', 'Nieuwe toepassingen op basis van praktijkbehoeften', 'todo'),
+  ('a3000003-0000-0000-0000-000000000003', 'Handleidingen', 'Stap-voor-stap documentatie voor elke toepassing', 'todo'),
+  ('a3000003-0000-0000-0000-000000000003', 'AI-routekaart', 'Strategisch plan voor de komende 12 maanden', 'todo'),
+  ('a3000003-0000-0000-0000-000000000003', 'Overdracht', 'Eindgesprek + evaluatie — team is zelfstandig', 'todo');

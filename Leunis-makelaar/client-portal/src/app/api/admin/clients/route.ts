@@ -36,6 +36,20 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createAdminClient()
+
+  // 1. Create Supabase Auth user so they can log in with magic link
+  const { error: authError } = await admin.auth.admin.createUser({
+    email,
+    email_confirm: true, // Skip email confirmation — admin verified the email
+    user_metadata: { name, company },
+  })
+
+  // Ignore "User already registered" — they may already have an auth account
+  if (authError && !authError.message.includes('already been registered')) {
+    return NextResponse.json({ error: `Auth: ${authError.message}` }, { status: 500 })
+  }
+
+  // 2. Insert into clients table
   const { data, error } = await admin.from('clients').insert({ name, email, company, phone }).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
