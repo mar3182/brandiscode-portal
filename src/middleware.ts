@@ -49,6 +49,16 @@ export async function middleware(request: NextRequest) {
       url.pathname = '/login'
       return NextResponse.redirect(url)
     }
+
+    // Forceer wachtwoord wijzigen bij eerste login
+    if (
+      !user.user_metadata?.password_changed &&
+      pathname !== '/dashboard/wachtwoord-wijzigen'
+    ) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard/wachtwoord-wijzigen'
+      return NextResponse.redirect(url)
+    }
   }
 
   // Bescherm /admin routes — vereist admin e-mail

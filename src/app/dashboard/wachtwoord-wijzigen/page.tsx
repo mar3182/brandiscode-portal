@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Lock, Loader2, ShieldCheck, CheckCircle } from 'lucide-react'
+import { Lock, Loader2, ShieldCheck, CheckCircle, AlertTriangle } from 'lucide-react'
 
 export default function DashboardWachtwoordPage() {
   const [password, setPassword] = useState('')
@@ -10,7 +11,17 @@ export default function DashboardWachtwoordPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [isFirstLogin, setIsFirstLogin] = useState(false)
   const supabase = createClient()
+  const router = useRouter()
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user && !user.user_metadata?.password_changed) {
+        setIsFirstLogin(true)
+      }
+    })
+  }, [supabase.auth])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,6 +55,10 @@ export default function DashboardWachtwoordPage() {
     setConfirmPassword('')
     setLoading(false)
     setSuccess(true)
+    setIsFirstLogin(false)
+
+    // Redirect na 2 seconden naar dashboard
+    setTimeout(() => router.push('/dashboard'), 2000)
   }
 
   return (
@@ -54,6 +69,13 @@ export default function DashboardWachtwoordPage() {
       </div>
 
       <div className="glass-card p-6">
+        {isFirstLogin && !success && (
+          <div className="flex items-center gap-2 mb-4 p-3 bg-brand-gold/10 border border-brand-gold/30 rounded-xl">
+            <AlertTriangle className="w-5 h-5 text-brand-gold flex-shrink-0" />
+            <p className="text-brand-gold text-sm">Kies een persoonlijk wachtwoord om verder te gaan.</p>
+          </div>
+        )}
+
         {success && (
           <div className="flex items-center gap-2 mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded-xl">
             <CheckCircle className="w-5 h-5 text-green-400" />
