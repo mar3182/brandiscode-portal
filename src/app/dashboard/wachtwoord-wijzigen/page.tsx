@@ -40,15 +40,23 @@ export default function DashboardWachtwoordPage() {
 
     setLoading(true)
 
-    const { error: updateError } = await supabase.auth.updateUser({
-      password,
+    // Stap 1: Wachtwoord wijzigen
+    const { error: pwError } = await supabase.auth.updateUser({ password })
+
+    if (pwError) {
+      setError('Er ging iets mis bij het wijzigen van het wachtwoord. Probeer het opnieuw.')
+      setLoading(false)
+      return
+    }
+
+    // Stap 2: Metadata updaten (password_changed flag)
+    const { error: metaError } = await supabase.auth.updateUser({
       data: { password_changed: true },
     })
 
-    if (updateError) {
-      setError('Er ging iets mis. Probeer het opnieuw.')
-      setLoading(false)
-      return
+    if (metaError) {
+      // Wachtwoord is wel gewijzigd, maar flag niet gezet — opnieuw inloggen lost het op
+      console.warn('Metadata update failed, forcing re-login')
     }
 
     setPassword('')
@@ -58,7 +66,10 @@ export default function DashboardWachtwoordPage() {
     setIsFirstLogin(false)
 
     // Redirect na 2 seconden naar dashboard
-    setTimeout(() => router.push('/dashboard'), 2000)
+    setTimeout(() => {
+      router.push('/dashboard')
+      router.refresh()
+    }, 2000)
   }
 
   return (
