@@ -1,0 +1,89 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { Users, FileText, CheckCircle2, MessageSquare } from 'lucide-react'
+import StatCard from '@/components/StatCard'
+import StatusBadge from '@/components/StatusBadge'
+import Link from 'next/link'
+
+export default function AdminDashboard() {
+  const [stats, setStats] = useState({ clients: 0, offertes: 0, signed: 0, feedback: 0 })
+  const [recentOffertes, setRecentOffertes] = useState<any[]>([])
+
+  useEffect(() => {
+    async function load() {
+      const [clientsRes, offertesRes] = await Promise.all([
+        fetch('/api/admin/clients'),
+        fetch('/api/admin/offertes'),
+      ])
+
+      const clients = await clientsRes.json()
+      const offertes = await offertesRes.json()
+
+      if (Array.isArray(clients) && Array.isArray(offertes)) {
+        setStats({
+          clients: clients.length,
+          offertes: offertes.length,
+          signed: offertes.filter((o: any) => o.status === 'getekend').length,
+          feedback: 0,
+        })
+        setRecentOffertes(offertes.slice(0, 5))
+      }
+    }
+    load()
+  }, [])
+
+  return (
+    <div className="max-w-6xl">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
+        <p className="text-white/50 mt-1">Beheer je klanten, offertes en projecten.</p>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <StatCard title="Klanten" value={stats.clients} icon={Users} color="blue" />
+        <StatCard title="Offertes" value={stats.offertes} icon={FileText} color="gold" />
+        <StatCard title="Getekend" value={stats.signed} icon={CheckCircle2} color="green" />
+        <StatCard title="Feedback" value={stats.feedback} icon={MessageSquare} color="pink" />
+      </div>
+
+      {/* Quick actions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <Link href="/admin/clients" className="glass-card p-6 hover:border-brand-blue/30 transition-all group">
+          <Users className="w-8 h-8 text-brand-blue mb-3" />
+          <h3 className="text-white font-semibold">Nieuwe klant toevoegen</h3>
+          <p className="text-white/40 text-sm mt-1">Maak een klantprofiel aan voor de portal.</p>
+        </Link>
+        <Link href="/admin/offertes" className="glass-card p-6 hover:border-brand-gold/30 transition-all group">
+          <FileText className="w-8 h-8 text-brand-gold mb-3" />
+          <h3 className="text-white font-semibold">Offerte aanmaken</h3>
+          <p className="text-white/40 text-sm mt-1">Nieuwe offerte met sprints en deliverables.</p>
+        </Link>
+      </div>
+
+      {/* Recent offertes */}
+      <div className="glass-card p-6">
+        <h2 className="text-lg font-semibold text-white mb-4">Recente offertes</h2>
+        {recentOffertes.length === 0 ? (
+          <p className="text-white/40 text-sm py-4">Nog geen offertes. Voer eerst de seed-data uit in Supabase.</p>
+        ) : (
+          <div className="space-y-3">
+            {recentOffertes.map((o: any) => (
+              <div key={o.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5">
+                <div>
+                  <p className="text-white font-medium">{o.title}</p>
+                  <p className="text-white/40 text-sm">{o.clients?.company || o.clients?.name}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-white/60">€{o.total_amount?.toLocaleString('nl-NL')}</span>
+                  <StatusBadge status={o.status} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

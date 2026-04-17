@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-dark: #1B2A4A;
+  --brand-gold: #D4A843;
+  --brand-blue: #2E86AB;
+  --brand-pink: #E84393;
+  --brand-orange: #F7631B;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: linear-gradient(135deg, #0f172a 0%, #1B2A4A 50%, #0f172a 100%);
+  min-height: 100vh;
+}
+
+/* Glassmorphism card */
+.glass-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+}
+
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(212, 168, 67, 0.3);
+}
+
+/* Gold gradient text */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #D4A843, #f0d78c);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Status badges */
+.status-badge {
+  @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium;
+}
+
+.status-actief {
+  @apply bg-emerald-500/20 text-emerald-300 border border-emerald-500/30;
+}
+
+.status-wacht {
+  @apply bg-amber-500/20 text-amber-300 border border-amber-500/30;
+}
+
+.status-afgerond {
+  @apply bg-brand-blue/20 text-blue-300 border border-brand-blue/30;
+}
+
+/* Signature pad */
+.signature-canvas {
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  cursor: crosshair;
+}
+
+.signature-canvas:hover {
+  border-color: rgba(212, 168, 67, 0.4);
+}
