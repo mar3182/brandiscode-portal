@@ -61,7 +61,7 @@ export default function OffertesPage() {
                     </span>
                     {offerte.signed_at && (
                       <span className="text-emerald-400">
-                        Getekend op {format(new Date(offerte.signed_at), 'd MMM yyyy', { locale: nl })}
+                        Akkoord op {format(new Date(offerte.signed_at), 'd MMM yyyy', { locale: nl })}
                       </span>
                     )}
                   </div>

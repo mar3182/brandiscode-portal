@@ -1,4 +1,4 @@
-export type OfferteStatus = 'concept' | 'verstuurd' | 'bekeken' | 'getekend' | 'afgewezen'
+export type OfferteStatus = 'concept' | 'verstuurd' | 'bekeken' | 'getekend' | 'afgewezen' | 'afgerond'
 export type SprintStatus = 'gepland' | 'actief' | 'review' | 'afgerond'
 export type DeliverableStatus = 'todo' | 'in_progress' | 'review' | 'done'
 

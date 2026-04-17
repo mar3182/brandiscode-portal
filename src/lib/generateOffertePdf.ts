@@ -1,7 +1,24 @@
 import jsPDF from 'jspdf'
 import type { OfferteWithSprints } from './types'
 
-export function generateOffertePdf(offerte: OfferteWithSprints, signatureDataUrl?: string) {
+function loadImage(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width
+      canvas.height = img.height
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0)
+      resolve(canvas.toDataURL('image/png'))
+    }
+    img.onerror = () => reject(new Error('Failed to load image'))
+    img.src = url
+  })
+}
+
+export async function generateOffertePdf(offerte: OfferteWithSprints, signatureDataUrl?: string) {
   const doc = new jsPDF('p', 'mm', 'a4')
   const pageWidth = doc.internal.pageSize.getWidth()
   const margin = 20
@@ -19,15 +36,25 @@ export function generateOffertePdf(offerte: OfferteWithSprints, signatureDataUrl
   doc.rect(0, 0, pageWidth, doc.internal.pageSize.getHeight(), 'F')
 
   // === HEADER ===
-  doc.setFontSize(24)
-  doc.setTextColor(...gold)
-  doc.setFont('helvetica', 'bold')
-  doc.text('Brand is Code', margin, y + 8)
+  // Load and add logo
+  try {
+    const logoDataUrl = await loadImage('/logo.png')
+    // Logo aspect ratio is ~1252:888 ≈ 1.41:1
+    const logoW = 45
+    const logoH = logoW / 1.41
+    doc.addImage(logoDataUrl, 'PNG', margin, y - 4, logoW, logoH)
+  } catch {
+    // Fallback: text if logo fails to load
+    doc.setFontSize(24)
+    doc.setTextColor(...gold)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Brand is Code', margin, y + 8)
+  }
 
   doc.setFontSize(9)
   doc.setTextColor(...gray)
   doc.setFont('helvetica', 'normal')
-  doc.text('mary@brandiscode.com', pageWidth - margin, y + 4, { align: 'right' })
+  doc.text('info@brandiscode.com', pageWidth - margin, y + 4, { align: 'right' })
   doc.text('brandiscode.com', pageWidth - margin, y + 9, { align: 'right' })
 
   y += 18
@@ -190,7 +217,7 @@ export function generateOffertePdf(offerte: OfferteWithSprints, signatureDataUrl
     const signedDate = new Date(signedAt).toLocaleDateString('nl-NL', {
       day: 'numeric', month: 'long', year: 'numeric'
     })
-    doc.text(`Getekend op: ${signedDate}`, margin, y)
+    doc.text(`Akkoord op: ${signedDate}`, margin, y)
     y += 8
 
     // Signature image
@@ -216,14 +243,14 @@ export function generateOffertePdf(offerte: OfferteWithSprints, signatureDataUrl
   const footerY = doc.internal.pageSize.getHeight() - 12
   doc.setFontSize(7)
   doc.setTextColor(...gray)
-  doc.text('Brand is Code  •  KvK: [KvK nummer]  •  BTW: [BTW nummer]', pageWidth / 2, footerY, { align: 'center' })
+  doc.text('Brand is Code  •  Hofstede 11, 4691DH Tholen  •  info@brandiscode.com', pageWidth / 2, footerY, { align: 'center' })
   doc.text('Dit document is digitaal ondertekend en heeft dezelfde juridische waarde als een handgeschreven handtekening.', pageWidth / 2, footerY + 4, { align: 'center' })
 
   return doc
 }
 
-export function downloadOffertePdf(offerte: OfferteWithSprints, signatureDataUrl?: string) {
-  const doc = generateOffertePdf(offerte, signatureDataUrl)
+export async function downloadOffertePdf(offerte: OfferteWithSprints, signatureDataUrl?: string) {
+  const doc = await generateOffertePdf(offerte, signatureDataUrl)
   const filename = `offerte-${offerte.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`
   doc.save(filename)
 }

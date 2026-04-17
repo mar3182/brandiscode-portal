@@ -40,12 +40,13 @@ export default function OfferteDetailPage() {
         sprints: sprintData || [],
       })
 
-      // Mark as bekeken
+      // Mark as bekeken when client views for the first time
       if (offerteData.status === 'verstuurd') {
         await supabase
           .from('offertes')
           .update({ status: 'bekeken', updated_at: new Date().toISOString() })
           .eq('id', id)
+        offerteData.status = 'bekeken'
       }
     }
     load()
@@ -73,14 +74,14 @@ export default function OfferteDetailPage() {
       setSigned(true)
       setOfferte(updatedOfferte)
       // Auto-download PDF
-      downloadOffertePdf(updatedOfferte, signatureDataUrl)
+      await downloadOffertePdf(updatedOfferte, signatureDataUrl)
     }
     setSigning(false)
   }
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     if (offerte) {
-      downloadOffertePdf(offerte)
+      await downloadOffertePdf(offerte)
     }
   }
 
@@ -131,7 +132,7 @@ export default function OfferteDetailPage() {
           {offerte.signed_at && (
             <span className="flex items-center gap-1.5 text-emerald-400">
               <CheckCircle2 className="w-4 h-4" />
-              Getekend: {format(new Date(offerte.signed_at), 'd MMMM yyyy', { locale: nl })}
+              Akkoord: {format(new Date(offerte.signed_at), 'd MMMM yyyy', { locale: nl })}
             </span>
           )}
         </div>
@@ -205,10 +206,10 @@ export default function OfferteDetailPage() {
           <div className="flex items-center gap-3">
             <CheckCircle2 className="w-8 h-8 text-emerald-400" />
             <div>
-              <h2 className="text-lg font-semibold text-emerald-300">Offerte getekend!</h2>
+              <h2 className="text-lg font-semibold text-emerald-300">Offerte akkoord!</h2>
               <p className="text-white/50 text-sm">
                 {offerte.signed_at
-                  ? `Getekend op ${format(new Date(offerte.signed_at), 'd MMMM yyyy', { locale: nl })}`
+                  ? `Akkoord op ${format(new Date(offerte.signed_at), 'd MMMM yyyy', { locale: nl })}`
                   : 'Bedankt voor je akkoord. Mary neemt snel contact met je op.'
                 }
               </p>

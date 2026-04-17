@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { LayoutDashboard, FileText, PenTool, BarChart3, MessageSquare, LogOut, ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -26,8 +27,15 @@ export default function Sidebar() {
     <aside className="fixed left-0 top-0 h-screen w-64 glass-card rounded-none border-r border-white/10 flex flex-col z-50">
       {/* Logo */}
       <div className="p-6 border-b border-white/10">
-        <h1 className="text-xl font-bold text-gold-gradient">Brand is Code</h1>
-        <p className="text-xs text-white/50 mt-1">Client Portal</p>
+        <Image
+          src="/logo.png"
+          alt="Brand is Code"
+          width={160}
+          height={113}
+          className="w-40 h-auto"
+          priority
+        />
+        <p className="text-xs text-white/50 mt-2">Client Portal</p>
       </div>
 
       {/* Navigation */}
