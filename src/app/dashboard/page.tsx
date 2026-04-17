@@ -19,13 +19,13 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const { data: client } = await supabase
-        .from('clients')
+      const { data: clientUser } = await supabase
+        .from('client_users')
         .select('name')
         .eq('email', user.email)
         .single()
 
-      if (client) setClientName(client.name)
+      if (clientUser) setClientName(clientUser.name)
 
       const { data: offerteData } = await supabase
         .from('offertes')

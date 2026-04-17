@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, FileText, PenTool, BarChart3, MessageSquare, LogOut, ShieldCheck } from 'lucide-react'
+import { LayoutDashboard, FileText, PenTool, BarChart3, MessageSquare, LogOut, ShieldCheck, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 const navigation = [
@@ -11,6 +11,7 @@ const navigation = [
   { name: 'Offertes', href: '/dashboard/offertes', icon: FileText },
   { name: 'Projectstatus', href: '/dashboard/projecten', icon: BarChart3 },
   { name: 'Feedback', href: '/dashboard/feedback', icon: MessageSquare },
+  { name: 'Team', href: '/dashboard/team', icon: Users },
   { name: 'Wachtwoord', href: '/dashboard/wachtwoord-wijzigen', icon: ShieldCheck },
 ]
 

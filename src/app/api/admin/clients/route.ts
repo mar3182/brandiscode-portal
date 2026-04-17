@@ -53,5 +53,14 @@ export async function POST(req: NextRequest) {
   const { data, error } = await admin.from('clients').insert({ name, email, company, phone }).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // 3. Insert owner record into client_users
+  await admin.from('client_users').insert({
+    client_id: data.id,
+    email,
+    name,
+    role: 'owner',
+  })
+
   return NextResponse.json(data, { status: 201 })
 }

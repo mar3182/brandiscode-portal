@@ -58,6 +58,15 @@ export interface Feedback {
   created_at: string
 }
 
+export interface ClientUser {
+  id: string
+  client_id: string
+  email: string
+  name: string
+  role: 'owner' | 'member'
+  created_at: string
+}
+
 // Extended types with relations
 export interface OfferteWithSprints extends Offerte {
   sprints: SprintWithDeliverables[]
