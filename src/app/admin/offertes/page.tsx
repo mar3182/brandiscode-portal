@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import StatusBadge from '@/components/StatusBadge'
 import type { SprintStatus, DeliverableStatus } from '@/lib/types'
-import { FileText, ChevronDown, ChevronRight, CheckCircle2, Circle, Loader2, Clock, ThumbsUp, ThumbsDown, MessageSquare, AlertCircle } from 'lucide-react'
+import { FileText, ChevronDown, ChevronRight, CheckCircle2, Circle, Loader2, Clock, ThumbsUp, MessageSquare } from 'lucide-react'
 
 const sprintStatuses: SprintStatus[] = ['gepland', 'actief', 'review', 'afgerond']
 const deliverableStatuses: DeliverableStatus[] = ['todo', 'in_progress', 'review', 'done']
@@ -149,9 +149,9 @@ export default function AdminOffertesPage() {
                         </span>
                       )}
                       {sprint.client_approved === false && (
-                        <span className="flex items-center gap-1 px-2 py-0.5 bg-red-500/20 rounded-full animate-pulse" title="Afgewezen door klant — klik voor feedback">
-                          <AlertCircle className="w-3 h-3 text-red-400" />
-                          <span className="text-xs text-red-400">Feedback</span>
+                        <span className="flex items-center gap-1 px-2 py-0.5 bg-blue-500/20 rounded-full" title="Klant heeft feedback gegeven">
+                          <MessageSquare className="w-3 h-3 text-blue-400" />
+                          <span className="text-xs text-blue-400">Feedback</span>
                         </span>
                       )}
                       {/* Sprint status dropdown */}
@@ -180,18 +180,18 @@ export default function AdminOffertesPage() {
                         <div className={`p-3 rounded-lg border mb-3 ${
                           sprint.client_approved
                             ? 'bg-emerald-500/5 border-emerald-500/20'
-                            : 'bg-red-500/5 border-red-500/20'
+                            : 'bg-blue-500/5 border-blue-500/20'
                         }`}>
                           <div className="flex items-center gap-2 mb-1">
                             {sprint.client_approved ? (
                               <ThumbsUp className="w-4 h-4 text-emerald-400" />
                             ) : (
-                              <ThumbsDown className="w-4 h-4 text-red-400" />
+                              <MessageSquare className="w-4 h-4 text-blue-400" />
                             )}
                             <span className={`text-sm font-medium ${
-                              sprint.client_approved ? 'text-emerald-400' : 'text-red-400'
+                              sprint.client_approved ? 'text-emerald-400' : 'text-blue-400'
                             }`}>
-                              {sprint.client_approved ? 'Goedgekeurd door klant' : 'Afgewezen door klant'}
+                              {sprint.client_approved ? 'Goedgekeurd door klant' : 'Feedback van klant'}
                             </span>
                             {sprint.client_approved_at && (
                               <span className="text-white/30 text-xs ml-auto">

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Users, FileText, CheckCircle2, MessageSquare, AlertCircle, ThumbsUp, ThumbsDown, Clock } from 'lucide-react'
+import { Users, FileText, CheckCircle2, MessageSquare, Clock } from 'lucide-react'
 import StatCard from '@/components/StatCard'
 import StatusBadge from '@/components/StatusBadge'
 import Link from 'next/link'
@@ -32,11 +32,11 @@ export default function AdminDashboard() {
       const offertes = await offertesRes.json()
 
       if (Array.isArray(clients) && Array.isArray(offertes)) {
-        // Collect all sprint feedbacks (approved or rejected)
+        // Collect all sprint feedbacks
         const feedbacks: SprintFeedback[] = []
         offertes.forEach((o: any) => {
           o.sprints?.forEach((s: any) => {
-            if (s.client_approved !== null) {
+            if (s.client_feedback) {
               feedbacks.push({
                 sprintTitle: s.title,
                 sprintNumber: s.number,
@@ -121,10 +121,10 @@ export default function AdminDashboard() {
       <div className="glass-card p-6">
         <div className="flex items-center gap-3 mb-4">
           <h2 className="text-lg font-semibold text-white">Klant feedback op sprints</h2>
-          {sprintFeedbacks.filter(f => !f.approved).length > 0 && (
-            <span className="px-2.5 py-0.5 bg-red-500/20 text-red-400 text-xs font-medium rounded-full flex items-center gap-1">
-              <AlertCircle className="w-3 h-3" />
-              {sprintFeedbacks.filter(f => !f.approved).length} afgewezen
+          {sprintFeedbacks.length > 0 && (
+            <span className="px-2.5 py-0.5 bg-blue-500/20 text-blue-400 text-xs font-medium rounded-full flex items-center gap-1">
+              <MessageSquare className="w-3 h-3" />
+              {sprintFeedbacks.length} {sprintFeedbacks.length === 1 ? 'bericht' : 'berichten'}
             </span>
           )}
         </div>
@@ -133,33 +133,21 @@ export default function AdminDashboard() {
         ) : (
           <div className="space-y-3">
             {sprintFeedbacks.map((fb, i) => (
-              <div key={i} className={`p-4 rounded-xl border ${
-                fb.approved === false
-                  ? 'bg-red-500/5 border-red-500/20'
-                  : 'bg-emerald-500/5 border-emerald-500/20'
-              }`}>
+              <div key={i} className="p-4 rounded-xl border bg-blue-500/5 border-blue-500/20">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    {fb.approved ? (
-                      <ThumbsUp className="w-4 h-4 text-emerald-400" />
-                    ) : (
-                      <ThumbsDown className="w-4 h-4 text-red-400" />
-                    )}
+                    <MessageSquare className="w-4 h-4 text-blue-400" />
                     <span className="text-white font-medium text-sm">
                       Sprint {fb.sprintNumber}: {fb.sprintTitle}
                     </span>
                   </div>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${
-                    fb.approved
-                      ? 'bg-emerald-500/20 text-emerald-400'
-                      : 'bg-red-500/20 text-red-400'
-                  }`}>
-                    {fb.approved ? 'Goedgekeurd' : 'Afgewezen'}
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">
+                    Feedback
                   </span>
                 </div>
                 <p className="text-white/40 text-xs mb-1">{fb.clientName} — {fb.offerteName}</p>
                 {fb.feedback && (
-                  <p className="text-white/70 text-sm mt-2 pl-6 border-l-2 border-white/10">
+                  <p className="text-white/70 text-sm mt-2 pl-6 border-l-2 border-blue-500/20">
                     &ldquo;{fb.feedback}&rdquo;
                   </p>
                 )}

@@ -7,7 +7,7 @@ import StatusBadge from '@/components/StatusBadge'
 import SignatureCanvas from '@/components/SignatureCanvas'
 import type { OfferteWithSprints, SprintWithDeliverables } from '@/lib/types'
 import { downloadOffertePdf } from '@/lib/generateOffertePdf'
-import { ArrowLeft, Download, CheckCircle2, XCircle, Calendar, Euro, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react'
+import { ArrowLeft, Download, CheckCircle2, Calendar, Euro, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { nl } from 'date-fns/locale'
@@ -16,8 +16,8 @@ export default function OfferteDetailPage() {
   const { id } = useParams<{ id: string }>()
   const [offerte, setOfferte] = useState<OfferteWithSprints | null>(null)
   const [signingSprintId, setSigningSprintId] = useState<string | null>(null)
-  const [rejectingSprintId, setRejectingSprintId] = useState<string | null>(null)
-  const [rejectFeedback, setRejectFeedback] = useState('')
+  const [feedbackSprintId, setFeedbackSprintId] = useState<string | null>(null)
+  const [feedbackText, setFeedbackText] = useState('')
   const [saving, setSaving] = useState(false)
   const [expandedSprint, setExpandedSprint] = useState<string | null>(null)
   const supabase = createClient()
@@ -107,27 +107,27 @@ export default function OfferteDetailPage() {
     setSaving(false)
   }
 
-  const handleRejectSprint = async (sprintId: string) => {
-    if (!rejectFeedback.trim()) return
+  const handleSendFeedback = async (sprintId: string) => {
+    if (!feedbackText.trim()) return
     setSaving(true)
     const { error } = await supabase
       .from('sprints')
       .update({
         client_approved: false,
         client_approved_at: new Date().toISOString(),
-        client_feedback: rejectFeedback.trim(),
+        client_feedback: feedbackText.trim(),
       })
       .eq('id', sprintId)
 
     if (!error && offerte) {
       const updatedSprints = offerte.sprints.map((s) =>
         s.id === sprintId
-          ? { ...s, client_approved: false, client_approved_at: new Date().toISOString(), client_feedback: rejectFeedback.trim() }
+          ? { ...s, client_approved: false, client_approved_at: new Date().toISOString(), client_feedback: feedbackText.trim() }
           : s
       )
       setOfferte({ ...offerte, sprints: updatedSprints })
-      setRejectingSprintId(null)
-      setRejectFeedback('')
+      setFeedbackSprintId(null)
+      setFeedbackText('')
     }
     setSaving(false)
   }
@@ -216,7 +216,7 @@ export default function OfferteDetailPage() {
           {offerte.sprints.map((sprint) => {
             const isExpanded = expandedSprint === sprint.id
             const isApproved = sprint.client_approved === true
-            const isRejected = sprint.client_approved === false
+            const hasFeedback = sprint.client_approved === false
             const isPending = sprint.client_approved === null
 
             return (
@@ -224,7 +224,7 @@ export default function OfferteDetailPage() {
                 key={sprint.id}
                 className={`glass-card overflow-hidden transition-all ${
                   isApproved ? 'border-emerald-500/20' :
-                  isRejected ? 'border-red-500/20' :
+                  hasFeedback ? 'border-blue-500/20' :
                   ''
                 }`}
               >
@@ -236,11 +236,11 @@ export default function OfferteDetailPage() {
                   <div className="flex items-center gap-3">
                     <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm ${
                       isApproved ? 'bg-emerald-500/20 text-emerald-400' :
-                      isRejected ? 'bg-red-500/20 text-red-400' :
+                      hasFeedback ? 'bg-blue-500/20 text-blue-400' :
                       'bg-brand-gold/20 text-brand-gold'
                     }`}>
                       {isApproved ? <CheckCircle2 className="w-4 h-4" /> :
-                       isRejected ? <XCircle className="w-4 h-4" /> :
+                       hasFeedback ? <MessageSquare className="w-4 h-4" /> :
                        sprint.number}
                     </span>
                     <div>
@@ -255,8 +255,8 @@ export default function OfferteDetailPage() {
                             Akkoord op {format(new Date(sprint.client_approved_at), 'd MMM yyyy', { locale: nl })}
                           </span>
                         )}
-                        {isRejected && (
-                          <span className="text-red-400 text-xs">Feedback gegeven</span>
+                        {hasFeedback && (
+                          <span className="text-blue-400 text-xs">Feedback verstuurd</span>
                         )}
                       </div>
                     </div>
@@ -296,13 +296,13 @@ export default function OfferteDetailPage() {
                       </div>
                     )}
 
-                    {/* Rejection feedback display */}
-                    {isRejected && sprint.client_feedback && (
-                      <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 mb-4">
+                    {/* Feedback display */}
+                    {hasFeedback && sprint.client_feedback && (
+                      <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 mb-4">
                         <div className="flex items-start gap-2">
-                          <MessageSquare className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+                          <MessageSquare className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" />
                           <div>
-                            <p className="text-red-300 text-sm font-medium">Jouw feedback</p>
+                            <p className="text-blue-300 text-sm font-medium">Jouw feedback</p>
                             <p className="text-white/60 text-sm">{sprint.client_feedback}</p>
                           </div>
                         </div>
@@ -310,20 +310,20 @@ export default function OfferteDetailPage() {
                     )}
 
                     {/* Approve / Reject buttons */}
-                    {canApprove && isPending && signingSprintId !== sprint.id && rejectingSprintId !== sprint.id && (
+                    {canApprove && isPending && signingSprintId !== sprint.id && feedbackSprintId !== sprint.id && (
                       <div className="flex gap-3">
                         <button
-                          onClick={() => { setSigningSprintId(sprint.id); setRejectingSprintId(null) }}
+                          onClick={() => { setSigningSprintId(sprint.id); setFeedbackSprintId(null) }}
                           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-gold text-brand-dark font-semibold text-sm hover:opacity-90 transition-all"
                         >
                           <CheckCircle2 className="w-4 h-4" />
                           Akkoord &amp; tekenen
                         </button>
                         <button
-                          onClick={() => { setRejectingSprintId(sprint.id); setSigningSprintId(null) }}
-                          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-white/10 text-white/60 text-sm hover:border-red-500/30 hover:text-red-400 transition-all"
+                          onClick={() => { setFeedbackSprintId(sprint.id); setSigningSprintId(null) }}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-white/10 text-white/60 text-sm hover:border-blue-500/30 hover:text-blue-400 transition-all"
                         >
-                          <XCircle className="w-4 h-4" />
+                          <MessageSquare className="w-4 h-4" />
                           Feedback geven
                         </button>
                       </div>
@@ -348,29 +348,30 @@ export default function OfferteDetailPage() {
                       </div>
                     )}
 
-                    {/* Reject form */}
-                    {rejectingSprintId === sprint.id && (
+                    {/* Feedback form */}
+                    {feedbackSprintId === sprint.id && (
                       <div className="mt-2">
                         <p className="text-white/50 text-sm mb-2">
-                          Wat moet er aangepast worden aan sprint {sprint.number}?
+                          Deel je opmerkingen over sprint {sprint.number}:
                         </p>
                         <textarea
-                          value={rejectFeedback}
-                          onChange={(e) => setRejectFeedback(e.target.value)}
-                          placeholder="Beschrijf je feedback..."
-                          className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:border-brand-gold/50 focus:outline-none resize-none"
+                          value={feedbackText}
+                          onChange={(e) => setFeedbackText(e.target.value)}
+                          placeholder="Deel je gedachten, vragen of suggesties..."
+                          className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:border-blue-500/50 focus:outline-none resize-none"
                           rows={3}
                         />
                         <div className="flex gap-3 mt-3">
                           <button
-                            onClick={() => handleRejectSprint(sprint.id)}
-                            disabled={saving || !rejectFeedback.trim()}
-                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/20 text-red-300 font-semibold text-sm hover:bg-red-500/30 transition-all disabled:opacity-50"
+                            onClick={() => handleSendFeedback(sprint.id)}
+                            disabled={saving || !feedbackText.trim()}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/20 text-blue-300 font-semibold text-sm hover:bg-blue-500/30 transition-all disabled:opacity-50"
                           >
+                            <MessageSquare className="w-4 h-4" />
                             Verstuur feedback
                           </button>
                           <button
-                            onClick={() => { setRejectingSprintId(null); setRejectFeedback('') }}
+                            onClick={() => { setFeedbackSprintId(null); setFeedbackText('') }}
                             className="text-xs text-white/40 hover:text-white/60 transition-colors"
                           >
                             Annuleren
