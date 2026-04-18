@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Mail, Lock, ArrowRight, Loader2 } from 'lucide-react'
+import Image from 'next/image'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -33,12 +34,23 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background gradient accents */}
+      <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-[#E84393]/10 rounded-full blur-[120px] -translate-x-1/2 -translate-y-1/2" />
+      <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-[#D4A843]/10 rounded-full blur-[120px] translate-x-1/2 translate-y-1/2" />
+
+      <div className="w-full max-w-md relative z-10">
         {/* Logo */}
-        <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold text-gold-gradient">Brand is Code</h1>
-          <p className="text-white/50 mt-2">Client Portal</p>
+        <div className="flex flex-col items-center mb-10">
+          <Image
+            src="/logo-small.png"
+            alt="Brand is Code"
+            width={120}
+            height={120}
+            priority
+            className="mb-4"
+          />
+          <p className="text-white/40 text-sm tracking-widest uppercase">Client Portal</p>
         </div>
 
         {/* Login Card */}
@@ -92,7 +104,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading || !email || !password}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-brand-gold to-brand-gold/80 text-brand-dark font-semibold rounded-xl hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-[#E84393] to-[#D4A843] text-white font-semibold rounded-xl hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
