@@ -50,6 +50,13 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
+    // Admin hoort op /admin, niet op /dashboard
+    if (user.email === process.env.ADMIN_EMAIL) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/admin'
+      return NextResponse.redirect(url)
+    }
+
     // Forceer wachtwoord wijzigen bij eerste login (alleen voor klanten, niet voor admin)
     if (
       user.email !== process.env.ADMIN_EMAIL &&
