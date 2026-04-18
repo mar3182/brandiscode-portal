@@ -1,14 +1,25 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Users, FileText, CheckCircle2, MessageSquare } from 'lucide-react'
+import { Users, FileText, CheckCircle2, MessageSquare, AlertCircle, ThumbsUp, ThumbsDown, Clock } from 'lucide-react'
 import StatCard from '@/components/StatCard'
 import StatusBadge from '@/components/StatusBadge'
 import Link from 'next/link'
 
+interface SprintFeedback {
+  sprintTitle: string
+  sprintNumber: number
+  offerteName: string
+  clientName: string
+  feedback: string
+  approved: boolean | null
+  date: string | null
+}
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState({ clients: 0, offertes: 0, signed: 0, feedback: 0 })
   const [recentOffertes, setRecentOffertes] = useState<any[]>([])
+  const [sprintFeedbacks, setSprintFeedbacks] = useState<SprintFeedback[]>([])
 
   useEffect(() => {
     async function load() {
@@ -21,13 +32,34 @@ export default function AdminDashboard() {
       const offertes = await offertesRes.json()
 
       if (Array.isArray(clients) && Array.isArray(offertes)) {
+        // Collect all sprint feedbacks (approved or rejected)
+        const feedbacks: SprintFeedback[] = []
+        offertes.forEach((o: any) => {
+          o.sprints?.forEach((s: any) => {
+            if (s.client_approved !== null) {
+              feedbacks.push({
+                sprintTitle: s.title,
+                sprintNumber: s.number,
+                offerteName: o.title,
+                clientName: o.clients?.company || o.clients?.name || 'Onbekend',
+                feedback: s.client_feedback || '',
+                approved: s.client_approved,
+                date: s.client_approved_at,
+              })
+            }
+          })
+        })
+        // Sort by date, newest first
+        feedbacks.sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+
         setStats({
           clients: clients.length,
           offertes: offertes.length,
           signed: offertes.filter((o: any) => o.status === 'getekend').length,
-          feedback: 0,
+          feedback: feedbacks.length,
         })
         setRecentOffertes(offertes.slice(0, 5))
+        setSprintFeedbacks(feedbacks)
       }
     }
     load()
@@ -63,7 +95,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Recent offertes */}
-      <div className="glass-card p-6">
+      <div className="glass-card p-6 mb-8">
         <h2 className="text-lg font-semibold text-white mb-4">Recente offertes</h2>
         {recentOffertes.length === 0 ? (
           <p className="text-white/40 text-sm py-4">Nog geen offertes. Voer eerst de seed-data uit in Supabase.</p>
@@ -79,6 +111,64 @@ export default function AdminDashboard() {
                   <span className="text-white/60">€{o.total_amount?.toLocaleString('nl-NL')}</span>
                   <StatusBadge status={o.status} />
                 </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Sprint feedback */}
+      <div className="glass-card p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <h2 className="text-lg font-semibold text-white">Klant feedback op sprints</h2>
+          {sprintFeedbacks.filter(f => !f.approved).length > 0 && (
+            <span className="px-2.5 py-0.5 bg-red-500/20 text-red-400 text-xs font-medium rounded-full flex items-center gap-1">
+              <AlertCircle className="w-3 h-3" />
+              {sprintFeedbacks.filter(f => !f.approved).length} afgewezen
+            </span>
+          )}
+        </div>
+        {sprintFeedbacks.length === 0 ? (
+          <p className="text-white/40 text-sm py-4">Nog geen feedback van klanten ontvangen.</p>
+        ) : (
+          <div className="space-y-3">
+            {sprintFeedbacks.map((fb, i) => (
+              <div key={i} className={`p-4 rounded-xl border ${
+                fb.approved === false
+                  ? 'bg-red-500/5 border-red-500/20'
+                  : 'bg-emerald-500/5 border-emerald-500/20'
+              }`}>
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    {fb.approved ? (
+                      <ThumbsUp className="w-4 h-4 text-emerald-400" />
+                    ) : (
+                      <ThumbsDown className="w-4 h-4 text-red-400" />
+                    )}
+                    <span className="text-white font-medium text-sm">
+                      Sprint {fb.sprintNumber}: {fb.sprintTitle}
+                    </span>
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    fb.approved
+                      ? 'bg-emerald-500/20 text-emerald-400'
+                      : 'bg-red-500/20 text-red-400'
+                  }`}>
+                    {fb.approved ? 'Goedgekeurd' : 'Afgewezen'}
+                  </span>
+                </div>
+                <p className="text-white/40 text-xs mb-1">{fb.clientName} — {fb.offerteName}</p>
+                {fb.feedback && (
+                  <p className="text-white/70 text-sm mt-2 pl-6 border-l-2 border-white/10">
+                    &ldquo;{fb.feedback}&rdquo;
+                  </p>
+                )}
+                {fb.date && (
+                  <p className="text-white/30 text-xs mt-2 flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {new Date(fb.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                )}
               </div>
             ))}
           </div>

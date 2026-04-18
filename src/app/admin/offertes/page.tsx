@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import StatusBadge from '@/components/StatusBadge'
 import type { SprintStatus, DeliverableStatus } from '@/lib/types'
-import { FileText, ChevronDown, ChevronRight, CheckCircle2, Circle, Loader2, Clock } from 'lucide-react'
+import { FileText, ChevronDown, ChevronRight, CheckCircle2, Circle, Loader2, Clock, ThumbsUp, ThumbsDown, MessageSquare, AlertCircle } from 'lucide-react'
 
 const sprintStatuses: SprintStatus[] = ['gepland', 'actief', 'review', 'afgerond']
 const deliverableStatuses: DeliverableStatus[] = ['todo', 'in_progress', 'review', 'done']
@@ -141,6 +141,19 @@ export default function AdminOffertesPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-white/50">€{sprint.amount?.toLocaleString('nl-NL')}</span>
+                      {/* Client approval indicator */}
+                      {sprint.client_approved === true && (
+                        <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-500/20 rounded-full" title="Goedgekeurd door klant">
+                          <ThumbsUp className="w-3 h-3 text-emerald-400" />
+                          <span className="text-xs text-emerald-400">OK</span>
+                        </span>
+                      )}
+                      {sprint.client_approved === false && (
+                        <span className="flex items-center gap-1 px-2 py-0.5 bg-red-500/20 rounded-full animate-pulse" title="Afgewezen door klant — klik voor feedback">
+                          <AlertCircle className="w-3 h-3 text-red-400" />
+                          <span className="text-xs text-red-400">Feedback</span>
+                        </span>
+                      )}
                       {/* Sprint status dropdown */}
                       <select
                         value={sprint.status}
@@ -160,9 +173,40 @@ export default function AdminOffertesPage() {
                   </button>
 
                   {/* Deliverables (expanded) */}
-                  {expanded[sprint.id] && sprint.deliverables && (
+                  {expanded[sprint.id] && (
                     <div className="px-6 pb-4 space-y-2 ml-16">
-                      {sprint.deliverables.map((d: any) => (
+                      {/* Client feedback banner */}
+                      {sprint.client_approved !== null && (
+                        <div className={`p-3 rounded-lg border mb-3 ${
+                          sprint.client_approved
+                            ? 'bg-emerald-500/5 border-emerald-500/20'
+                            : 'bg-red-500/5 border-red-500/20'
+                        }`}>
+                          <div className="flex items-center gap-2 mb-1">
+                            {sprint.client_approved ? (
+                              <ThumbsUp className="w-4 h-4 text-emerald-400" />
+                            ) : (
+                              <ThumbsDown className="w-4 h-4 text-red-400" />
+                            )}
+                            <span className={`text-sm font-medium ${
+                              sprint.client_approved ? 'text-emerald-400' : 'text-red-400'
+                            }`}>
+                              {sprint.client_approved ? 'Goedgekeurd door klant' : 'Afgewezen door klant'}
+                            </span>
+                            {sprint.client_approved_at && (
+                              <span className="text-white/30 text-xs ml-auto">
+                                {new Date(sprint.client_approved_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                          </div>
+                          {sprint.client_feedback && (
+                            <p className="text-white/70 text-sm pl-6 border-l-2 border-white/10 mt-2">
+                              &ldquo;{sprint.client_feedback}&rdquo;
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {sprint.deliverables?.map((d: any) => (
                         <div
                           key={d.id}
                           className="flex items-center gap-3 p-3 rounded-lg bg-white/5"
