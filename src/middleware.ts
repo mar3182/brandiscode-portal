@@ -50,8 +50,9 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
-    // Forceer wachtwoord wijzigen bij eerste login
+    // Forceer wachtwoord wijzigen bij eerste login (alleen voor klanten, niet voor admin)
     if (
+      user.email !== process.env.ADMIN_EMAIL &&
       !user.user_metadata?.password_changed &&
       pathname !== '/dashboard/wachtwoord-wijzigen'
     ) {
