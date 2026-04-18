@@ -5,9 +5,9 @@ import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import StatusBadge from '@/components/StatusBadge'
 import SignatureCanvas from '@/components/SignatureCanvas'
-import type { OfferteWithSprints } from '@/lib/types'
+import type { OfferteWithSprints, SprintWithDeliverables } from '@/lib/types'
 import { downloadOffertePdf } from '@/lib/generateOffertePdf'
-import { ArrowLeft, Download, CheckCircle2, Calendar, Euro } from 'lucide-react'
+import { ArrowLeft, Download, CheckCircle2, XCircle, Calendar, Euro, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { nl } from 'date-fns/locale'
@@ -15,8 +15,11 @@ import { nl } from 'date-fns/locale'
 export default function OfferteDetailPage() {
   const { id } = useParams<{ id: string }>()
   const [offerte, setOfferte] = useState<OfferteWithSprints | null>(null)
-  const [signing, setSigning] = useState(false)
-  const [signed, setSigned] = useState(false)
+  const [signingSprintId, setSigningSprintId] = useState<string | null>(null)
+  const [rejectingSprintId, setRejectingSprintId] = useState<string | null>(null)
+  const [rejectFeedback, setRejectFeedback] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [expandedSprint, setExpandedSprint] = useState<string | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -52,31 +55,81 @@ export default function OfferteDetailPage() {
     load()
   }, [id, supabase])
 
-  const handleSign = async (signatureDataUrl: string) => {
-    setSigning(true)
+  const handleApproveSprint = async (sprintId: string, signatureDataUrl: string) => {
+    setSaving(true)
     const { error } = await supabase
-      .from('offertes')
+      .from('sprints')
       .update({
-        status: 'getekend',
-        signature_data: signatureDataUrl,
-        signed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        client_approved: true,
+        client_approved_at: new Date().toISOString(),
+        client_feedback: null,
       })
-      .eq('id', id)
+      .eq('id', sprintId)
 
-    if (!error) {
-      const updatedOfferte = {
-        ...offerte!,
-        status: 'getekend' as const,
-        signed_at: new Date().toISOString(),
-        signature_data: signatureDataUrl,
+    if (!error && offerte) {
+      // Also store signature on offerte if not already set
+      if (!offerte.signature_data) {
+        await supabase
+          .from('offertes')
+          .update({
+            signature_data: signatureDataUrl,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', id)
       }
-      setSigned(true)
+
+      const updatedSprints = offerte.sprints.map((s) =>
+        s.id === sprintId
+          ? { ...s, client_approved: true, client_approved_at: new Date().toISOString(), client_feedback: null }
+          : s
+      )
+      const updatedOfferte = { ...offerte, sprints: updatedSprints, signature_data: signatureDataUrl }
+
+      // Check if all sprints are approved → mark offerte as getekend
+      const allApproved = updatedSprints.every((s) => s.client_approved === true)
+      if (allApproved) {
+        await supabase
+          .from('offertes')
+          .update({
+            status: 'getekend',
+            signed_at: new Date().toISOString(),
+            signature_data: signatureDataUrl,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', id)
+        updatedOfferte.status = 'getekend'
+        updatedOfferte.signed_at = new Date().toISOString()
+      }
+
       setOfferte(updatedOfferte)
-      // Auto-download PDF
-      await downloadOffertePdf(updatedOfferte, signatureDataUrl)
+      setSigningSprintId(null)
     }
-    setSigning(false)
+    setSaving(false)
+  }
+
+  const handleRejectSprint = async (sprintId: string) => {
+    if (!rejectFeedback.trim()) return
+    setSaving(true)
+    const { error } = await supabase
+      .from('sprints')
+      .update({
+        client_approved: false,
+        client_approved_at: new Date().toISOString(),
+        client_feedback: rejectFeedback.trim(),
+      })
+      .eq('id', sprintId)
+
+    if (!error && offerte) {
+      const updatedSprints = offerte.sprints.map((s) =>
+        s.id === sprintId
+          ? { ...s, client_approved: false, client_approved_at: new Date().toISOString(), client_feedback: rejectFeedback.trim() }
+          : s
+      )
+      setOfferte({ ...offerte, sprints: updatedSprints })
+      setRejectingSprintId(null)
+      setRejectFeedback('')
+    }
+    setSaving(false)
   }
 
   const handleDownloadPdf = async () => {
@@ -93,7 +146,9 @@ export default function OfferteDetailPage() {
     )
   }
 
-  const canSign = offerte.status === 'verstuurd' || offerte.status === 'bekeken'
+  const canApprove = offerte.status === 'verstuurd' || offerte.status === 'bekeken'
+  const approvedCount = offerte.sprints.filter((s) => s.client_approved === true).length
+  const totalSprints = offerte.sprints.length
 
   return (
     <div className="max-w-4xl">
@@ -132,94 +187,228 @@ export default function OfferteDetailPage() {
           {offerte.signed_at && (
             <span className="flex items-center gap-1.5 text-emerald-400">
               <CheckCircle2 className="w-4 h-4" />
-              Akkoord: {format(new Date(offerte.signed_at), 'd MMMM yyyy', { locale: nl })}
+              Volledig akkoord: {format(new Date(offerte.signed_at), 'd MMMM yyyy', { locale: nl })}
             </span>
           )}
         </div>
+
+        {/* Progress bar */}
+        {totalSprints > 0 && canApprove && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-xs text-white/40 mb-1.5">
+              <span>Voortgang goedkeuring</span>
+              <span>{approvedCount} van {totalSprints} sprints goedgekeurd</span>
+            </div>
+            <div className="w-full h-2 rounded-full bg-white/10">
+              <div
+                className="h-2 rounded-full bg-brand-gold transition-all duration-500"
+                style={{ width: `${(approvedCount / totalSprints) * 100}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Sprints breakdown */}
+      {/* Sprints — per sprint akkoord */}
       {offerte.sprints.length > 0 && (
-        <div className="glass-card p-8 mb-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Sprint overzicht</h2>
-          <div className="space-y-4">
-            {offerte.sprints.map((sprint) => (
-              <div key={sprint.id} className="p-4 rounded-xl bg-white/5 border border-white/5">
-                <div className="flex items-center justify-between mb-2">
+        <div className="space-y-4 mb-6">
+          <h2 className="text-lg font-semibold text-white">Sprints</h2>
+          {offerte.sprints.map((sprint) => {
+            const isExpanded = expandedSprint === sprint.id
+            const isApproved = sprint.client_approved === true
+            const isRejected = sprint.client_approved === false
+            const isPending = sprint.client_approved === null
+
+            return (
+              <div
+                key={sprint.id}
+                className={`glass-card overflow-hidden transition-all ${
+                  isApproved ? 'border-emerald-500/20' :
+                  isRejected ? 'border-red-500/20' :
+                  ''
+                }`}
+              >
+                {/* Sprint header */}
+                <button
+                  onClick={() => setExpandedSprint(isExpanded ? null : sprint.id)}
+                  className="w-full p-5 flex items-center justify-between text-left"
+                >
                   <div className="flex items-center gap-3">
-                    <span className="w-8 h-8 rounded-lg bg-brand-gold/20 flex items-center justify-center text-brand-gold font-bold text-sm">
-                      {sprint.number}
+                    <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm ${
+                      isApproved ? 'bg-emerald-500/20 text-emerald-400' :
+                      isRejected ? 'bg-red-500/20 text-red-400' :
+                      'bg-brand-gold/20 text-brand-gold'
+                    }`}>
+                      {isApproved ? <CheckCircle2 className="w-4 h-4" /> :
+                       isRejected ? <XCircle className="w-4 h-4" /> :
+                       sprint.number}
                     </span>
                     <div>
                       <p className="text-white font-medium">{sprint.title}</p>
-                      {sprint.description && (
-                        <p className="text-white/40 text-sm">{sprint.description}</p>
-                      )}
+                      <div className="flex items-center gap-3 mt-0.5">
+                        <span className="text-white/40 text-xs flex items-center gap-1">
+                          <Euro className="w-3 h-3" />
+                          {sprint.amount.toLocaleString('nl-NL')}
+                        </span>
+                        {isApproved && sprint.client_approved_at && (
+                          <span className="text-emerald-400 text-xs">
+                            Akkoord op {format(new Date(sprint.client_approved_at), 'd MMM yyyy', { locale: nl })}
+                          </span>
+                        )}
+                        {isRejected && (
+                          <span className="text-red-400 text-xs">Feedback gegeven</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-white/60 flex items-center gap-1">
-                      <Euro className="w-3.5 h-3.5" />
-                      {sprint.amount.toLocaleString('nl-NL')}
-                    </span>
                     <StatusBadge status={sprint.status} />
+                    {isExpanded ? <ChevronUp className="w-4 h-4 text-white/40" /> : <ChevronDown className="w-4 h-4 text-white/40" />}
                   </div>
-                </div>
+                </button>
 
-                {/* Deliverables */}
-                {sprint.deliverables && sprint.deliverables.length > 0 && (
-                  <div className="mt-3 ml-11 space-y-1.5">
-                    {sprint.deliverables.map((d) => (
-                      <div key={d.id} className="flex items-center gap-2 text-sm">
-                        <span className={`w-1.5 h-1.5 rounded-full ${
-                          d.status === 'done' ? 'bg-emerald-400' :
-                          d.status === 'in_progress' ? 'bg-brand-gold' :
-                          'bg-white/20'
-                        }`} />
-                        <span className={d.status === 'done' ? 'text-white/60 line-through' : 'text-white/60'}>
-                          {d.title}
-                        </span>
+                {/* Expanded content */}
+                {isExpanded && (
+                  <div className="px-5 pb-5 border-t border-white/5 pt-4">
+                    {sprint.description && (
+                      <p className="text-white/50 text-sm mb-4">{sprint.description}</p>
+                    )}
+
+                    {/* Deliverables */}
+                    {sprint.deliverables && sprint.deliverables.length > 0 && (
+                      <div className="mb-4">
+                        <p className="text-xs text-white/30 uppercase tracking-wider mb-2">Deliverables</p>
+                        <div className="space-y-1.5">
+                          {sprint.deliverables.map((d) => (
+                            <div key={d.id} className="flex items-center gap-2 text-sm">
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                d.status === 'done' ? 'bg-emerald-400' :
+                                d.status === 'in_progress' ? 'bg-brand-gold' :
+                                d.status === 'review' ? 'bg-blue-400' :
+                                'bg-white/20'
+                              }`} />
+                              <span className={d.status === 'done' ? 'text-white/60 line-through' : 'text-white/60'}>
+                                {d.title}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    ))}
+                    )}
+
+                    {/* Rejection feedback display */}
+                    {isRejected && sprint.client_feedback && (
+                      <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 mb-4">
+                        <div className="flex items-start gap-2">
+                          <MessageSquare className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-red-300 text-sm font-medium">Jouw feedback</p>
+                            <p className="text-white/60 text-sm">{sprint.client_feedback}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Approve / Reject buttons */}
+                    {canApprove && isPending && signingSprintId !== sprint.id && rejectingSprintId !== sprint.id && (
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => { setSigningSprintId(sprint.id); setRejectingSprintId(null) }}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-gold text-brand-dark font-semibold text-sm hover:opacity-90 transition-all"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          Akkoord &amp; tekenen
+                        </button>
+                        <button
+                          onClick={() => { setRejectingSprintId(sprint.id); setSigningSprintId(null) }}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-white/10 text-white/60 text-sm hover:border-red-500/30 hover:text-red-400 transition-all"
+                        >
+                          <XCircle className="w-4 h-4" />
+                          Feedback geven
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Signature canvas for this sprint */}
+                    {signingSprintId === sprint.id && (
+                      <div className="mt-2">
+                        <p className="text-white/50 text-sm mb-3">
+                          Teken hieronder om akkoord te gaan met sprint {sprint.number}: {sprint.title}
+                        </p>
+                        <SignatureCanvas
+                          onSave={(dataUrl) => handleApproveSprint(sprint.id, dataUrl)}
+                          disabled={saving}
+                        />
+                        <button
+                          onClick={() => setSigningSprintId(null)}
+                          className="mt-2 text-xs text-white/40 hover:text-white/60 transition-colors"
+                        >
+                          Annuleren
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Reject form */}
+                    {rejectingSprintId === sprint.id && (
+                      <div className="mt-2">
+                        <p className="text-white/50 text-sm mb-2">
+                          Wat moet er aangepast worden aan sprint {sprint.number}?
+                        </p>
+                        <textarea
+                          value={rejectFeedback}
+                          onChange={(e) => setRejectFeedback(e.target.value)}
+                          placeholder="Beschrijf je feedback..."
+                          className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:border-brand-gold/50 focus:outline-none resize-none"
+                          rows={3}
+                        />
+                        <div className="flex gap-3 mt-3">
+                          <button
+                            onClick={() => handleRejectSprint(sprint.id)}
+                            disabled={saving || !rejectFeedback.trim()}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/20 text-red-300 font-semibold text-sm hover:bg-red-500/30 transition-all disabled:opacity-50"
+                          >
+                            Verstuur feedback
+                          </button>
+                          <button
+                            onClick={() => { setRejectingSprintId(null); setRejectFeedback('') }}
+                            className="text-xs text-white/40 hover:text-white/60 transition-colors"
+                          >
+                            Annuleren
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Already approved */}
+                    {isApproved && (
+                      <div className="flex items-center gap-2 text-emerald-400 text-sm">
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Je hebt deze sprint goedgekeurd</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            ))}
-          </div>
+            )
+          })}
         </div>
       )}
 
-      {/* Digital signature */}
-      {canSign && !signed && (
-        <div className="glass-card p-8 border-brand-gold/20">
-          <h2 className="text-lg font-semibold text-white mb-2">Digitaal ondertekenen</h2>
-          <p className="text-white/50 text-sm mb-4">
-            Door te tekenen ga je akkoord met de voorwaarden in deze offerte.
-          </p>
-          <SignatureCanvas onSave={handleSign} disabled={signing} />
-        </div>
-      )}
-
-      {/* Success message */}
-      {(signed || offerte.status === 'getekend') && (
+      {/* All sprints approved */}
+      {offerte.status === 'getekend' && (
         <div className="glass-card p-8 border-emerald-500/20 bg-emerald-500/5">
           <div className="flex items-center gap-3">
             <CheckCircle2 className="w-8 h-8 text-emerald-400" />
             <div>
-              <h2 className="text-lg font-semibold text-emerald-300">Offerte akkoord!</h2>
+              <h2 className="text-lg font-semibold text-emerald-300">Alle sprints akkoord!</h2>
               <p className="text-white/50 text-sm">
                 {offerte.signed_at
-                  ? `Akkoord op ${format(new Date(offerte.signed_at), 'd MMMM yyyy', { locale: nl })}`
+                  ? `Volledig akkoord op ${format(new Date(offerte.signed_at), 'd MMMM yyyy', { locale: nl })}`
                   : 'Bedankt voor je akkoord. Mary neemt snel contact met je op.'
                 }
               </p>
             </div>
           </div>
-          {offerte.signature_data && (
-            <div className="mt-4 p-4 rounded-xl bg-black/20 inline-block">
-              <img src={offerte.signature_data} alt="Handtekening" className="h-20" />
-            </div>
-          )}
           <div className="mt-4">
             <button
               onClick={handleDownloadPdf}

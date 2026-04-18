@@ -1,5 +1,5 @@
 export type OfferteStatus = 'concept' | 'verstuurd' | 'bekeken' | 'getekend' | 'afgewezen' | 'afgerond'
-export type SprintStatus = 'gepland' | 'actief' | 'review' | 'afgerond'
+export type SprintStatus = 'gepland' | 'actief' | 'review' | 'afgerond' | 'afgewezen'
 export type DeliverableStatus = 'todo' | 'in_progress' | 'review' | 'done'
 
 export interface Client {
@@ -36,6 +36,9 @@ export interface Sprint {
   start_date: string | null
   end_date: string | null
   created_at: string
+  client_approved: boolean | null
+  client_approved_at: string | null
+  client_feedback: string | null
 }
 
 export interface Deliverable {
