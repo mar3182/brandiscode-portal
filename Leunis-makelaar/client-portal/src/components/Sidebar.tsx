@@ -1,20 +1,63 @@
 'use client'
 
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, FileText, PenTool, BarChart3, MessageSquare, LogOut } from 'lucide-react'
+import { LayoutDashboard, FileText, BarChart3, MessageSquare, LogOut, ShieldCheck, Users, ClipboardList, Receipt, Building2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Offertes', href: '/dashboard/offertes', icon: FileText },
-  { name: 'Projectstatus', href: '/dashboard/projecten', icon: BarChart3 },
-  { name: 'Feedback', href: '/dashboard/feedback', icon: MessageSquare },
-]
 
 export default function Sidebar() {
   const pathname = usePathname()
   const supabase = createClient()
+  const [openOnboardingCount, setOpenOnboardingCount] = useState(0)
+  const [openFacturenCount, setOpenFacturenCount] = useState(0)
+
+  useEffect(() => {
+    async function loadOnboardingCount() {
+      const res = await fetch('/api/onboarding')
+      if (!res.ok) return
+      const data = await res.json()
+      if (!Array.isArray(data)) return
+
+      const unanswered = data.filter(
+        (question: any) => question.is_required && !question.answer?.trim()
+      ).length
+
+      setOpenOnboardingCount(unanswered)
+    }
+
+    loadOnboardingCount()
+  }, [])
+
+  useEffect(() => {
+    async function loadFacturenCount() {
+      const res = await fetch('/api/facturen')
+      if (!res.ok) return
+      const data = await res.json()
+      if (!Array.isArray(data)) return
+
+      const open = data.filter(
+        (factuur: any) => factuur.status === 'verstuurd' || factuur.status === 'herinnering'
+      ).length
+
+      setOpenFacturenCount(open)
+    }
+
+    loadFacturenCount()
+  }, [])
+
+  const navigation = useMemo(() => [
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Offertes', href: '/dashboard/offertes', icon: FileText },
+    { name: 'Projectstatus', href: '/dashboard/projecten', icon: BarChart3 },
+    { name: 'Informatie', href: '/dashboard/onboarding', icon: ClipboardList, badge: openOnboardingCount },
+    { name: 'Bedrijfsgegevens', href: '/dashboard/bedrijfsgegevens', icon: Building2 },
+    { name: 'Facturen', href: '/dashboard/facturen', icon: Receipt, badge: openFacturenCount, badgeClass: 'bg-red-500/20 text-red-300' },
+    { name: 'Feedback', href: '/dashboard/feedback', icon: MessageSquare },
+    { name: 'Team', href: '/dashboard/team', icon: Users },
+    { name: 'Wachtwoord', href: '/dashboard/wachtwoord-wijzigen', icon: ShieldCheck },
+  ], [openOnboardingCount])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -25,8 +68,15 @@ export default function Sidebar() {
     <aside className="fixed left-0 top-0 h-screen w-64 glass-card rounded-none border-r border-white/10 flex flex-col z-50">
       {/* Logo */}
       <div className="p-6 border-b border-white/10">
-        <h1 className="text-xl font-bold text-gold-gradient">Brand is Code</h1>
-        <p className="text-xs text-white/50 mt-1">Client Portal</p>
+        <Image
+          src="/logo.png"
+          alt="Brand is Code"
+          width={160}
+          height={113}
+          className="w-40 h-auto"
+          priority
+        />
+        <p className="text-xs text-white/50 mt-2">Client Portal</p>
       </div>
 
       {/* Navigation */}
@@ -44,7 +94,12 @@ export default function Sidebar() {
               }`}
             >
               <item.icon className="w-5 h-5" />
-              {item.name}
+              <span className="flex-1">{item.name}</span>
+              {item.badge ? (
+                <span className={`min-w-5 h-5 px-1 rounded-full text-xs flex items-center justify-center ${item.badgeClass || 'bg-amber-500/20 text-amber-300'}`}>
+                  {item.badge}
+                </span>
+              ) : null}
             </Link>
           )
         })}

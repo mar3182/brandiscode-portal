@@ -1,50 +1,211 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Users, Plus, Loader2 } from 'lucide-react'
+import { Users, Plus, Loader2, Pencil, Save, X } from 'lucide-react'
 import type { Client } from '@/lib/types'
+import {
+  type ProfileFieldErrors,
+  formatBtwInput,
+  formatIbanInput,
+  formatKvkInput,
+  validateCompanyProfileFields,
+} from '@/lib/companyProfileValidation'
+
+type ClientForm = {
+  id?: string
+  owner_name: string
+  name: string
+  email: string
+  company: string
+  phone: string
+  contact_person: string
+  kvk_number: string
+  btw_number: string
+  iban: string
+  billing_email: string
+  billing_address_line1: string
+  billing_address_line2: string
+  billing_postal_code: string
+  billing_city: string
+  billing_country: string
+  mark_completed: boolean
+}
+
+const initialForm: ClientForm = {
+  owner_name: '',
+  name: '',
+  email: '',
+  company: '',
+  phone: '',
+  contact_person: '',
+  kvk_number: '',
+  btw_number: '',
+  iban: '',
+  billing_email: '',
+  billing_address_line1: '',
+  billing_address_line2: '',
+  billing_postal_code: '',
+  billing_city: '',
+  billing_country: 'Nederland',
+  mark_completed: false,
+}
+
+const INPUT_CLASS = 'w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-brand-blue/50 transition-all'
 
 export default function AdminClientsPage() {
   const [clients, setClients] = useState<Client[]>([])
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({ name: '', email: '', company: '', phone: '' })
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [actionError, setActionError] = useState('')
+  const [createFieldErrors, setCreateFieldErrors] = useState<ProfileFieldErrors>({})
+  const [editFieldErrors, setEditFieldErrors] = useState<ProfileFieldErrors>({})
+  const [form, setForm] = useState<ClientForm>(initialForm)
+  const [editForm, setEditForm] = useState<ClientForm | null>(null)
 
   useEffect(() => {
-    fetch('/api/admin/clients')
-      .then(r => r.json())
-      .then(data => { if (Array.isArray(data)) setClients(data) })
+    void loadClients()
   }, [])
+
+  async function loadClients() {
+    const res = await fetch('/api/admin/clients', { cache: 'no-store' })
+    if (!res.ok) return
+    const data = await res.json()
+    if (Array.isArray(data)) setClients(data)
+  }
+
+  const toPayload = (source: ClientForm) => ({
+    id: source.id,
+    owner_name: source.owner_name,
+    name: source.name,
+    email: source.email,
+    company: source.company,
+    phone: source.phone,
+    contact_person: source.contact_person,
+    kvk_number: source.kvk_number,
+    btw_number: source.btw_number,
+    iban: source.iban,
+    billing_email: source.billing_email,
+    billing_address_line1: source.billing_address_line1,
+    billing_address_line2: source.billing_address_line2,
+    billing_postal_code: source.billing_postal_code,
+    billing_city: source.billing_city,
+    billing_country: source.billing_country,
+    mark_completed: source.mark_completed,
+  })
+
+  const toEditForm = (client: Client): ClientForm => ({
+    id: client.id,
+    owner_name: client.name || '',
+    name: client.name || '',
+    email: client.email || '',
+    company: client.company || '',
+    phone: client.phone || '',
+    contact_person: client.contact_person || '',
+    kvk_number: client.kvk_number || '',
+    btw_number: client.btw_number || '',
+    iban: client.iban || '',
+    billing_email: client.billing_email || client.email || '',
+    billing_address_line1: client.billing_address_line1 || '',
+    billing_address_line2: client.billing_address_line2 || '',
+    billing_postal_code: client.billing_postal_code || '',
+    billing_city: client.billing_city || '',
+    billing_country: client.billing_country || 'Nederland',
+    mark_completed: Boolean(client.onboarding_completed_at),
+  })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setActionError('')
+    setCreateFieldErrors({})
+
+    const validation = validateCompanyProfileFields({
+      email: form.email,
+      billing_email: form.billing_email,
+      kvk_number: form.kvk_number,
+      btw_number: form.btw_number,
+      iban: form.iban,
+    })
+
+    if (Object.keys(validation.errors).length > 0) {
+      setCreateFieldErrors(validation.errors)
+      setLoading(false)
+      return
+    }
 
     const res = await fetch('/api/admin/clients', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify(toPayload(form)),
     })
 
     if (res.ok) {
       const newClient = await res.json()
       setClients(prev => [newClient, ...prev])
-      setForm({ name: '', email: '', company: '', phone: '' })
+      setForm(initialForm)
       setShowForm(false)
+    } else {
+      const err = await res.json().catch(() => ({}))
+      setActionError(err.error || 'Klant opslaan is mislukt')
+      if (err.field_errors) setCreateFieldErrors(err.field_errors)
     }
 
     setLoading(false)
   }
 
+  async function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editForm?.id) return
+
+    setSavingEdit(true)
+    setActionError('')
+    setEditFieldErrors({})
+
+    const validation = validateCompanyProfileFields({
+      billing_email: editForm.billing_email,
+      kvk_number: editForm.kvk_number,
+      btw_number: editForm.btw_number,
+      iban: editForm.iban,
+    })
+
+    if (Object.keys(validation.errors).length > 0) {
+      setEditFieldErrors(validation.errors)
+      setSavingEdit(false)
+      return
+    }
+
+    const res = await fetch('/api/admin/clients', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(toPayload(editForm)),
+    })
+
+    if (res.ok) {
+      const updated = await res.json()
+      setClients((prev) => prev.map((client) => (client.id === updated.id ? updated : client)))
+      setEditForm(null)
+    } else {
+      const err = await res.json().catch(() => ({}))
+      setActionError(err.error || 'Klant bijwerken is mislukt')
+      if (err.field_errors) setEditFieldErrors(err.field_errors)
+    }
+
+    setSavingEdit(false)
+  }
+
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-6xl">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-white">Klanten</h1>
-          <p className="text-white/50 mt-1">Beheer je klantprofielen.</p>
+          <p className="text-white/50 mt-1">Beheer klantprofielen, bedrijfsgegevens en facturatie-informatie.</p>
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => {
+            setShowForm(!showForm)
+            setActionError('')
+          }}
           className="flex items-center gap-2 px-4 py-2.5 bg-brand-blue text-white font-medium rounded-xl hover:opacity-90 transition-all text-sm"
         >
           <Plus className="w-4 h-4" />
@@ -52,54 +213,131 @@ export default function AdminClientsPage() {
         </button>
       </div>
 
+      {actionError && (
+        <div className="mb-4 glass-card p-4 border border-red-500/30 bg-red-500/10 text-red-300 text-sm">
+          {actionError}
+        </div>
+      )}
+
       {/* New client form */}
       {showForm && (
         <div className="glass-card p-6 mb-6 border-brand-blue/20">
           <h2 className="text-lg font-semibold text-white mb-4">Nieuwe klant toevoegen</h2>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-white/60 mb-1.5">Naam *</label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                required
-                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-brand-blue/50 transition-all"
-                placeholder="Volledige naam"
-              />
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Field label="Naam eigenaar account *">
+                <input
+                  type="text"
+                  value={form.owner_name}
+                  onChange={e => setForm(f => ({ ...f, owner_name: e.target.value, name: e.target.value }))}
+                  required
+                  className={INPUT_CLASS}
+                  placeholder="Volledige naam"
+                />
+              </Field>
+              <Field label="E-mail *">
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                  required
+                  className={INPUT_CLASS}
+                  placeholder="klant@email.nl"
+                />
+              </Field>
+              <Field label="Bedrijf">
+                <input
+                  type="text"
+                  value={form.company}
+                  onChange={e => setForm(f => ({ ...f, company: e.target.value }))}
+                  className={INPUT_CLASS}
+                  placeholder="Bedrijfsnaam"
+                />
+              </Field>
+              <Field label="Telefoon">
+                <input
+                  type="tel"
+                  value={form.phone}
+                  onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                  className={INPUT_CLASS}
+                  placeholder="+31 6..."
+                />
+              </Field>
+              <Field label="KvK nummer" error={createFieldErrors.kvk_number}>
+                <input
+                  type="text"
+                  value={form.kvk_number}
+                  onChange={e => setForm(f => ({ ...f, kvk_number: formatKvkInput(e.target.value) }))}
+                  className={INPUT_CLASS}
+                  placeholder="12345678"
+                />
+              </Field>
+              <Field label="BTW nummer" error={createFieldErrors.btw_number}>
+                <input
+                  type="text"
+                  value={form.btw_number}
+                  onChange={e => setForm(f => ({ ...f, btw_number: formatBtwInput(e.target.value) }))}
+                  className={INPUT_CLASS}
+                  placeholder="NL001234567B01"
+                />
+              </Field>
+              <Field label="Factuur e-mail" error={createFieldErrors.billing_email}>
+                <input
+                  type="email"
+                  value={form.billing_email}
+                  onChange={e => setForm(f => ({ ...f, billing_email: e.target.value }))}
+                  className={INPUT_CLASS}
+                />
+              </Field>
+              <Field label="IBAN" error={createFieldErrors.iban}>
+                <input
+                  type="text"
+                  value={form.iban}
+                  onChange={e => setForm(f => ({ ...f, iban: formatIbanInput(e.target.value) }))}
+                  className={INPUT_CLASS}
+                />
+              </Field>
             </div>
-            <div>
-              <label className="block text-sm text-white/60 mb-1.5">E-mail *</label>
-              <input
-                type="email"
-                value={form.email}
-                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                required
-                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-brand-blue/50 transition-all"
-                placeholder="klant@email.nl"
-              />
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Field label="Adresregel 1">
+                <input
+                  type="text"
+                  value={form.billing_address_line1}
+                  onChange={e => setForm(f => ({ ...f, billing_address_line1: e.target.value }))}
+                  className={INPUT_CLASS}
+                />
+              </Field>
+              <Field label="Postcode">
+                <input
+                  type="text"
+                  value={form.billing_postal_code}
+                  onChange={e => setForm(f => ({ ...f, billing_postal_code: e.target.value }))}
+                  className={INPUT_CLASS}
+                />
+              </Field>
+              <Field label="Plaats">
+                <input
+                  type="text"
+                  value={form.billing_city}
+                  onChange={e => setForm(f => ({ ...f, billing_city: e.target.value }))}
+                  className="input"
+                />
+              </Field>
             </div>
+
             <div>
-              <label className="block text-sm text-white/60 mb-1.5">Bedrijf</label>
-              <input
-                type="text"
-                value={form.company}
-                onChange={e => setForm(f => ({ ...f, company: e.target.value }))}
-                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-brand-blue/50 transition-all"
-                placeholder="Bedrijfsnaam"
-              />
+              <label className="flex items-start gap-3 text-sm text-white/70">
+                <input
+                  type="checkbox"
+                  checked={form.mark_completed}
+                  onChange={(e) => setForm((p) => ({ ...p, mark_completed: e.target.checked }))}
+                  className="mt-1"
+                />
+                Markeer klantgegevens als compleet voor facturatie.
+              </label>
             </div>
-            <div>
-              <label className="block text-sm text-white/60 mb-1.5">Telefoon</label>
-              <input
-                type="tel"
-                value={form.phone}
-                onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-brand-blue/50 transition-all"
-                placeholder="+31 6..."
-              />
-            </div>
-            <div className="md:col-span-2 flex gap-3 pt-2">
+            <div className="flex gap-3 pt-2">
               <button
                 type="submit"
                 disabled={loading}
@@ -129,22 +367,133 @@ export default function AdminClientsPage() {
       ) : (
         <div className="space-y-3">
           {clients.map(client => (
-            <div key={client.id} className="glass-card p-5 flex items-center justify-between">
-              <div>
-                <p className="text-white font-medium">{client.name}</p>
-                <div className="flex items-center gap-3 text-sm text-white/40 mt-1">
-                  <span>{client.email}</span>
-                  {client.company && <span>• {client.company}</span>}
-                  {client.phone && <span>• {client.phone}</span>}
+            <div key={client.id} className="glass-card p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-white font-medium">{client.company || client.name}</p>
+                  <div className="flex flex-wrap items-center gap-3 text-sm text-white/40 mt-1">
+                    <span>{client.email}</span>
+                    {client.phone && <span>• {client.phone}</span>}
+                    {client.kvk_number && <span>• KvK {client.kvk_number}</span>}
+                    {client.btw_number && <span>• BTW {client.btw_number}</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-white/30">
+                    {new Date(client.created_at).toLocaleDateString('nl-NL')}
+                  </span>
+                  <button
+                    onClick={() => {
+                      setEditForm(toEditForm(client))
+                      setActionError('')
+                    }}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white/80 text-sm"
+                  >
+                    <Pencil className="w-4 h-4" />
+                    Bewerken
+                  </button>
                 </div>
               </div>
-              <span className="text-xs text-white/30">
-                {new Date(client.created_at).toLocaleDateString('nl-NL')}
-              </span>
+              <div className="mt-3 text-sm text-white/45">
+                Factuuradres: {client.billing_address_line1 || '-'}
+                {client.billing_postal_code || client.billing_city ? `, ${client.billing_postal_code || ''} ${client.billing_city || ''}` : ''}
+                {client.billing_country ? `, ${client.billing_country}` : ''}
+              </div>
             </div>
           ))}
         </div>
       )}
+
+      {editForm && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-4xl glass-card p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-white text-lg font-semibold">Klant bewerken</h3>
+              <button
+                onClick={() => setEditForm(null)}
+                className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveEdit} className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="Naam eigenaar account">
+                  <input className={INPUT_CLASS} value={editForm.owner_name} onChange={(e) => setEditForm((prev) => prev ? ({ ...prev, owner_name: e.target.value, name: e.target.value }) : prev)} />
+                </Field>
+                <Field label="E-mail (niet wijzigbaar)">
+                  <input className={`${INPUT_CLASS} opacity-70`} value={editForm.email} disabled />
+                </Field>
+                <Field label="Bedrijfsnaam">
+                  <input className={INPUT_CLASS} value={editForm.company} onChange={(e) => setEditForm((prev) => prev ? ({ ...prev, company: e.target.value }) : prev)} />
+                </Field>
+                <Field label="Telefoon">
+                  <input className={INPUT_CLASS} value={editForm.phone} onChange={(e) => setEditForm((prev) => prev ? ({ ...prev, phone: e.target.value }) : prev)} />
+                </Field>
+                <Field label="KvK nummer" error={editFieldErrors.kvk_number}>
+                  <input className={INPUT_CLASS} value={editForm.kvk_number} onChange={(e) => setEditForm((prev) => prev ? ({ ...prev, kvk_number: formatKvkInput(e.target.value) }) : prev)} />
+                </Field>
+                <Field label="BTW nummer" error={editFieldErrors.btw_number}>
+                  <input className={INPUT_CLASS} value={editForm.btw_number} onChange={(e) => setEditForm((prev) => prev ? ({ ...prev, btw_number: formatBtwInput(e.target.value) }) : prev)} />
+                </Field>
+                <Field label="Factuur e-mail" error={editFieldErrors.billing_email}>
+                  <input className={INPUT_CLASS} type="email" value={editForm.billing_email} onChange={(e) => setEditForm((prev) => prev ? ({ ...prev, billing_email: e.target.value }) : prev)} />
+                </Field>
+                <Field label="IBAN" error={editFieldErrors.iban}>
+                  <input className={INPUT_CLASS} value={editForm.iban} onChange={(e) => setEditForm((prev) => prev ? ({ ...prev, iban: formatIbanInput(e.target.value) }) : prev)} />
+                </Field>
+                <Field label="Adresregel 1">
+                  <input className={INPUT_CLASS} value={editForm.billing_address_line1} onChange={(e) => setEditForm((prev) => prev ? ({ ...prev, billing_address_line1: e.target.value }) : prev)} />
+                </Field>
+                <Field label="Adresregel 2">
+                  <input className={INPUT_CLASS} value={editForm.billing_address_line2} onChange={(e) => setEditForm((prev) => prev ? ({ ...prev, billing_address_line2: e.target.value }) : prev)} />
+                </Field>
+                <Field label="Postcode">
+                  <input className={INPUT_CLASS} value={editForm.billing_postal_code} onChange={(e) => setEditForm((prev) => prev ? ({ ...prev, billing_postal_code: e.target.value }) : prev)} />
+                </Field>
+                <Field label="Plaats">
+                  <input className={INPUT_CLASS} value={editForm.billing_city} onChange={(e) => setEditForm((prev) => prev ? ({ ...prev, billing_city: e.target.value }) : prev)} />
+                </Field>
+              </div>
+              <label className="flex items-start gap-3 text-sm text-white/70">
+                <input
+                  type="checkbox"
+                  checked={editForm.mark_completed}
+                  onChange={(e) => setEditForm((prev) => prev ? ({ ...prev, mark_completed: e.target.checked }) : prev)}
+                  className="mt-1"
+                />
+                Gegevens zijn compleet voor facturatie.
+              </label>
+              <div className="flex items-center gap-3">
+                <button type="submit" disabled={savingEdit} className="btn-primary inline-flex items-center gap-2 disabled:opacity-50">
+                  {savingEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Opslaan
+                </button>
+                <button type="button" onClick={() => setEditForm(null)} className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white/70 text-sm">
+                  Annuleren
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
+  )
+}
+
+function Field({
+  label,
+  children,
+  error,
+}: {
+  label: string
+  children: React.ReactNode
+  error?: string
+}) {
+  return (
+    <label className="block">
+      <span className="block text-sm text-white/60 mb-1.5">{label}</span>
+      {children}
+      {error ? <span className="block mt-1.5 text-xs text-red-300">{error}</span> : null}
+    </label>
   )
 }

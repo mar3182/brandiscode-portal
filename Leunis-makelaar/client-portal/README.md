@@ -8,6 +8,8 @@ Custom mini-app voor klantcommunicatie en projectbeheer.
 - **Digitaal ondertekenen** — Handtekening zetten direct in de browser
 - **Projectstatus volgen** — Sprint voortgang en deliverables in real-time
 - **Feedback geven** — Beoordelingen + berichten per sprint
+- **Bedrijfsgegevens beheren** — Klant vult zelf bedrijfs- en facturatiegegevens in (KvK, BTW, IBAN, factuuradres)
+- **Klantenbeheer voor admin** — Admin kan klantprofielen met bedrijfsgegevens aanmaken en bewerken
 
 ## Tech Stack
 
@@ -34,8 +36,23 @@ npm run dev
 
 1. Maak een nieuw project aan op [supabase.com](https://supabase.com)
 2. Ga naar SQL Editor en voer `supabase/schema.sql` uit
-3. Kopieer de Project URL en Anon Key naar `.env.local`
-4. Schakel Email Auth (Magic Link) in onder Authentication > Providers
+3. Voer daarna migraties uit:
+    - `supabase/migration-sprint-approval.sql`
+    - `supabase/migration-onboarding.sql`
+    - `supabase/migration-facturen.sql`
+    - `supabase/migration-client-profile.sql`
+4. Kopieer de Project URL en Anon Key naar `.env.local`
+5. Schakel Email Auth (Magic Link) in onder Authentication > Providers
+
+Na het uitvoeren van `supabase/seed-leunis.sql`:
+
+1. Ga naar Supabase dashboard -> Authentication -> Users
+2. Klik "Invite user" -> [arno@leunismakelaars.nl](mailto:arno@leunismakelaars.nl)
+3. Ga naar de `client_users` tabel en voeg toe:
+    - `client_id`: het UUID van Leunis Makelaars uit de `clients` tabel
+    - `email`: [arno@leunismakelaars.nl](mailto:arno@leunismakelaars.nl)
+    - `name`: Arno Leunis
+    - `role`: owner
 
 ## Project Structure
 

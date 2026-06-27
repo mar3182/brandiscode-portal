@@ -1,6 +1,7 @@
-export type OfferteStatus = 'concept' | 'verstuurd' | 'bekeken' | 'getekend' | 'afgewezen'
-export type SprintStatus = 'gepland' | 'actief' | 'review' | 'afgerond'
+export type OfferteStatus = 'concept' | 'verstuurd' | 'bekeken' | 'getekend' | 'afgewezen' | 'afgerond'
+export type SprintStatus = 'gepland' | 'actief' | 'review' | 'afgerond' | 'afgewezen'
 export type DeliverableStatus = 'todo' | 'in_progress' | 'review' | 'done'
+export type FactuurStatus = 'concept' | 'verstuurd' | 'betaald' | 'herinnering'
 
 export interface Client {
   id: string
@@ -8,6 +9,17 @@ export interface Client {
   name: string
   company: string | null
   phone: string | null
+  contact_person: string | null
+  kvk_number: string | null
+  btw_number: string | null
+  iban: string | null
+  billing_email: string | null
+  billing_address_line1: string | null
+  billing_address_line2: string | null
+  billing_postal_code: string | null
+  billing_city: string | null
+  billing_country: string | null
+  onboarding_completed_at: string | null
   created_at: string
 }
 
@@ -36,6 +48,9 @@ export interface Sprint {
   start_date: string | null
   end_date: string | null
   created_at: string
+  client_approved: boolean | null
+  client_approved_at: string | null
+  client_feedback: string | null
 }
 
 export interface Deliverable {
@@ -56,6 +71,72 @@ export interface Feedback {
   rating: number | null
   is_read: boolean
   created_at: string
+}
+
+export interface ClientUser {
+  id: string
+  client_id: string
+  email: string
+  name: string
+  role: 'owner' | 'member'
+  created_at: string
+}
+
+export interface SprintMessage {
+  id: string
+  sprint_id: string
+  sender_email: string
+  sender_role: 'admin' | 'client'
+  message: string
+  created_at: string
+}
+
+export interface OnboardingQuestion {
+  id: string
+  offerte_id: string
+  question: string
+  hint: string | null
+  answer_type: 'text' | 'choice' | 'yesno'
+  options: string[] | null
+  sort_order: number
+  is_required: boolean
+  created_at: string
+  answer?: string | null
+}
+
+export interface OnboardingAnswer {
+  id: string
+  question_id: string
+  client_id: string
+  answer: string
+  answered_at: string
+}
+
+export interface Factuur {
+  id: string
+  client_id: string
+  sprint_id: string | null
+  factuur_nummer: string
+  title: string
+  description: string | null
+  amount: number
+  btw_percentage: number
+  status: FactuurStatus
+  issue_date: string
+  due_date: string | null
+  paid_at: string | null
+  pdf_path: string | null
+  created_at: string
+  updated_at: string
+  btw_amount: number
+  total_amount: number
+  sprint?: Sprint | null
+}
+
+export function computeFactuurBedragen(factuur: Pick<Factuur, 'amount' | 'btw_percentage'>) {
+  const btw_amount = Math.round(factuur.amount * factuur.btw_percentage) / 100
+  const total_amount = factuur.amount + btw_amount
+  return { btw_amount, total_amount }
 }
 
 // Extended types with relations
