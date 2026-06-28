@@ -1,19 +1,38 @@
 'use client'
 
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, FileText, LogOut, ArrowLeft } from 'lucide-react'
+import { LayoutDashboard, Users, FileText, LogOut, ArrowLeft, Receipt } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-
-const adminNav = [
-  { name: 'Overzicht', href: '/admin', icon: LayoutDashboard },
-  { name: 'Klanten', href: '/admin/clients', icon: Users },
-  { name: 'Offertes & Sprints', href: '/admin/offertes', icon: FileText },
-]
 
 export default function AdminSidebar() {
   const pathname = usePathname()
   const supabase = createClient()
+  const [openFacturenCount, setOpenFacturenCount] = useState(0)
+
+  useEffect(() => {
+    async function loadOpenFacturen() {
+      const res = await fetch('/api/admin/facturen')
+      if (!res.ok) return
+      const data = await res.json()
+      if (!Array.isArray(data)) return
+
+      const open = data.filter(
+        (factuur: any) => factuur.status === 'verstuurd' || factuur.status === 'herinnering'
+      ).length
+      setOpenFacturenCount(open)
+    }
+
+    loadOpenFacturen()
+  }, [])
+
+  const adminNav = useMemo(() => [
+    { name: 'Overzicht', href: '/admin', icon: LayoutDashboard },
+    { name: 'Klanten', href: '/admin/clients', icon: Users },
+    { name: 'Offertes & Sprints', href: '/admin/offertes', icon: FileText },
+    { name: 'Facturen', href: '/admin/facturen', icon: Receipt, badge: openFacturenCount },
+  ], [openFacturenCount])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -43,7 +62,12 @@ export default function AdminSidebar() {
               }`}
             >
               <item.icon className="w-5 h-5" />
-              {item.name}
+              <span className="flex-1">{item.name}</span>
+              {item.badge ? (
+                <span className="min-w-5 h-5 px-1 rounded-full bg-red-500/20 text-red-300 text-xs flex items-center justify-center">
+                  {item.badge}
+                </span>
+              ) : null}
             </Link>
           )
         })}

@@ -1,13 +1,15 @@
-import { OfferteStatus, SprintStatus, DeliverableStatus } from '@/lib/types'
+import { OfferteStatus, SprintStatus, DeliverableStatus, FactuurStatus } from '@/lib/types'
 
-type StatusType = OfferteStatus | SprintStatus | DeliverableStatus
+type StatusType = OfferteStatus | SprintStatus | DeliverableStatus | FactuurStatus
 
 const statusLabels: Record<string, string> = {
   concept: 'Concept',
-  verstuurd: 'Verstuurd',
+  verstuurd: 'Nieuw',
   bekeken: 'Bekeken',
-  getekend: 'Getekend ✓',
+  getekend: 'Akkoord ✓',
   afgewezen: 'Afgewezen',
+  betaald: 'Betaald',
+  herinnering: 'Herinnering',
   gepland: 'Gepland',
   actief: 'Actief',
   review: 'Review',
@@ -19,10 +21,12 @@ const statusLabels: Record<string, string> = {
 
 const statusClasses: Record<string, string> = {
   concept: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
-  verstuurd: 'bg-brand-blue/20 text-blue-300 border-brand-blue/30',
+  verstuurd: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
   bekeken: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
   getekend: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
   afgewezen: 'bg-red-500/20 text-red-300 border-red-500/30',
+  betaald: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+  herinnering: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
   gepland: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
   actief: 'bg-brand-gold/20 text-brand-gold border-brand-gold/30',
   review: 'bg-purple-500/20 text-purple-300 border-purple-500/30',

@@ -7,16 +7,17 @@ on:
 
 env:
   NODE_VERSION: '20'
-  REGISTRY: ghcr.io
 
 jobs:
-  # Job 1: Build Artifact
-  build-staging:
-    name: Build Staging Artifact
+  # Job 1: Build & Deploy to Vercel Preview
+  deploy-staging:
+    name: Deploy to Vercel Staging
     runs-on: ubuntu-latest
+    environment:
+      name: staging
     outputs:
-      image-tag: ${{ steps.meta.outputs.tags }}
-      image-digest: ${{ steps.build.outputs.digest }}
+      preview-url: ${{ steps.deploy.outputs.preview-url }}
+      deployment-url: ${{ steps.deploy.outputs.deployment-url }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -32,22 +33,36 @@ jobs:
       - name: Build application
         run: cd client-portal && npm run build
 
-      - name: Create build metadata
+      - name: Deploy to Vercel Preview
+        id: deploy
         run: |
-          echo "BUILD_SHA=${{ github.sha }}" >> $GITHUB_ENV
-          echo "BUILD_BRANCH=${{ github.ref_name }}" >> $GITHUB_ENV
-          echo "BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
+          cd client-portal
+          
+          # Install Vercel CLI
+          npm install -g vercel
+          
+          # Deploy to Vercel (non-production, creates preview)
+          VERCEL_OUTPUT=$(vercel deploy --token=${{ secrets.VERCEL_TOKEN }} 2>&1)
+          
+          # Extract preview URL
+          PREVIEW_URL=$(echo "$VERCEL_OUTPUT" | grep -oP 'https://[^\s]+' | head -1)
+          
+          if [ -z "$PREVIEW_URL" ]; then
+            echo "❌ Failed to deploy to Vercel"
+            echo "$VERCEL_OUTPUT"
+            exit 1
+          fi
+          
+          echo "preview-url=$PREVIEW_URL" >> $GITHUB_OUTPUT
+          echo "deployment-url=$PREVIEW_URL" >> $GITHUB_OUTPUT
+          echo "✅ Deployed to: $PREVIEW_URL"
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: build-staging-${{ github.sha }}
-          path: client-portal/.next
-          retention-days: 5
+      - name: Wait for deployment
+        run: sleep 5
 
-  # Job 2: Database Migration Dry-Run
-  migration-dryrun:
-    name: Database Migration Dry-Run (Staging)
+  # Job 2: Database Migration Validation
+  migration-validate:
+    name: Validate Pending Migrations
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -56,243 +71,160 @@ jobs:
       - name: Collect pending migrations
         id: migrations
         run: |
-          MIGRATIONS=$(find supabase -name "migration-*.sql" -type f | sort)
-          echo "List of pending migrations:"
+          MIGRATIONS=$(find client-portal/supabase -name "migration-*.sql" -type f | sort)
+          MIGRATION_COUNT=$(echo "$MIGRATIONS" | grep -c .)
+          
+          if [ -z "$MIGRATIONS" ]; then
+            MIGRATION_COUNT=0
+          fi
+          
+          echo "migration-count=$MIGRATION_COUNT" >> $GITHUB_OUTPUT
+          echo "Found $MIGRATION_COUNT pending migrations"
           echo "$MIGRATIONS"
-          echo "PENDING_MIGRATIONS=$(echo "$MIGRATIONS" | wc -l)" >> $GITHUB_OUTPUT
 
       - name: Validate migration syntax
         run: |
-          for migration in supabase/migration-*.sql; do
+          FAILED=0
+          for migration in client-portal/supabase/migration-*.sql; do
             if [ -f "$migration" ]; then
               echo "Validating: $migration"
-              head -20 "$migration"
-              echo "---"
+              
+              # Check for destructive patterns without metadata
+              if grep -E "(DROP TABLE|DROP COLUMN|DELETE FROM|TRUNCATE)" "$migration" > /dev/null; then
+                if ! grep -E "(-- MIGRATION PURPOSE:|-- ROLLBACK:|-- RISICO:)" "$migration" > /dev/null; then
+                  echo "❌ Destructive operation found but missing metadata"
+                  FAILED=1
+                fi
+              fi
             fi
           done
-
-      - name: Upload migration report
-        uses: actions/upload-artifact@v3
-        with:
-          name: migration-dryrun-report
-          path: supabase/migration-*.sql
-
-  # Job 3: Deploy to Staging
-  deploy-staging:
-    name: Deploy to Staging Environment
-    needs: [build-staging, migration-dryrun]
-    runs-on: ubuntu-latest
-    environment:
-      name: staging
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download build artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: build-staging-${{ github.sha }}
-          path: ./staging-build
-
-      - name: Notify deployment start
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.repos.createDeployment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: '${{ github.sha }}',
-              environment: 'staging',
-              description: 'Deploying to staging environment',
-              auto_merge: false,
-              required_contexts: []
-            })
-
-      - name: Deploy to staging (simulated)
-        run: |
-          echo "🚀 Deploying to staging..."
-          echo "Build SHA: ${{ github.sha }}"
-          echo "Branch: ${{ github.ref_name }}"
-          echo "Deployment timestamp: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           
-          # In production: use rsync, scp, or deployment service
-          # rsync -avz ./staging-build/ user@staging-server:/app/
+          if [ $FAILED -eq 1 ]; then
+            exit 1
+          fi
+          echo "✅ All migrations validated"
 
-      - name: Wait for staging to be ready
-        run: sleep 5
-
-  # Job 4: Staging Smoke Tests
-  smoke-tests-staging:
-    name: Smoke Tests (Staging)
+  # Job 3: Smoke Tests Suite A (No Authentication)
+  smoke-tests-no-auth:
+    name: Smoke Tests - No Auth
     needs: deploy-staging
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Create smoke test script
+      - name: Test unauthenticated endpoints
+        env:
+          STAGING_URL: ${{ needs.deploy-staging.outputs.preview-url }}
         run: |
-          cat > smoke-tests.js << 'EOF'
-          const https = require('https');
+          echo "🔍 Smoke contract test against: $STAGING_URL"
+          FAILED=0
           
-          const tests = [
-            {
-              name: 'Health Check',
-              url: 'https://staging.example.com/api/health',
-              expectedStatus: 200
-            },
-            {
-              name: 'Auth Sanity Check',
-              url: 'https://staging.example.com/api/auth/me',
-              expectedStatus: [200, 401] // 401 expected if not authenticated
-            },
-            {
-              name: 'API Core Route',
-              url: 'https://staging.example.com/api/clients',
-              expectedStatus: [200, 401]
-            }
-          ];
+          # --- Suite A contract (must match HANDOFF-SPECIALIST-CICD-EXECUTION.md) ---
+          # GET /login => 200
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$STAGING_URL/login")
+          if [ "$STATUS" -eq 200 ]; then
+            echo "✅ GET /login: $STATUS"
+          else
+            echo "❌ GET /login: Expected 200, got $STATUS"
+            FAILED=1
+          fi
           
-          let passed = 0;
-          let failed = 0;
+          # GET /api/client-profile => 401
+          # GET /api/admin/clients => 401
+          # GET /api/onboarding => 401
+          # GET /api/facturen => 401
+          for endpoint in "/api/client-profile" "/api/admin/clients" "/api/onboarding" "/api/facturen"; do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$STAGING_URL$endpoint")
+            if [ "$STATUS" -eq 401 ]; then
+              echo "✅ GET $endpoint: $STATUS"
+            else
+              echo "❌ GET $endpoint: Expected 401, got $STATUS"
+              FAILED=1
+            fi
+          done
           
-          async function runTest(test) {
-            return new Promise((resolve) => {
-              https.get(test.url, (res) => {
-                const success = test.expectedStatus.includes(res.statusCode);
-                if (success) {
-                  console.log(`✅ ${test.name}: ${res.statusCode}`);
-                  passed++;
-                } else {
-                  console.log(`❌ ${test.name}: Expected ${test.expectedStatus}, got ${res.statusCode}`);
-                  failed++;
-                }
-                resolve();
-              }).on('error', (err) => {
-                console.log(`❌ ${test.name}: ${err.message}`);
-                failed++;
-                resolve();
-              });
-            });
-          }
+          # GET /api/health => 200
+          HEALTH_STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$STAGING_URL/api/health")
+          if [ "$HEALTH_STATUS" -eq 200 ]; then
+            echo "✅ GET /api/health: $HEALTH_STATUS"
+          else
+            echo "❌ GET /api/health: Expected 200, got $HEALTH_STATUS"
+            FAILED=1
+          fi
           
-          async function runAllTests() {
-            for (const test of tests) {
-              await runTest(test);
-            }
-            console.log(`\n📊 Results: ${passed} passed, ${failed} failed`);
-            process.exit(failed > 0 ? 1 : 0);
-          }
-          
-          runAllTests();
-          EOF
-
-      - name: Run smoke tests
-        run: node smoke-tests.js
-        continue-on-error: true
-
-      - name: Upload smoke test results
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: smoke-test-staging-results
-          path: smoke-tests.js
-
-  # Job 5: Health Check
-  health-check-staging:
-    name: Health Check (Staging)
-    needs: smoke-tests-staging
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check staging app status
-        run: |
-          echo "🔍 Checking staging environment health..."
-          echo "Endpoint: https://staging.example.com/api/health"
-          
-          # Simulate health check
-          STATUS="healthy"
-          echo "Status: $STATUS"
-          
-          if [ "$STATUS" != "healthy" ]; then
-            echo "❌ Staging health check FAILED"
+          if [ $FAILED -ne 0 ]; then
+            echo "❌ Smoke contract FAILED — staging deploy rejected"
             exit 1
           fi
-          echo "✅ Staging health check PASSED"
+          echo "✅ Suite A complete: all 6 contract endpoints passed"
 
-  # Job 6: Deployment Summary
+  # Job 4: Health Endpoint Check
+  health-check-staging:
+    name: Health Check - Staging
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check /api/health endpoint
+        env:
+          STAGING_URL: ${{ needs.deploy-staging.outputs.preview-url }}
+        run: |
+          echo "🔍 Checking health endpoint..."
+          
+          RESPONSE=$(curl -s "$STAGING_URL/api/health")
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$STAGING_URL/api/health")
+          
+          if [ "$STATUS" -ne 200 ]; then
+            echo "❌ Health check failed: HTTP $STATUS"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+          
+          # Hard fail if 'status' field is absent from response
+          if ! echo "$RESPONSE" | grep -q '"status"'; then
+            echo "❌ Health response missing required 'status' field"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+          
+          echo "✅ Health endpoint OK: $RESPONSE"
+
+  # Job 5: Deployment Summary
   deployment-summary:
-    name: Deployment Summary
+    name: Staging Deployment Summary
     if: always()
-    needs: [health-check-staging]
+    needs: [deploy-staging, migration-validate, smoke-tests-no-auth, health-check-staging]
     runs-on: ubuntu-latest
     steps:
-      - name: Generate deployment summary
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.repos.createDeploymentStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              deployment_id: ${{ github.run_id }},
-              state: 'success',
-              description: 'Staging deployment completed successfully',
-              environment_url: 'https://staging.example.com'
-            })
-
-      - name: Post deployment summary
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.repos.createCommitComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              commit_sha: '${{ github.sha }}',
-              body: `
-            ## 🚀 Staging Deployment Summary
-
-            | Item | Value |
-            |------|-------|
-            | Environment | Staging |
-            | Commit SHA | \`${{ github.sha }}\` |
-            | Branch | ${{ github.ref_name }} |
-            | Deployment Time | $(date -u +'%Y-%m-%dT%H:%M:%SZ') |
-            | Status | ✅ SUCCESS |
-
-            **Next Steps:**
-            - Run integration tests
-            - Manual QA verification
-            - Merge to main for production release
-            `
-            })
-
-  # Failure Handling: Automatic Rollback on Staging
-  handle-failure:
-    name: Handle Deployment Failure
-    if: failure()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Notify failure
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `
-            ❌ **Staging deployment FAILED**
-
-            **Actions:**
-            1. Check workflow logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            2. Verify database migrations
-            3. Check smoke test results
-            4. Staging environment is in rollback state
-
-            **On-call contact: [incident-channel]**
-            `
-            })
+      - name: Write deployment summary
+        env:
+          PREVIEW_URL: ${{ needs.deploy-staging.outputs.preview-url }}
+          DEPLOY_RESULT: ${{ needs.deploy-staging.result }}
+          MIGRATION_RESULT: ${{ needs.migration-validate.result }}
+          SMOKE_RESULT: ${{ needs.smoke-tests-no-auth.result }}
+          HEALTH_RESULT: ${{ needs.health-check-staging.result }}
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 🚀 Staging Deployment Summary
+          
+          | Component | Status |
+          |-----------|--------|
+          | Vercel Deploy | $DEPLOY_RESULT |
+          | Migration Validation | $MIGRATION_RESULT |
+          | Smoke Tests (No Auth) | $SMOKE_RESULT |
+          | Health Check | $HEALTH_RESULT |
+          
+          **Preview URL**: [\`$PREVIEW_URL\`]($PREVIEW_URL)
+          
+          **Timestamp**: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          
+          EOF
+          
+          # Check overall status
+          if [ "$DEPLOY_RESULT" = "success" ] && [ "$MIGRATION_RESULT" = "success" ] && [ "$SMOKE_RESULT" = "success" ] && [ "$HEALTH_RESULT" = "success" ]; then
+            echo "✅ **All checks passed** - Staging deployment healthy"
+            exit 0
+          else
+            echo "❌ **Some checks failed** - Review logs above"
+            exit 1
+          fi

@@ -76,20 +76,19 @@ jobs:
           key: ${{ runner.os }}-node-${{ env.NODE_VERSION }}-${{ hashFiles('**/package-lock.json') }}
 
       - name: Run ESLint
-        run: cd client-portal && npm run lint 2>&1 | tee lint-report.txt || true
-        continue-on-error: true
+        run: |
+          cd client-portal
+          npm run lint
+          echo "✅ ESLint passed"
 
-      - name: Comment lint results
+      - name: Lint Failure Summary
         if: failure()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '⚠️ **Linting issues detected** — please review and fix.'
-            })
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          ## ❌ ESLint Failed
+          
+          Linting issues detected. Please review and fix.
+          EOF
 
   # Job 3: Type Checking
   typecheck:
@@ -143,8 +142,10 @@ jobs:
           key: ${{ runner.os }}-node-${{ env.NODE_VERSION }}-${{ hashFiles('**/package-lock.json') }}
 
       - name: Run tests
-        run: cd client-portal && npm test 2>&1 || true
-        continue-on-error: true
+        run: |
+          cd client-portal
+          npm test
+          echo "✅ Unit tests passed"
 
   # Job 5: Build
   build:
@@ -260,7 +261,7 @@ jobs:
       - name: Validate migration files
         run: |
           FAILED=0
-          for migration in supabase/migration-*.sql; do
+          for migration in client-portal/supabase/migration-*.sql; do
             if [ -f "$migration" ]; then
               echo "Checking migration: $migration"
               
@@ -291,21 +292,17 @@ jobs:
             exit 1
           fi
 
-      - name: Comment migration status
+      - name: Migration Summary
         if: always()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const migrations = fs.readdirSync('supabase')
-              .filter(f => f.match(/^migration-.*\.sql$/))
-              .length;
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `✅ **Migration Check**: ${migrations} migrations found and validated`
-            })
+        run: |
+          MIGRATION_COUNT=$(find client-portal/supabase -name "migration-*.sql" -type f 2>/dev/null | wc -l)
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## ✅ Migration Safety Check
+          
+          Migrations found: **${MIGRATION_COUNT}**
+          
+          All validated for destructive operations & required metadata.
+          EOF
 
   # Summary: all quality gates must pass
   quality-gates-summary:
@@ -327,28 +324,28 @@ jobs:
           fi
           echo "✅ All quality gates PASSED"
 
-      - name: Create check summary
+      - name: Write PR quality summary
         if: always()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `
-            ## ✅ PR Quality & Security Gates
-
-            | Gate | Status |
-            |------|--------|
-            | Lint | ${{ needs.lint.result }} |
-            | Type Check | ${{ needs.typecheck.result }} |
-            | Tests | ${{ needs.test.result }} |
-            | Build | ${{ needs.build.result }} |
-            | Dependencies | ${{ needs.dependency-check.result }} |
-            | Secrets | ${{ needs.secret-scan.result }} |
-            | Migrations | ${{ needs.migration-check.result }} |
-
-            **Merge allowed**: \`\`\`${{ needs.quality-gates-summary.result == 'success' ? 'YES ✅' : 'NO ❌' }}\`\`\`
-            `
-            })
+        run: |
+          echo "## PR Quality & Security Gates" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Gate | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Type Check | ${{ needs.typecheck.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tests | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dependencies | ${{ needs.dependency-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secrets | ${{ needs.secret-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Migrations | ${{ needs.migration-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ needs.lint.result }}" == "success" ]] && \
+             [[ "${{ needs.typecheck.result }}" == "success" ]] && \
+             [[ "${{ needs.build.result }}" == "success" ]] && \
+             [[ "${{ needs.dependency-check.result }}" == "success" ]] && \
+             [[ "${{ needs.secret-scan.result }}" == "success" ]] && \
+             [[ "${{ needs.migration-check.result }}" == "success" ]]; then
+            echo "**Result**: ✅ ALL PASSED — merge allowed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Result**: ❌ FAILED — fix required before merge" >> $GITHUB_STEP_SUMMARY
+          fi

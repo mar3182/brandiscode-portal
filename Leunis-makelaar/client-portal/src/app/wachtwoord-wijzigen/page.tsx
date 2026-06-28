@@ -2,42 +2,49 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Mail, Lock, ArrowRight, Loader2 } from 'lucide-react'
+import { Lock, ArrowRight, Loader2, ShieldCheck } from 'lucide-react'
 import Image from 'next/image'
 
-export default function LoginPage() {
-  const [email, setEmail] = useState('')
+export default function WachtwoordWijzigenPage() {
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const supabase = createClient()
   const router = useRouter()
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
     setError('')
 
-    if (!email || !password) {
-      setError('Vul je e-mailadres en wachtwoord in om in te loggen.')
-      setLoading(false)
+    if (password.length < 8) {
+      setError('Wachtwoord moet minimaal 8 tekens bevatten.')
       return
     }
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
+    if (password !== confirmPassword) {
+      setError('Wachtwoorden komen niet overeen.')
+      return
+    }
+
+    setLoading(true)
+
+    const { error: updateError } = await supabase.auth.updateUser({
       password,
+      data: { password_changed: true },
     })
 
-    if (authError) {
-      setError('Onjuist e-mailadres of wachtwoord.')
+    if (updateError) {
+      setError('Er ging iets mis. Probeer het opnieuw.')
       setLoading(false)
       return
     }
 
-    router.push('/dashboard')
+    // Redirect to dashboard
+    const res = await fetch('/api/auth/redirect')
+    const { redirect } = await res.json()
+    window.location.href = redirect || '/dashboard'
   }
 
   return (
@@ -55,39 +62,25 @@ export default function LoginPage() {
             width={120}
             height={120}
             priority
-            className="mb-4 w-auto h-auto"
+            className="mb-4"
           />
           <p className="text-white/40 text-sm tracking-widest uppercase">Client Portal</p>
         </div>
 
-        {/* Login Card */}
+        {/* Card */}
         <div className="glass-card p-8">
-          <h2 className="text-xl font-semibold text-white mb-2">Welkom terug</h2>
+          <div className="flex items-center gap-3 mb-2">
+            <ShieldCheck className="w-6 h-6 text-brand-gold" />
+            <h2 className="text-xl font-semibold text-white">Wachtwoord wijzigen</h2>
+          </div>
           <p className="text-white/50 text-sm mb-6">
-            Log in met je e-mailadres en wachtwoord.
+            Kies een nieuw persoonlijk wachtwoord om door te gaan.
           </p>
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm text-white/60 mb-2">
-                E-mailadres
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="jouw@email.nl"
-                  className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-brand-gold/50 focus:ring-1 focus:ring-brand-gold/30 transition-all"
-                />
-              </div>
-            </div>
-
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="password" className="block text-sm text-white/60 mb-2">
-                Wachtwoord
+                Nieuw wachtwoord
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
@@ -96,7 +89,28 @@ export default function LoginPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="Minimaal 8 tekens"
+                  required
+                  minLength={8}
+                  className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-brand-gold/50 focus:ring-1 focus:ring-brand-gold/30 transition-all"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="confirm" className="block text-sm text-white/60 mb-2">
+                Bevestig wachtwoord
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
+                <input
+                  id="confirm"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Herhaal wachtwoord"
+                  required
+                  minLength={8}
                   className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-brand-gold/50 focus:ring-1 focus:ring-brand-gold/30 transition-all"
                 />
               </div>
@@ -106,20 +120,16 @@ export default function LoginPage() {
               <p className="text-red-400 text-sm">{error}</p>
             )}
 
-            <Link href="/login/wachtwoord-vergeten" className="inline-block text-sm text-white/60 hover:text-white transition-colors">
-              Wachtwoord vergeten?
-            </Link>
-
             <button
               type="submit"
-              disabled={loading || !email || !password}
+              disabled={loading || !password || !confirmPassword}
               className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-[#E84393] to-[#D4A843] text-white font-semibold rounded-xl hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <>
-                  Inloggen
+                  Opslaan en doorgaan
                   <ArrowRight className="w-5 h-5" />
                 </>
               )}
@@ -127,7 +137,6 @@ export default function LoginPage() {
           </form>
         </div>
 
-        {/* Footer */}
         <p className="text-center text-white/30 text-xs mt-6">
           © {new Date().getFullYear()} Brand is Code — KvK 91166667
         </p>

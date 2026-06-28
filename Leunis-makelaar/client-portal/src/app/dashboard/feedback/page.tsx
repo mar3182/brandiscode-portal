@@ -23,13 +23,13 @@ export default function FeedbackPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const { data: client } = await supabase
-        .from('clients')
-        .select('id')
+      const { data: clientUser } = await supabase
+        .from('client_users')
+        .select('client_id')
         .eq('email', user.email)
         .single()
 
-      if (client) setClientId(client.id)
+      if (clientUser) setClientId(clientUser.client_id)
 
       const { data: fb } = await supabase
         .from('feedback')

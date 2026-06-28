@@ -52,16 +52,36 @@ Je werkt minimaal in deze bestanden:
    - Geen secrets in logs.
    - Alle vereiste secrets expliciet gedocumenteerd.
 
-## 6) Onbekenden die je eerst moet vastleggen
-Voordat je CD-finalisatie doet, leg expliciet vast:
-1. Staging target: Vercel, container host, SSH server of anders.
-2. Production deploy target: idem.
-3. Database beheerflow: Supabase managed flow en backup/restore methode.
-4. Welke smoke endpoints als contract gelden voor go/no-go.
+## 6) Bevestigde keuzes (door product owner)
+Deze keuzes zijn definitief voor de hardening-implementatie:
 
-Als deze niet bekend zijn, implementeer een **fail-safe mode**:
-- Workflow moet expliciet stoppen met heldere melding dat deployment target ontbreekt,
-- en mag niet groen eindigen op simulatie.
+1. **Deploy target (staging + production): Vercel**
+    - Staging: Vercel Preview environment (branch-based) met vaste staging alias.
+    - Production: Vercel Production environment (main/release flow).
+    - Geen SSH/Docker/ECS deployment in deze fase.
+
+2. **Database backup/restore: Supabase managed backups**
+    - Gebruik Supabase managed backup/restore (point-in-time of backup restore).
+    - Production deployment mag alleen door na backup-checkpoint gate.
+    - Geen eigen `pg_dump/pg_restore` pipeline in deze fase.
+
+3. **Smoke test contracten**
+    - **Suite A (zonder login):**
+       - `GET /login` => 200
+       - `GET /api/client-profile` => 401
+       - `GET /api/admin/clients` => 401
+       - `GET /api/onboarding` => 401
+       - `GET /api/facturen` => 401
+    - **Suite B (met sessie):**
+       - Klant login + dashboard bereikbaar => 200
+       - `GET /api/client-profile` => 200
+       - `GET /api/onboarding` => 200
+       - `GET /api/facturen` => 200
+       - Admin login + `GET /api/admin/clients` => 200
+    - **Aanbevolen extra endpoint:**
+       - `GET /api/health` => 200 met eenvoudige status payload.
+
+Alle workflow-stappen die hiermee conflicteren (placeholders, voorbeeld-domeinen, simulatie-success) moeten verwijderd of hard-fail gemaakt worden.
 
 ## 7) Validatie die jij moet uitvoeren
 1. Intentionele PR failure test (lint of test laten falen) en aantonen dat merge wordt geblokkeerd.

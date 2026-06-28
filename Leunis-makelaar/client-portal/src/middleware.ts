@@ -49,6 +49,24 @@ export async function middleware(request: NextRequest) {
       url.pathname = '/login'
       return NextResponse.redirect(url)
     }
+
+    // Admin hoort op /admin, niet op /dashboard
+    if (user.email === process.env.ADMIN_EMAIL) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/admin'
+      return NextResponse.redirect(url)
+    }
+
+    // Forceer wachtwoord wijzigen bij eerste login (alleen voor klanten, niet voor admin)
+    if (
+      user.email !== process.env.ADMIN_EMAIL &&
+      !user.user_metadata?.password_changed &&
+      pathname !== '/dashboard/wachtwoord-wijzigen'
+    ) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard/wachtwoord-wijzigen'
+      return NextResponse.redirect(url)
+    }
   }
 
   // Bescherm /admin routes — vereist admin e-mail

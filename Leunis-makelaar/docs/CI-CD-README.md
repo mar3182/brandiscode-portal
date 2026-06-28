@@ -140,17 +140,51 @@ On failure (any step):
    - Requires 2 reviewers to approve deployment
    - Secrets: production-only, rotated monthly
 
-### Secrets Configuration
-Store these in GitHub Secrets (not in code):
+### Secrets Configuration (Complete Matrix)
+
+Store these in GitHub Secrets (not in code). **NEVER commit secrets to Git.**
+
+#### Required GitHub Secrets
+
+| Secret Name             | Purpose                         | Used In                         | Where to Get               | Rotation        |
+| ----------------------- | ------------------------------- | ------------------------------- | -------------------------- | --------------- |
+| `VERCEL_TOKEN`          | Deploy to Vercel                | 02-staging-cd, 03-production-cd | Vercel > Settings > Tokens | Every 90 days   |
+| `GITGUARDIAN_API_KEY`   | Secret scanning in PR           | 01-pr-checks                    | GitGuardian dashboard      | Every 180 days  |
+| `SUPABASE_ACCESS_TOKEN` | Database backup/restore API     | 03-production-cd                | Supabase org settings      | Every 180 days  |
+| `SUPABASE_PROJECT_ID`   | Identify which Supabase project | 03-production-cd                | Supabase project dashboard | N/A (static ID) |
+
+#### GitHub Environments
+
+**Staging Environment**:
+- Secrets: SUPABASE_URL_STAGING, SUPABASE_ANON_KEY_STAGING
+- Approvals required: 0 (auto-deploy)
+- Deployment URL: `https://staging.example.com`
+
+**Production Environment**:
+- Secrets: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_DB_URL
+- Approvals required: 2 (manual approval gate)
+- Deployment URL: `https://example.com`
+- Teams with access: @devops, @platform, @engineering-leads
+
+#### Environment Variables (via Vercel)
+
+Set in Vercel project settings:
 ```
-SUPABASE_URL_STAGING = https://xxx.supabase.co
-SUPABASE_KEY_STAGING = [key]
-SUPABASE_URL_PROD = https://xxx.supabase.co
-SUPABASE_KEY_PROD = [key]
-GITGUARDIAN_API_KEY = [key]
+NEXT_PUBLIC_SUPABASE_URL=https://[project-id].supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=[your-anon-key]
 ```
 
-**NEVER commit secrets to Git.** Use `.env.local` locally (ignored by Git).
+#### Local Development Setup
+
+Create `.env.local` (git-ignored):
+```bash
+# Copy staging credentials for local development
+NEXT_PUBLIC_SUPABASE_URL=https://[staging-project].supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=[staging-anon-key]
+SUPABASE_SERVICE_ROLE_KEY=[service-role-key]
+```
+
+**Never use production secrets locally.**
 
 ---
 
@@ -372,3 +406,55 @@ Track these to measure deployment effectiveness:
 **Last Updated**: 2026-06-27  
 **Owner**: @team/platform  
 **Status**: ✅ Production Ready
+
+---
+
+## GitHub Setup Checklist (One-Time Configuration)
+
+Complete these steps **ONE TIME** when setting up the repository for CI/CD:
+
+### Step 1: Create GitHub Secrets
+**Path**: Settings > Secrets and variables > Actions
+
+Add these secrets:
+- [ ] `VERCEL_TOKEN` (get from Vercel dashboard)
+- [ ] `GITGUARDIAN_API_KEY` (get from GitGuardian)
+- [ ] `SUPABASE_ACCESS_TOKEN` (get from Supabase org settings)
+- [ ] `SUPABASE_PROJECT_ID` (get from Supabase dashboard, e.g., abcdefg123456)
+
+### Step 2: Create GitHub Environments
+**Path**: Settings > Environments
+
+**Create `staging` environment**:
+- Deployment branches: `develop`
+- Required reviewers: None
+- Auto-deploy on merge to develop
+
+**Create `production` environment**:
+- Deployment branches: `main` only
+- Required reviewers: 2 people from @devops or @platform team
+- Manual approval before each deploy
+
+### Step 3: Configure Branch Protection
+**Path**: Settings > Branches > Branch protection rules
+
+**For `develop` branch**:
+- ✅ Require PR before merging
+- ✅ Require 1 approval
+- ✅ Require CI checks: `01-pr-checks`
+- ✅ Dismiss stale PRs
+
+**For `main` branch**:
+- ✅ Require PR before merging
+- ✅ Require 2 approvals
+- ✅ Require CI checks: `01-pr-checks`
+- ✅ Include administrators
+
+### Step 4: Test the Pipeline
+1. Create test PR to develop
+2. Verify: 01-pr-checks runs
+3. Merge PR
+4. Verify: 02-staging-cd deploys to staging
+5. Create tag: `git tag release-v0.0.1-test && git push origin release-v0.0.1-test`
+6. Verify: 03-production-cd runs (approve when prompted)
+
