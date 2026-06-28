@@ -1,76 +1,125 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { OnboardingQuestion } from '@/lib/types'
-import { CheckCircle2, ClipboardList, Loader2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import {
+  type ProfileFieldErrors,
+  formatBtwInput,
+  formatIbanInput,
+  formatKvkInput,
+} from '@/lib/companyProfileValidation'
+import { Building2, Users, FileText, MessageCircle, CheckCircle2, ArrowRight, Loader2, ChevronRight } from 'lucide-react'
+
+const STEPS = [
+  { id: 1, label: 'Bedrijfsgegevens' },
+  { id: 2, label: 'Welkom in de portal' },
+  { id: 3, label: 'Klaar!' },
+]
+
+const INPUT_CLASS = 'w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-brand-gold/50 transition-all'
+
+interface BillingForm {
+  contact_person: string
+  kvk_number: string
+  btw_number: string
+  iban: string
+  billing_email: string
+  billing_address_line1: string
+  billing_address_line2: string
+  billing_postal_code: string
+  billing_city: string
+  billing_country: string
+}
+
+const emptyForm: BillingForm = {
+  contact_person: '',
+  kvk_number: '',
+  btw_number: '',
+  iban: '',
+  billing_email: '',
+  billing_address_line1: '',
+  billing_address_line2: '',
+  billing_postal_code: '',
+  billing_city: '',
+  billing_country: 'Nederland',
+}
 
 export default function OnboardingPage() {
-  const [questions, setQuestions] = useState<OnboardingQuestion[]>([])
+  const router = useRouter()
+  const [step, setStep] = useState(1)
+  const [form, setForm] = useState<BillingForm>(emptyForm)
+  const [fieldErrors, setFieldErrors] = useState<ProfileFieldErrors>({})
   const [loading, setLoading] = useState(true)
-  const [savingMap, setSavingMap] = useState<Record<string, boolean>>({})
-  const [savedMap, setSavedMap] = useState<Record<string, boolean>>({})
-  const saveTimers = useRef<Record<string, number>>({})
-  const hideSavedTimers = useRef<Record<string, number>>({})
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    async function loadQuestions() {
-      const res = await fetch('/api/onboarding')
+    async function load() {
+      const res = await fetch('/api/onboarding/wizard')
+      if (!res.ok) { setLoading(false); return }
       const data = await res.json()
-      if (Array.isArray(data)) setQuestions(data)
+      if (data.client) {
+        setForm({
+          contact_person: data.client.contact_person ?? '',
+          kvk_number: data.client.kvk_number ?? '',
+          btw_number: data.client.btw_number ?? '',
+          iban: data.client.iban ?? '',
+          billing_email: data.client.billing_email ?? '',
+          billing_address_line1: data.client.billing_address_line1 ?? '',
+          billing_address_line2: data.client.billing_address_line2 ?? '',
+          billing_postal_code: data.client.billing_postal_code ?? '',
+          billing_city: data.client.billing_city ?? '',
+          billing_country: data.client.billing_country ?? 'Nederland',
+        })
+      }
       setLoading(false)
     }
-
-    loadQuestions()
-
-    return () => {
-      Object.values(saveTimers.current).forEach((timerId) => window.clearTimeout(timerId))
-      Object.values(hideSavedTimers.current).forEach((timerId) => window.clearTimeout(timerId))
-    }
+    load()
   }, [])
 
-  const persistAnswer = useCallback(async (questionId: string, answer: string) => {
-    setSavingMap((prev) => ({ ...prev, [questionId]: true }))
+  async function handleBillingSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    setError('')
+    setFieldErrors({})
 
-    const res = await fetch('/api/onboarding', {
+    const res = await fetch('/api/onboarding/wizard', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question_id: questionId, answer }),
+      body: JSON.stringify({ step: 'billing', ...form }),
     })
+    const data = await res.json()
 
-    setSavingMap((prev) => ({ ...prev, [questionId]: false }))
-
-    if (!res.ok) return
-
-    setSavedMap((prev) => ({ ...prev, [questionId]: true }))
-    if (hideSavedTimers.current[questionId]) {
-      window.clearTimeout(hideSavedTimers.current[questionId])
-    }
-    hideSavedTimers.current[questionId] = window.setTimeout(() => {
-      setSavedMap((prev) => ({ ...prev, [questionId]: false }))
-    }, 2000)
-  }, [])
-
-  const queueSave = useCallback((questionId: string, answer: string) => {
-    setQuestions((prev) => prev.map((q) => (q.id === questionId ? { ...q, answer } : q)))
-
-    if (saveTimers.current[questionId]) {
-      window.clearTimeout(saveTimers.current[questionId])
+    if (!res.ok) {
+      if (data.errors) setFieldErrors(data.errors)
+      else setError(data.error ?? 'Er ging iets mis. Probeer het opnieuw.')
+      setSaving(false)
+      return
     }
 
-    saveTimers.current[questionId] = window.setTimeout(() => {
-      persistAnswer(questionId, answer)
-    }, 500)
-  }, [persistAnswer])
+    setSaving(false)
+    setStep(2)
+  }
 
-  const requiredCount = questions.filter((q) => q.is_required).length
-  const answeredRequiredCount = questions.filter((q) => q.is_required && q.answer?.trim()).length
-  const answeredCount = questions.filter((q) => q.answer?.trim()).length
-  const progressPercentage = requiredCount > 0 ? Math.round((answeredRequiredCount / requiredCount) * 100) : 0
-  const allRequiredAnswered = requiredCount > 0 && answeredRequiredCount === requiredCount
+  async function handleComplete() {
+    setSaving(true)
+    await fetch('/api/onboarding/wizard', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ step: 'complete' }),
+    })
+    setSaving(false)
+    setStep(3)
+  }
+
+  function goToDashboard() {
+    router.push('/dashboard')
+    router.refresh()
+  }
 
   if (loading) {
     return (
-      <div className="max-w-4xl">
+      <div className="max-w-2xl mx-auto">
         <div className="glass-card p-12 text-center">
           <Loader2 className="w-8 h-8 text-brand-gold animate-spin mx-auto" />
         </div>
@@ -79,110 +128,231 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="max-w-4xl">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white">Informatie doorgeven</h1>
-        <p className="text-white/50 mt-1">Beantwoord de onderstaande vragen zodat we direct aan de slag kunnen.</p>
-      </div>
-
-      <div className="glass-card p-5 mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-sm text-white/70">{answeredCount} van {questions.length} vragen beantwoord</p>
-          <p className="text-sm text-white/40">{progressPercentage}%</p>
-        </div>
-        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-          <div className="h-full bg-gradient-to-r from-brand-gold to-brand-gold/70 transition-all" style={{ width: `${progressPercentage}%` }} />
-        </div>
-      </div>
-
-      {allRequiredAnswered && (
-        <div className="mb-6 px-4 py-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
-          Alles ingevuld - we gaan aan de slag! ✓
+    <div className="max-w-2xl mx-auto space-y-6">
+      {/* Voortgangsbalk */}
+      {step < 3 && (
+        <div className="glass-card p-4">
+          <div className="flex items-center justify-between">
+            {STEPS.map((s, i) => (
+              <div key={s.id} className="flex items-center gap-2">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
+                  step > s.id ? 'bg-green-500 text-white' :
+                  step === s.id ? 'bg-brand-gold text-black' :
+                  'bg-white/10 text-white/40'
+                }`}>
+                  {step > s.id ? <CheckCircle2 className="w-4 h-4" /> : s.id}
+                </div>
+                <span className={`text-sm hidden sm:block ${step === s.id ? 'text-white font-medium' : 'text-white/40'}`}>
+                  {s.label}
+                </span>
+                {i < STEPS.length - 1 && (
+                  <ChevronRight className="w-4 h-4 text-white/20 mx-1" />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {questions.length === 0 ? (
-        <div className="glass-card p-12 text-center">
-          <ClipboardList className="w-12 h-12 text-white/20 mx-auto mb-4" />
-          <p className="text-white/40">Er zijn nog geen vragen ingesteld voor dit project.</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {questions.map((question, index) => {
-            const isSaved = savedMap[question.id]
-            const isSaving = savingMap[question.id]
-            const currentAnswer = question.answer || ''
+      {/* Stap 1 — Bedrijfsgegevens */}
+      {step === 1 && (
+        <div className="glass-card p-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-brand-gold/20 flex items-center justify-center">
+              <Building2 className="w-5 h-5 text-brand-gold" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white">Bedrijfsgegevens</h1>
+              <p className="text-white/50 text-sm">Vul je gegevens in voor facturatie</p>
+            </div>
+          </div>
 
-            return (
-              <div key={question.id} className="glass-card p-5">
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div>
-                    <p className="text-sm text-white/40 mb-1">Vraag {index + 1}</p>
-                    <h2 className="text-white font-medium">{question.question}</h2>
-                    {question.hint && <p className="text-white/40 text-sm mt-1">{question.hint}</p>}
-                  </div>
-                  <div className="h-6 w-6 flex items-center justify-center">
-                    {isSaving && <Loader2 className="w-4 h-4 text-white/40 animate-spin" />}
-                    {!isSaving && isSaved && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
-                  </div>
-                </div>
+          <form onSubmit={handleBillingSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm text-white/60 mb-1.5">Contactpersoon *</label>
+              <input
+                className={INPUT_CLASS}
+                placeholder="Voor- en achternaam"
+                value={form.contact_person}
+                onChange={e => setForm(f => ({ ...f, contact_person: e.target.value }))}
+                required
+              />
+            </div>
 
-                {question.answer_type === 'text' && (
-                  <textarea
-                    rows={3}
-                    value={currentAnswer}
-                    onChange={(e) => queueSave(question.id, e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:border-brand-gold/50"
-                    placeholder="Typ je antwoord..."
-                  />
-                )}
-
-                {question.answer_type === 'choice' && (
-                  <div className="flex flex-wrap gap-2">
-                    {(question.options || []).map((option) => {
-                      const active = currentAnswer === option
-                      return (
-                        <button
-                          key={option}
-                          type="button"
-                          onClick={() => queueSave(question.id, option)}
-                          className={`px-3 py-1.5 rounded-full border text-sm transition-all ${
-                            active
-                              ? 'bg-brand-gold/20 border-brand-gold/40 text-brand-gold'
-                              : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
-                          }`}
-                        >
-                          {option}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-
-                {question.answer_type === 'yesno' && (
-                  <div className="flex gap-2">
-                    {['Ja', 'Nee'].map((option) => {
-                      const active = currentAnswer === option
-                      return (
-                        <button
-                          key={option}
-                          type="button"
-                          onClick={() => queueSave(question.id, option)}
-                          className={`px-4 py-2 rounded-xl border text-sm transition-all ${
-                            active
-                              ? 'bg-brand-gold/20 border-brand-gold/40 text-brand-gold'
-                              : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
-                          }`}
-                        >
-                          {option}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-white/60 mb-1.5">KvK-nummer</label>
+                <input
+                  className={`${INPUT_CLASS}${fieldErrors.kvk_number ? ' border-red-500/50' : ''}`}
+                  placeholder="12345678"
+                  value={form.kvk_number}
+                  onChange={e => setForm(f => ({ ...f, kvk_number: formatKvkInput(e.target.value) }))}
+                  maxLength={8}
+                />
+                {fieldErrors.kvk_number && <p className="text-red-400 text-xs mt-1">{fieldErrors.kvk_number}</p>}
               </div>
-            )
-          })}
+              <div>
+                <label className="block text-sm text-white/60 mb-1.5">BTW-nummer</label>
+                <input
+                  className={`${INPUT_CLASS}${fieldErrors.btw_number ? ' border-red-500/50' : ''}`}
+                  placeholder="NL123456789B01"
+                  value={form.btw_number}
+                  onChange={e => setForm(f => ({ ...f, btw_number: formatBtwInput(e.target.value) }))}
+                  maxLength={14}
+                />
+                {fieldErrors.btw_number && <p className="text-red-400 text-xs mt-1">{fieldErrors.btw_number}</p>}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm text-white/60 mb-1.5">IBAN</label>
+              <input
+                className={`${INPUT_CLASS}${fieldErrors.iban ? ' border-red-500/50' : ''}`}
+                placeholder="NL00 BANK 0000 0000 00"
+                value={form.iban}
+                onChange={e => setForm(f => ({ ...f, iban: formatIbanInput(e.target.value) }))}
+              />
+              {fieldErrors.iban && <p className="text-red-400 text-xs mt-1">{fieldErrors.iban}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm text-white/60 mb-1.5">Factuur e-mailadres *</label>
+              <input
+                type="email"
+                className={`${INPUT_CLASS}${fieldErrors.billing_email ? ' border-red-500/50' : ''}`}
+                placeholder="facturen@bedrijf.nl"
+                value={form.billing_email}
+                onChange={e => setForm(f => ({ ...f, billing_email: e.target.value }))}
+                required
+              />
+              {fieldErrors.billing_email && <p className="text-red-400 text-xs mt-1">{fieldErrors.billing_email}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm text-white/60 mb-1.5">Factuuradres *</label>
+              <input
+                className={INPUT_CLASS}
+                placeholder="Straat en huisnummer"
+                value={form.billing_address_line1}
+                onChange={e => setForm(f => ({ ...f, billing_address_line1: e.target.value }))}
+                required
+              />
+            </div>
+            <div>
+              <input
+                className={INPUT_CLASS}
+                placeholder="Toevoeging (optioneel)"
+                value={form.billing_address_line2}
+                onChange={e => setForm(f => ({ ...f, billing_address_line2: e.target.value }))}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-white/60 mb-1.5">Postcode *</label>
+                <input
+                  className={INPUT_CLASS}
+                  placeholder="1234 AB"
+                  value={form.billing_postal_code}
+                  onChange={e => setForm(f => ({ ...f, billing_postal_code: e.target.value }))}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-white/60 mb-1.5">Stad *</label>
+                <input
+                  className={INPUT_CLASS}
+                  placeholder="Amsterdam"
+                  value={form.billing_city}
+                  onChange={e => setForm(f => ({ ...f, billing_city: e.target.value }))}
+                  required
+                />
+              </div>
+            </div>
+
+            {error && <p className="text-red-400 text-sm bg-red-500/10 rounded-xl px-4 py-3">{error}</p>}
+
+            <button
+              type="submit"
+              disabled={saving}
+              className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-brand-gold text-black font-semibold rounded-xl hover:bg-brand-gold/90 transition-all disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+              Volgende stap
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Stap 2 — Portal tour */}
+      {step === 2 && (
+        <div className="glass-card p-8">
+          <div className="mb-8 text-center">
+            <h1 className="text-2xl font-bold text-white mb-2">Welkom in jouw portal</h1>
+            <p className="text-white/50">Dit is wat je allemaal kunt doen</p>
+          </div>
+
+          <div className="space-y-4 mb-8">
+            <div className="flex items-start gap-4 p-4 bg-white/5 rounded-xl border border-white/10">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                <Users className="w-5 h-5 text-blue-400" />
+              </div>
+              <div>
+                <h3 className="text-white font-semibold mb-1">Team</h3>
+                <p className="text-white/50 text-sm">Voeg teamleden toe zodat collega&apos;s ook toegang krijgen tot de portal.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4 p-4 bg-white/5 rounded-xl border border-white/10">
+              <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                <FileText className="w-5 h-5 text-green-400" />
+              </div>
+              <div>
+                <h3 className="text-white font-semibold mb-1">Facturen</h3>
+                <p className="text-white/50 text-sm">Bekijk, download en betaal je facturen direct vanuit de portal.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4 p-4 bg-white/5 rounded-xl border border-white/10">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                <MessageCircle className="w-5 h-5 text-purple-400" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="text-white font-semibold">AI Chat</h3>
+                  <span className="text-xs bg-brand-gold/20 text-brand-gold px-2 py-0.5 rounded-full">Binnenkort</span>
+                </div>
+                <p className="text-white/50 text-sm">Stel vragen aan onze AI assistent. Complexe vragen worden direct doorgestuurd naar ons team.</p>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={handleComplete}
+            disabled={saving}
+            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-brand-gold text-black font-semibold rounded-xl hover:bg-brand-gold/90 transition-all disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+            Afronden
+          </button>
+        </div>
+      )}
+
+      {/* Stap 3 — Klaar */}
+      {step === 3 && (
+        <div className="glass-card p-12 text-center">
+          <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-6">
+            <CheckCircle2 className="w-8 h-8 text-green-400" />
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-3">Alles is ingesteld!</h1>
+          <p className="text-white/50 mb-8">Je bedrijfsgegevens zijn opgeslagen en je portal staat klaar voor gebruik.</p>
+          <button
+            onClick={goToDashboard}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-brand-gold text-black font-semibold rounded-xl hover:bg-brand-gold/90 transition-all"
+          >
+            Naar het dashboard
+            <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
       )}
     </div>
