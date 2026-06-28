@@ -6,7 +6,7 @@ description: >
   hashtag strategie, SEO teksten voor brandiscode.com, thought leadership content,
   1 idee omzetten naar meerdere formaten, content recyclen. Geef mij een onderwerp of
   ruwe tekst en ik lever de volledige content set klaar voor publicatie.
-tools: [web, read]
+tools: [web, read, edit]
 model: "Claude Sonnet 4.5 (Copilot)"
 argument-hint: "Geef een onderwerp, ruwe aantekeningen of bestaande tekst om te verwerken"
 ---

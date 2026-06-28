@@ -6,7 +6,7 @@ description: >
   voorbereiding, KvK en BTW nummers, IBAN beheer, openstaande betalingen opvolgen,
   factuurstatus bijhouden in het portal, administratieve vragen, urenregistratie,
   kosten overzicht per klant. Roep mij aan voor alles wat met geld en administratie te maken heeft.
-tools: [read, search]
+tools: [read, search, edit]
 model: "Claude Sonnet 4.5 (Copilot)"
 argument-hint: "Beschrijf je administratieve vraag of taak (bijv. 'factuur maken voor Leunis Sprint 1')"
 ---
