@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Users, Plus, Loader2, Pencil, Save, X } from 'lucide-react'
+import { Users, Plus, Loader2, Pencil, Save, X, RefreshCw, CheckCircle2, Clock } from 'lucide-react'
 import type { Client } from '@/lib/types'
 import {
   type ProfileFieldErrors,
@@ -62,6 +62,8 @@ export default function AdminClientsPage() {
   const [editFieldErrors, setEditFieldErrors] = useState<ProfileFieldErrors>({})
   const [form, setForm] = useState<ClientForm>(initialForm)
   const [editForm, setEditForm] = useState<ClientForm | null>(null)
+  const [triggeringId, setTriggeringId] = useState<string | null>(null)
+  const [triggerSuccess, setTriggerSuccess] = useState<string | null>(null)
 
   useEffect(() => {
     void loadClients()
@@ -192,6 +194,31 @@ export default function AdminClientsPage() {
     }
 
     setSavingEdit(false)
+  }
+
+  async function handleTriggerOnboarding(clientId: string) {
+    setTriggeringId(clientId)
+    setActionError('')
+    setTriggerSuccess(null)
+
+    const res = await fetch('/api/admin/onboarding/trigger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: clientId, action: 'trigger' }),
+    })
+
+    if (res.ok) {
+      setClients(prev => prev.map(c =>
+        c.id === clientId ? { ...c, onboarding_completed_at: null } : c
+      ))
+      setTriggerSuccess(clientId)
+      setTimeout(() => setTriggerSuccess(null), 3000)
+    } else {
+      const err = await res.json().catch(() => ({}))
+      setActionError(err.error || 'Onboarding triggeren mislukt')
+    }
+
+    setTriggeringId(null)
   }
 
   return (
@@ -377,11 +404,41 @@ export default function AdminClientsPage() {
                     {client.kvk_number && <span>• KvK {client.kvk_number}</span>}
                     {client.btw_number && <span>• BTW {client.btw_number}</span>}
                   </div>
+                  <div className="mt-2">
+                    {client.onboarding_completed_at ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-green-500/15 text-green-400 border border-green-500/20">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Onboarding voltooid
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-yellow-500/15 text-yellow-400 border border-yellow-500/20">
+                        <Clock className="w-3 h-3" />
+                        Onboarding in afwachting
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs text-white/30">
                     {new Date(client.created_at).toLocaleDateString('nl-NL')}
                   </span>
+                  <button
+                    onClick={() => handleTriggerOnboarding(client.id)}
+                    disabled={triggeringId === client.id}
+                    title="Onboarding opnieuw triggeren"
+                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-all ${
+                      triggerSuccess === client.id
+                        ? 'bg-green-500/20 text-green-400'
+                        : 'bg-white/5 hover:bg-white/10 text-white/60 hover:text-white'
+                    }`}
+                  >
+                    {triggeringId === client.id
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : triggerSuccess === client.id
+                        ? <CheckCircle2 className="w-3.5 h-3.5" />
+                        : <RefreshCw className="w-3.5 h-3.5" />}
+                    <span className="hidden sm:inline">{triggerSuccess === client.id ? 'Getriggerd!' : 'Onboarding'}</span>
+                  </button>
                   <button
                     onClick={() => {
                       setEditForm(toEditForm(client))
@@ -390,7 +447,7 @@ export default function AdminClientsPage() {
                     className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white/80 text-sm"
                   >
                     <Pencil className="w-4 h-4" />
-                    Bewerken
+                    <span className="hidden sm:inline">Bewerken</span>
                   </button>
                 </div>
               </div>
