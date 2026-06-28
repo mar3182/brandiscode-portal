@@ -46,8 +46,10 @@ Een professionele, geautomatiseerde onboarding flow bouwen voor nieuwe klanten v
 - [ ] Admin: onboarding triggeren per klant
 - [ ] Admin: voortgang zien (hoeveel stappen voltooid)
 - [ ] Onboarding voltooiing vastleggen in DB (`onboarding_completed_at`)
+- [ ] **Responsive design** — alle pagina's werken correct op mobiel (320px+) en tablet
 
-### Toekomst (buiten scope nu)
+### Toekomst (gepland)
+- PWA / native app Android + macOS (responsive is de fundering)
 - AI chat agent integratie
 - Automatische e-mailnotificaties
 - Meerdere talen

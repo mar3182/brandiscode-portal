@@ -75,9 +75,9 @@ Je werkt als ontwikkelaar aan het **Brand is Code client portal** — een Next.j
 5. **Cache-Control** — API routes die gevoelige data retourneren krijgen `no-store` headers
 6. **Geen hardcoded secrets** — gebruik altijd `process.env.*`
 
----
+7. **Responsive-first** — elke pagina werkt op mobiel (320px+), tablet en desktop. Gebruik Tailwind responsive prefixes (`sm:`, `md:`, `lg:`). Test altijd op kleine schermen. De portal wordt in de toekomst een native app (Android + macOS) — mobile-first is de standaard.
 
-## Git Werkwijze
+---
 
 - **Productie branch:** `main` (deployt automatisch naar Vercel)
 - **Feature branches:** `feature/[naam]`
