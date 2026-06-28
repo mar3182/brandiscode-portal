@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, FileText, LogOut, ArrowLeft, Receipt } from 'lucide-react'
+import { LayoutDashboard, Users, FileText, LogOut, ArrowLeft, Receipt, Menu, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function AdminSidebar() {
   const pathname = usePathname()
   const supabase = createClient()
   const [openFacturenCount, setOpenFacturenCount] = useState(0)
+  const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => {
     async function loadOpenFacturen() {
@@ -40,11 +41,41 @@ export default function AdminSidebar() {
   }
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 glass-card rounded-none border-r border-white/10 flex flex-col z-50">
+    <>
+      {/* Hamburger button — mobile only */}
+      <button
+        className="fixed top-4 left-4 z-50 md:hidden glass-card p-2 rounded-lg"
+        onClick={() => setMobileOpen(true)}
+        aria-label="Menu openen"
+      >
+        <Menu className="w-5 h-5 text-white" />
+      </button>
+
+      {/* Overlay backdrop — mobile only */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 md:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      <aside className={`fixed left-0 top-0 h-screen w-64 glass-card rounded-none border-r border-white/10 flex flex-col z-50 transition-transform duration-300 ${
+        mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+      }`}>
       {/* Logo */}
-      <div className="p-6 border-b border-white/10">
-        <h1 className="text-xl font-bold text-gold-gradient">Brand is Code</h1>
-        <p className="text-xs text-brand-orange mt-1 font-semibold">Admin Panel</p>
+      <div className="p-6 border-b border-white/10 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gold-gradient">Brand is Code</h1>
+          <p className="text-xs text-brand-orange mt-1 font-semibold">Admin Panel</p>
+        </div>
+        {/* Close button — mobile only */}
+        <button
+          className="md:hidden text-white/40 hover:text-white"
+          onClick={() => setMobileOpen(false)}
+          aria-label="Menu sluiten"
+        >
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Navigation */}
@@ -55,6 +86,7 @@ export default function AdminSidebar() {
             <Link
               key={item.name}
               href={item.href}
+              onClick={() => setMobileOpen(false)}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                 isActive
                   ? 'bg-brand-orange/20 text-brand-orange border border-brand-orange/30'
@@ -75,6 +107,7 @@ export default function AdminSidebar() {
         <div className="pt-4 mt-4 border-t border-white/10">
           <Link
             href="/dashboard"
+            onClick={() => setMobileOpen(false)}
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-white/40 hover:text-white hover:bg-white/5 transition-all"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -94,5 +127,6 @@ export default function AdminSidebar() {
         </button>
       </div>
     </aside>
+    </>
   )
 }

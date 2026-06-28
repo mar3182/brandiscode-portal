@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, FileText, BarChart3, MessageSquare, LogOut, ShieldCheck, Users, ClipboardList, Receipt, Building2 } from 'lucide-react'
+import { LayoutDashboard, FileText, BarChart3, MessageSquare, LogOut, ShieldCheck, Users, ClipboardList, Receipt, Building2, Menu, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function Sidebar() {
@@ -12,6 +12,7 @@ export default function Sidebar() {
   const supabase = createClient()
   const [openOnboardingCount, setOpenOnboardingCount] = useState(0)
   const [openFacturenCount, setOpenFacturenCount] = useState(0)
+  const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => {
     async function loadOnboardingCount() {
@@ -65,18 +66,48 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 glass-card rounded-none border-r border-white/10 flex flex-col z-50">
-      {/* Logo */}
-      <div className="p-6 border-b border-white/10">
-        <Image
-          src="/logo.png"
-          alt="Brand is Code"
-          width={160}
-          height={113}
-          className="w-40 h-auto"
-          priority
+    <>
+      {/* Hamburger button — mobile only */}
+      <button
+        className="fixed top-4 left-4 z-50 md:hidden glass-card p-2 rounded-lg"
+        onClick={() => setMobileOpen(true)}
+        aria-label="Menu openen"
+      >
+        <Menu className="w-5 h-5 text-white" />
+      </button>
+
+      {/* Overlay backdrop — mobile only */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 md:hidden"
+          onClick={() => setMobileOpen(false)}
         />
-        <p className="text-xs text-white/50 mt-2">Client Portal</p>
+      )}
+
+      <aside className={`fixed left-0 top-0 h-screen w-64 glass-card rounded-none border-r border-white/10 flex flex-col z-50 transition-transform duration-300 ${
+        mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+      }`}>
+      {/* Logo */}
+      <div className="p-6 border-b border-white/10 flex items-center justify-between">
+        <div>
+          <Image
+            src="/logo.png"
+            alt="Brand is Code"
+            width={160}
+            height={113}
+            className="w-40 h-auto"
+            priority
+          />
+          <p className="text-xs text-white/50 mt-2">Client Portal</p>
+        </div>
+        {/* Close button — mobile only */}
+        <button
+          className="md:hidden text-white/40 hover:text-white"
+          onClick={() => setMobileOpen(false)}
+          aria-label="Menu sluiten"
+        >
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Navigation */}
@@ -87,6 +118,7 @@ export default function Sidebar() {
             <Link
               key={item.name}
               href={item.href}
+              onClick={() => setMobileOpen(false)}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                 isActive
                   ? 'bg-brand-gold/20 text-brand-gold border border-brand-gold/30'
@@ -116,5 +148,6 @@ export default function Sidebar() {
         </button>
       </div>
     </aside>
+    </>
   )
 }
