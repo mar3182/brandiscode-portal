@@ -35,7 +35,7 @@ export async function GET() {
   if (!caller) return noStore({ error: 'Niet ingelogd' }, 401)
 
   const admin = createAdminClient()
-  const { data: client, error } = await admin
+  const { data, error } = await admin
     .from('clients')
     .select(
       'company, contact_person, kvk_number, btw_number, iban, billing_email, ' +
@@ -45,7 +45,22 @@ export async function GET() {
     .eq('id', caller.clientId)
     .single()
 
-  if (error) return noStore({ error: error.message }, 500)
+  if (error) return noStore({ error: (error as { message: string }).message }, 500)
+
+  const client = data as unknown as {
+    company: string | null
+    contact_person: string | null
+    kvk_number: string | null
+    btw_number: string | null
+    iban: string | null
+    billing_email: string | null
+    billing_address_line1: string | null
+    billing_address_line2: string | null
+    billing_postal_code: string | null
+    billing_city: string | null
+    billing_country: string | null
+    onboarding_completed_at: string | null
+  } | null
 
   return noStore({
     client,

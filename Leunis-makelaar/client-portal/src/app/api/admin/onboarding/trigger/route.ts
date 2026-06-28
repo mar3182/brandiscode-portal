@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  const { data: client, error } = await admin
+  const { data: clientRaw, error } = await admin
     .from('clients')
     .select(
       'id, company, name, email, contact_person, kvk_number, btw_number, iban, ' +
@@ -37,7 +37,23 @@ export async function GET(req: NextRequest) {
     .eq('id', clientId)
     .single()
 
-  if (error) return noStore({ error: error.message }, 500)
+  if (error) return noStore({ error: (error as { message: string }).message }, 500)
+
+  const client = clientRaw as unknown as {
+    id: string
+    company: string | null
+    name: string | null
+    email: string | null
+    contact_person: string | null
+    kvk_number: string | null
+    btw_number: string | null
+    iban: string | null
+    billing_email: string | null
+    billing_address_line1: string | null
+    billing_postal_code: string | null
+    billing_city: string | null
+    onboarding_completed_at: string | null
+  } | null
 
   // Bepaal voltooiing per stap op basis van ingevulde velden
   const billingComplete = !!(
