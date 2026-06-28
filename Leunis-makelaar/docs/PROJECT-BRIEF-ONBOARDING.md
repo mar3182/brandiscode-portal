@@ -164,16 +164,19 @@ Informatieve cards, geen invulvelden:
 
 ## 7. VOORTGANG TRACKING
 
-| Taak                                      | Agent | Status         | Notities                               |
-| ----------------------------------------- | ----- | -------------- | -------------------------------------- |
-| Backend API onboarding opslaan in clients | B     | ⬜ Niet gestart |                                        |
-| Backend admin trigger endpoint            | B     | ⬜ Niet gestart |                                        |
-| Frontend wizard stap 1 (bedrijfsgegevens) | A     | ⬜ Niet gestart | Hergebruik companyProfileValidation.ts |
-| Frontend wizard stap 2 (tour)             | A     | ⬜ Niet gestart |                                        |
-| Frontend wizard stap 3 (voltooiing)       | A     | ⬜ Niet gestart |                                        |
-| Admin trigger knop + voortgang            | C     | ⬜ Niet gestart |                                        |
-| Testen end-to-end                         | PM    | ⬜ Niet gestart |                                        |
-| Pushen naar main + Vercel deploy          | PM    | ⬜ Niet gestart |                                        |
+| Taak                                      | Agent | Status  | Notities                                        |
+| ----------------------------------------- | ----- | ------- | ----------------------------------------------- |
+| Backend API onboarding opslaan in clients | B     | ✅ Klaar | `/api/onboarding/wizard` route                  |
+| Backend admin trigger endpoint            | B     | ✅ Klaar | `/api/admin/onboarding/trigger` route           |
+| Middleware redirect naar onboarding       | B     | ✅ Klaar | `middleware.ts` redirect na password_changed    |
+| Frontend wizard stap 1 (bedrijfsgegevens) | A     | ✅ Klaar | KvK/BTW/IBAN maskers, validatie                 |
+| Frontend wizard stap 2 (tour)             | A     | ✅ Klaar | Cards: Team, Facturen, AI Chat (binnenkort)     |
+| Frontend wizard stap 3 (voltooiing)       | A     | ✅ Klaar | `onboarding_completed_at` + redirect dashboard  |
+| Admin trigger knop + voortgang            | C     | ✅ Klaar | Status badge + RefreshCw trigger per klant      |
+| Responsive sidebar + mobile layout        | PM    | ✅ Klaar | Hamburger menu, overlay, `ml-0 md:ml-64`        |
+| Vercel opschonen (1 project)              | PM    | ✅ Klaar | `client-portal-deploy` verwijderd               |
+| Testen end-to-end met echte klant         | PM    | ⬜ Open  | Leunis Makelaars — eerst testgebruiker aanmaken |
+| Supabase migration uitgevoerd             | PM    | ✅ Klaar | `migration-client-profile.sql` in SQL Editor    |
 
 ---
 
