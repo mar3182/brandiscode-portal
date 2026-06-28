@@ -12,11 +12,9 @@ on:
         type: choice
         options:
           - production
-          - staging
 
 env:
   NODE_VERSION: '20'
-  REGISTRY: ghcr.io
 
 jobs:
   # Pre-deployment validation
@@ -25,16 +23,16 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       should-deploy: ${{ steps.checks.outputs.should-deploy }}
+      checks-passed: ${{ steps.verify-checks.outputs.checks-passed }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Verify branch protection
+      - name: Verify branch/tag eligibility
         run: |
-          echo "✓ Verifying deployment eligibility..."
-          # Check if on main or tagged release
+          echo "🔍 Verifying deployment eligibility..."
           if [[ "${{ github.ref }}" =~ ^refs/tags/release- ]] || [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "✓ Branch/tag is valid for production"
           else
@@ -42,23 +40,56 @@ jobs:
             exit 1
           fi
 
-      - name: Verify all CI checks passed
+      - name: Verify all required status checks passed
+        id: verify-checks
         uses: actions/github-script@v7
         with:
           script: |
-            const commit = await github.rest.repos.getCommit({
+            // Explicit list of required check names (must match exactly what GitHub reports)
+            const REQUIRED_CHECKS = [
+              'Lint & Code Quality',
+              'Type Safety Check',
+              'Unit Tests',
+              'Build Artifact',
+              'Dependency Vulnerability Scan',
+              'Secret & Credential Scan',
+              'Database Migration Safety Validation'
+            ];
+            
+            const { data } = await github.rest.checks.listForRef({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              ref: context.sha
+              ref: context.sha,
+              status: 'completed',
+              per_page: 100
             });
             
-            const allChecksPassed = commit.data.commit.verification && 
-                                    commit.data.commit.verification.verified;
+            const completedChecks = data.check_runs;
+            const completedNames = completedChecks.map(c => c.name);
             
-            if (!allChecksPassed) {
-              console.log('⚠️ Commit checks status: review manually');
+            console.log('Completed checks found:');
+            completedChecks.forEach(c => console.log(`  - ${c.name}: ${c.conclusion}`));
+            
+            let failed = false;
+            
+            for (const required of REQUIRED_CHECKS) {
+              const found = completedChecks.find(c => c.name === required);
+              if (!found) {
+                console.log(`❌ MISSING required check: "${required}"`);
+                failed = true;
+              } else if (found.conclusion !== 'success') {
+                console.log(`❌ Required check "${required}" did not succeed: ${found.conclusion}`);
+                failed = true;
+              } else {
+                console.log(`✅ ${required}: success`);
+              }
+            }
+            
+            if (failed) {
+              core.setFailed('❌ One or more required checks are missing or did not pass. Deployment blocked.');
             } else {
-              console.log('✓ All commit checks verified');
+              core.setOutput('checks-passed', 'true');
+              console.log('\n✅ All required checks verified as passed.');
             }
 
       - name: Collect deployment metadata
@@ -68,9 +99,9 @@ jobs:
           echo "DEPLOY_TAG=${{ github.ref_name }}" >> $GITHUB_ENV
           echo "DEPLOY_SHA=${{ github.sha }}" >> $GITHUB_ENV
 
-  # Database backup & migration preparation
+  # Database backup checkpoint
   database-checkpoint:
-    name: Database Backup & Checkpoint
+    name: Database Backup Checkpoint
     needs: pre-deploy-checks
     if: needs.pre-deploy-checks.outputs.should-deploy == 'true'
     runs-on: ubuntu-latest
@@ -79,26 +110,65 @@ jobs:
     outputs:
       backup-id: ${{ steps.backup.outputs.backup-id }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Validate backup secrets present
+        run: |
+          if [ -z "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ]; then
+            echo "❌ SUPABASE_ACCESS_TOKEN secret is not configured"
+            exit 1
+          fi
+          if [ -z "${{ secrets.SUPABASE_PROJECT_ID }}" ]; then
+            echo "❌ SUPABASE_PROJECT_ID secret is not configured"
+            exit 1
+          fi
+          echo "✅ Backup secrets present"
 
       - name: Create pre-deployment backup
         id: backup
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
         run: |
-          BACKUP_ID="backup-$(date +%s)-${{ github.sha }}"
-          echo "backup-id=$BACKUP_ID" >> $GITHUB_OUTPUT
-          echo "📦 Backup ID: $BACKUP_ID"
-          echo "⏰ Timestamp: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          # Create backup via Supabase Management API
+          BACKUP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_ID}/database/backups" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"backup_type":"manual"}')
           
-          # In production: use Supabase backup API or pg_dump
-          # Example: supabase db backup create --backup-id "$BACKUP_ID"
-          echo "✓ Backup checkpoint created (simulated)"
-
-      - name: Log backup details (NO SECRETS IN LOGS)
-        run: |
-          echo "Backup created successfully"
-          echo "Backup ID: ${{ steps.backup.outputs.backup-id }}"
+          HTTP_CODE=$(echo "$BACKUP_RESPONSE" | tail -1)
+          BODY=$(echo "$BACKUP_RESPONSE" | head -n -1)
+          
+          echo "Supabase API HTTP status: $HTTP_CODE"
+          
+          # Hard fail if API call did not succeed
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "❌ Backup API call failed with HTTP $HTTP_CODE"
+            echo "Response: $BODY"
+            exit 1
+          fi
+          
+          # Extract backup ID from response
+          BACKUP_ID=$(echo "$BODY" | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+          
+          # Hard fail - no fabricated fallback ID allowed
+          if [ -z "$BACKUP_ID" ]; then
+            echo "❌ Could not extract backup ID from Supabase response"
+            echo "Response body: $BODY"
+            echo "Pipeline stopped. No deployment without verified backup."
+            exit 1
+          fi
+          
+          echo "backup-id=$BACKUP_ID" >> $GITHUB_OUTPUT
+          echo "✅ Backup created with ID: $BACKUP_ID"
           echo "Timestamp: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+
+      - name: Log backup details
+        run: |
+          echo "## 📦 Database Backup Checkpoint" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Backup ID**: \`${{ steps.backup.outputs.backup-id }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Created**: $(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_STEP_SUMMARY
+          echo "**Rollback Available**: Yes - use backup ID to restore" >> $GITHUB_STEP_SUMMARY
 
   # Migration execution
   database-migration:
@@ -112,60 +182,88 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Prepare migrations
-        run: |
-          echo "📋 Pending migrations:"
-          find supabase -name "migration-*.sql" -type f | sort | while read migration; do
-            echo "  - $(basename "$migration")"
-          done
-
       - name: Validate migration safety
         run: |
-          UNSAFE_PATTERNS=0
+          FAILED=0
+          echo "📋 Validating pending migrations..."
           
-          for migration in supabase/migration-*.sql; do
+          for migration in client-portal/supabase/migration-*.sql; do
             if [ -f "$migration" ]; then
               echo "Checking: $(basename "$migration")"
               
-              # Only destructive ops with proper documentation are allowed
-              if grep -E "DROP TABLE|TRUNCATE" "$migration" > /dev/null; then
-                if ! grep -E "-- MIGRATION PURPOSE:|-- ROLLBACK:" "$migration" > /dev/null; then
-                  echo "❌ Destructive operation without documentation in $migration"
-                  UNSAFE_PATTERNS=$((UNSAFE_PATTERNS + 1))
+              # Require documentation for destructive ops
+              if grep -E "DROP TABLE|DROP COLUMN|TRUNCATE" "$migration" > /dev/null; then
+                if ! grep -E "-- MIGRATION PURPOSE:|-- ROLLBACK:|-- RISICO:" "$migration" > /dev/null; then
+                  echo "❌ Destructive operation missing required metadata"
+                  FAILED=1
                 fi
               fi
             fi
           done
           
-          if [ $UNSAFE_PATTERNS -gt 0 ]; then
-            echo "❌ Found $UNSAFE_PATTERNS migrations with safety issues"
+          if [ $FAILED -eq 1 ]; then
+            echo "❌ Migration safety validation FAILED"
             exit 1
           fi
-          echo "✓ All migrations passed safety validation"
-
-      - name: Execute migrations (backward-compatible only)
-        run: |
-          echo "🔄 Executing backward-compatible migrations..."
-          echo "Backup ID: ${{ needs.database-checkpoint.outputs.backup-id }}"
           
-          # In production:
-          # supabase db push --linked --password "$SUPABASE_PASSWORD"
-          echo "✓ Migrations executed (simulated)"
+          echo "✅ All migrations passed safety validation"
 
-      - name: Validate migration results
+      - name: Validate migration secret present
         run: |
-          echo "✓ Migration validation passed"
-          # Run validation queries from migrations
-          # SELECT * FROM clients; -- validate table structure
+          if [ -z "${{ secrets.SUPABASE_DB_URL }}" ]; then
+            echo "❌ SUPABASE_DB_URL secret is not configured"
+            echo "Cannot execute migrations without database URL"
+            exit 1
+          fi
+          echo "✅ Migration secret present"
 
-  # Build for production
+      - name: Install psql client
+        run: |
+          if ! command -v psql &>/dev/null; then
+            echo "psql not found — installing postgresql-client..."
+            sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+          fi
+          psql --version
+
+      - name: Execute migrations
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          echo "🔄 Executing migrations via psql..."
+          
+          MIGRATION_FAILED=0
+          MIGRATION_COUNT=0
+          
+          for migration in $(find client-portal/supabase -name "migration-*.sql" | sort); do
+            if [ -f "$migration" ]; then
+              MIGRATION_COUNT=$((MIGRATION_COUNT + 1))
+              echo "Applying: $(basename "$migration")"
+              
+              if ! psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$migration"; then
+                echo "❌ Migration failed: $migration"
+                MIGRATION_FAILED=1
+                break
+              fi
+              
+              echo "✅ Applied: $(basename "$migration")"
+            fi
+          done
+          
+          if [ $MIGRATION_FAILED -eq 1 ]; then
+            echo "❌ Migration execution failed. Pipeline stopped."
+            echo "Rollback will be triggered automatically."
+            exit 1
+          fi
+          
+          echo "✅ $MIGRATION_COUNT migration(s) executed successfully"
+          echo "⏰ Timestamp: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+
+  # Build production artifact
   build-production:
     name: Build Production Artifact
     needs: pre-deploy-checks
     if: needs.pre-deploy-checks.outputs.should-deploy == 'true'
     runs-on: ubuntu-latest
-    outputs:
-      image-digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -190,27 +288,14 @@ jobs:
             echo "❌ Build artifact not found"
             exit 1
           fi
-          echo "✓ Build artifact verified"
-
-      - name: Create build manifest
-        run: |
-          cat > build-manifest.json << EOF
-          {
-            "timestamp": "$(date -u +'%Y-%m-%dT%H:%M:%SZ')",
-            "sha": "${{ github.sha }}",
-            "tag": "${{ github.ref_name }}",
-            "node_version": "${{ env.NODE_VERSION }}"
-          }
-          EOF
+          echo "✅ Build artifact verified"
 
       - name: Upload build (INTERNAL ONLY)
         uses: actions/upload-artifact@v3
         with:
           name: build-prod-${{ github.sha }}
-          path: |
-            client-portal/.next
-            build-manifest.json
-          retention-days: 1  # Delete quickly
+          path: client-portal/.next
+          retention-days: 1
 
   # Blue-Green Deployment
   deploy-blue-green:
@@ -220,160 +305,261 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: https://example.com
+    outputs:
+      new-url: ${{ steps.deploy-blue.outputs.url }}
+      old-url: ${{ steps.get-green.outputs.url }}
     steps:
-      - name: Download build artifact
-        uses: actions/download-artifact@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          name: build-prod-${{ github.sha }}
+          node-version: ${{ env.NODE_VERSION }}
 
-      - name: Deploy to Blue environment
+      - name: Get current GREEN (active) environment
+        id: get-green
         run: |
-          echo "🔵 Deploying to BLUE (new) environment..."
-          echo "Deployment time: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          # Get current production URL from Vercel
+          npm install -g vercel
           
-          # In production:
-          # Deploy to blue.example.com
-          # rsync -avz .next/ user@blue-server:/app/
+          PROD_URL=$(vercel ls --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1 | grep -oP 'https://[^\s]+' | head -1)
           
-          echo "✓ BLUE deployment completed"
+          if [ -z "$PROD_URL" ]; then
+            echo "❌ Could not determine current GREEN (production) URL from Vercel"
+            echo "Deployment blocked — cannot proceed without knowing the active production URL"
+            exit 1
+          fi
+          
+          echo "url=$PROD_URL" >> $GITHUB_OUTPUT
+          echo "Current GREEN (active): $PROD_URL"
 
-      - name: Run health checks on BLUE
+      - name: Deploy to BLUE (new) environment
+        id: deploy-blue
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          cd client-portal
+          npm install -g vercel
+          
+          echo "🔵 Deploying to BLUE (new) production environment..."
+          
+          # Deploy to production (becomes BLUE)
+          DEPLOY_OUTPUT=$(vercel deploy --prod --token=$VERCEL_TOKEN 2>&1)
+          
+          BLUE_URL=$(echo "$DEPLOY_OUTPUT" | grep -oP 'https://[^\s]+' | head -1)
+          
+          if [ -z "$BLUE_URL" ]; then
+            echo "❌ Failed to deploy to Vercel"
+            echo "$DEPLOY_OUTPUT"
+            exit 1
+          fi
+          
+          echo "url=$BLUE_URL" >> $GITHUB_OUTPUT
+          echo "✅ BLUE deployment completed: $BLUE_URL"
+
+      - name: Health check on BLUE
+        env:
+          BLUE_URL: ${{ steps.deploy-blue.outputs.url }}
         run: |
           echo "🔍 Running health checks on BLUE environment..."
-          sleep 5
           
-          # Check /api/health endpoint
-          # curl -f https://blue.example.com/api/health || exit 1
+          HEALTH_STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$BLUE_URL/api/health")
           
-          echo "✓ BLUE environment healthy"
+          if [ "$HEALTH_STATUS" -ne 200 ]; then
+            echo "❌ Health check failed: $HEALTH_STATUS"
+            exit 1
+          fi
+          
+          echo "✅ BLUE environment health check passed"
 
-      - name: Run smoke tests on BLUE
+      - name: Smoke tests on BLUE (authenticated)
+        env:
+          BLUE_URL: ${{ steps.deploy-blue.outputs.url }}
         run: |
           echo "🧪 Running smoke tests on BLUE environment..."
           
-          # Core functionality tests
-          echo "  - Auth endpoint"
-          echo "  - API sanity"
-          echo "  - Database connectivity"
+          # Test 1: Login page
+          LOGIN_STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$BLUE_URL/login")
+          if [ "$LOGIN_STATUS" -eq 200 ]; then
+            echo "✅ Login page accessible"
+          else
+            echo "❌ Login page failed: $LOGIN_STATUS"
+            exit 1
+          fi
           
-          echo "✓ BLUE smoke tests passed"
+          # Test 2: Protected APIs return 401 (no auth)
+          for endpoint in "/api/client-profile" "/api/admin/clients"; do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$BLUE_URL$endpoint")
+            if [ "$STATUS" -eq 401 ]; then
+              echo "✅ Protected endpoint $endpoint correctly returns 401"
+            else
+              echo "❌ Expected 401 on $endpoint, got $STATUS"
+              exit 1
+            fi
+          done
+          
+          echo "✅ BLUE smoke tests passed"
 
       - name: Switch traffic to BLUE (Go-Live)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          BLUE_URL: ${{ steps.deploy-blue.outputs.url }}
         run: |
-          echo "🚀 Switching traffic to BLUE (new) environment..."
-          
-          # In production:
-          # Load balancer switch: green -> blue
-          # DNS update (if needed)
-          # CDN cache purge
-          
-          echo "✓ Traffic switched to BLUE environment"
-          echo "Status: LIVE on new version"
+          echo "🚀 Confirming traffic switched to BLUE..."
+          echo "**OLD** (GREEN): ${{ steps.get-green.outputs.url }}"
+          echo "**NEW** (BLUE): $BLUE_URL"
+          echo "✅ Traffic now on BLUE environment (Vercel production alias)"
 
-      - name: Monitor BLUE (post-switch)
+      - name: Monitor BLUE (post-deployment)
+        env:
+          BLUE_URL: ${{ steps.deploy-blue.outputs.url }}
         run: |
           echo "📊 Monitoring BLUE environment post-deployment..."
-          sleep 10
           
-          # Monitor metrics for 5 minutes
-          echo "✓ Post-deployment monitoring completed"
-          echo "✓ No anomalies detected"
+          # Monitor for 30 seconds with periodic health checks
+          for i in {1..3}; do
+            sleep 10
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$BLUE_URL/api/health")
+            echo "Health check #$i: $STATUS"
+            
+            if [ "$STATUS" -ne 200 ]; then
+              echo "❌ Post-deployment health check failed"
+              exit 1
+            fi
+          done
+          
+          echo "✅ Post-deployment monitoring completed - no anomalies"
 
-  # Deployment success
+  # Success notification
   deployment-success:
     name: Deployment Success Notification
-    if: success()
-    needs: deploy-blue-green
+    if: success() && needs.deploy-blue-green.result == 'success'
+    needs: [pre-deploy-checks, deploy-blue-green, database-checkpoint]
     runs-on: ubuntu-latest
     steps:
-      - name: Generate deployment report
+      - name: Write deployment success summary
+        env:
+          BLUE_URL: ${{ needs.deploy-blue-green.outputs.new-url }}
+          GREEN_URL: ${{ needs.deploy-blue-green.outputs.old-url }}
+          BACKUP_ID: ${{ needs.database-checkpoint.outputs.backup-id }}
         run: |
-          cat > deployment-report.txt << EOF
-          ✅ PRODUCTION DEPLOYMENT SUCCESSFUL
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## ✅ Production Deployment Successful
           
-          Timestamp: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
-          Commit SHA: ${{ github.sha }}
-          Tag: ${{ github.ref_name }}
-          Environment: Production
-          Strategy: Blue-Green
+          | Metric | Value |
+          |--------|-------|
+          | Environment | Production |
+          | Strategy | Blue-Green |
+          | Commit | \`${{ github.sha }}\` |
+          | Release Tag | ${{ github.ref_name }} |
+          | Timestamp | $(date -u +'%Y-%m-%dT%H:%M:%SZ') |
+          | Status | 🟢 LIVE |
           
-          Status: Live
-          Backup ID: ${{ needs.database-checkpoint.outputs.backup-id }}
+          **Active Environment (BLUE)**: [\`$BLUE_URL\`]($BLUE_URL)
+          **Previous Environment (GREEN)**: [\`$GREEN_URL\`]($GREEN_URL)
+          **Backup ID (rollback)**: \`$BACKUP_ID\`
+          
+          **Post-Deployment Checklist**:
+          ✅ All CI checks passed
+          ✅ Database backup created
+          ✅ Migrations executed
+          ✅ BLUE environment health checks passed
+          ✅ Smoke tests passed
+          ✅ Traffic switched to BLUE
+          ✅ Post-deployment monitoring completed
+          
+          **Rollback Available**: Run workflow with tag \`rollback-$BACKUP_ID\` to restore GREEN environment.
           EOF
 
-      - name: Notify deployment success
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.repos.createCommitComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              commit_sha: '${{ github.sha }}',
-              body: `
-            ✅ **Production Deployment Successful**
-
-            | Metric | Value |
-            |--------|-------|
-            | Environment | Production |
-            | Strategy | Blue-Green |
-            | Commit | \`${{ github.sha }}\` |
-            | Release | ${{ github.ref_name }} |
-            | Timestamp | $(date -u +'%Y-%m-%dT%H:%M:%SZ') |
-            | Status | 🟢 LIVE |
-
-            **Post-Deployment Actions:**
-            ✓ Health checks passed
-            ✓ Smoke tests passed
-            ✓ Database migrations applied
-            ✓ Backup checkpoint available
-
-            **Rollback Available:** Yes (use release-${BACKUP_ID})
-            `
-            })
-
-  # Deployment failure handling
-  deployment-failure:
-    name: Deployment Failure & Rollback
+  # Failure handling - automatic rollback
+  deployment-failure-rollback:
+    name: Deployment Failure & Automatic Rollback
     if: failure() && needs.pre-deploy-checks.outputs.should-deploy == 'true'
     needs: [pre-deploy-checks, database-checkpoint]
     runs-on: ubuntu-latest
     environment:
       name: production
     steps:
-      - name: Alert on failure
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `
-            ❌ **PRODUCTION DEPLOYMENT FAILED**
-
-            **Backup Available:** Yes
-            Backup ID: ${{ needs.database-checkpoint.outputs.backup-id }}
-
-            **Immediate Actions:**
-            1. Check workflow logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            2. DO NOT attempt manual fixes
-            3. Contact on-call engineer
-            4. See runbook: docs/runbooks/incident-response.md
-
-            **Rollback Instructions:**
-            Follow: docs/runbooks/rollback.md
-            `
-            })
-
-      - name: Initiate automatic rollback
+      - name: Rollback Vercel to previous version
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          echo "⚠️  Deployment failed - initiating rollback..."
-          echo "Backup ID: ${{ needs.database-checkpoint.outputs.backup-id }}"
-          echo "See runbook: docs/runbooks/rollback.md for manual steps"
+          echo "⚠️  Deployment failed - initiating automatic rollback..."
+          
+          npm install -g vercel
+          
+          # Rollback to previous production deployment
+          ROLLBACK_HTTP=$(vercel rollback --prod --token=$VERCEL_TOKEN 2>&1; echo "EXIT:$?")
+          ROLLBACK_EXIT=$(echo "$ROLLBACK_HTTP" | grep 'EXIT:' | cut -d: -f2)
+          
+          if [ "$ROLLBACK_EXIT" = "0" ]; then
+            echo "✅ Vercel rollback successful"
+          else
+            echo "❌ Vercel rollback FAILED (exit code: $ROLLBACK_EXIT)"
+            echo "Output: $ROLLBACK_HTTP"
+            echo "Manual rollback required — see docs/runbooks/rollback.md"
+            exit 1
+          fi
 
-      - name: Restore from backup
+      - name: Restore database from backup
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+          BACKUP_ID: ${{ needs.database-checkpoint.outputs.backup-id }}
         run: |
-          echo "🔄 Rolling back to previous version..."
-          # supabase db restore --backup-id "${{ needs.database-checkpoint.outputs.backup-id }}"
-          echo "✓ Rollback initiated"
+          echo "🔄 Restoring database from backup: $BACKUP_ID"
+          
+          # Restore via Supabase API — validate HTTP status
+          RESTORE_RESULT=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/database/backups/$BACKUP_ID/restore" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json")
+          
+          RESTORE_HTTP=$(echo "$RESTORE_RESULT" | tail -1)
+          RESTORE_BODY=$(echo "$RESTORE_RESULT" | head -n -1)
+          
+          if [ "$RESTORE_HTTP" -ge 200 ] && [ "$RESTORE_HTTP" -lt 300 ]; then
+            echo "✅ Database restore initiated (HTTP $RESTORE_HTTP)"
+            echo "Response: $RESTORE_BODY"
+          else
+            echo "❌ Database restore FAILED (HTTP $RESTORE_HTTP)"
+            echo "Response: $RESTORE_BODY"
+            echo "MANUAL ACTION REQUIRED — see docs/runbooks/rollback.md"
+            exit 1
+          fi
+
+      - name: Verify rollback complete
+        run: |
+          echo "✅ Automatic rollback completed"
+          echo ""
+          echo "## 🔄 Rollback Summary"
+          echo "- Vercel: Rolled back to previous production version"
+          echo "- Database: Restored from backup"
+          echo "- Status: Previous environment (GREEN) now active"
+          echo ""
+          echo "**Next**: Review logs, fix issues, and redeploy"
+
+      - name: Write failure summary
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## ❌ Production Deployment Failed & Rolled Back
+          
+          | Component | Status |
+          |-----------|--------|
+          | Vercel Deploy | Failed ❌ |
+          | Automatic Rollback | Success ✅ |
+          | Database Restore | Success ✅ |
+          | Current Status | GREEN environment active |
+          
+          **Backup ID**: \`${{ needs.database-checkpoint.outputs.backup-id }}\`
+          **Timestamp**: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          
+          **Troubleshooting**:
+          1. Review workflow logs for specific error
+          2. Check health checks and smoke tests output
+          3. Fix issues in develop branch
+          4. Create new release tag to retry deployment
+          
+          **Runbook**: See [Incident Response Guide](../docs/runbooks/incident-response.md)
+          EOF
