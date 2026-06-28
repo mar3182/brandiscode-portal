@@ -117,6 +117,53 @@ AI implementeren hoeft niet chaotisch of eng te zijn. Brand is Code doet het in 
 
 ---
 
+## Workshop: Microsoft 365 Copilot Agents (op locatie)
+
+Mary geeft een praktische workshop over het bouwen en gebruiken van agents in Microsoft 365 Copilot.
+
+**Kennisbron:** Het volledige transcript van de referentievideo staat in `docs/m365-copilot-agents-workshop-transcript.txt` — gebruik dit als primaire bron voor alle workshopinhoud.
+
+### Kerninhoud van de workshop (uit transcript):
+
+**Gratis versie (Copilot Chat):**
+- Agent = subject matter expert met vaste instructies + toon
+- Beschrijf je agent in 2-3 zinnen → Copilot genereert instructies automatisch
+- Kennisbron: specifieke website of alle websites
+- Beperking: géén SharePoint/OneDrive-bestanden — alleen websites
+- Extra capabilities: document/chart/code genereren (code interpreter), afbeeldingen genereren
+
+**Betaalde versie (Microsoft 365 Copilot):**
+- Toegang tot "Work IQ": e-mails, Teams-chats, SharePoint-bestanden, vergaderingen
+- Agent beginnen met lege kennisbron → jij bepaalt wat het mag gebruiken
+- Agents delen met collega's via link
+- **Researcher agent**: diep chain-of-thought onderzoek, web + werkdata, max 25x/maand
+- **Analyst agent**: data-analyse vanuit spreadsheets/PDF's, grafieken genereren
+- Agents vanuit SharePoint/OneDrive direct aanmaken op een document
+
+**Grens vrij → betaald:**
+- Alles over agents in de gratis chat is website-only
+- Betaald = bestanden, Teams, e-mail, SharePoint als kennisbron
+
+**Copilot Studio (voor makers):**
+- Lichte versie = wat je bouwt in M365 Copilot chat
+- Volledige Copilot Studio = scheduling, enterprise connectors, topics/workflows, pro-dev
+- Bestaande agent kopiëren naar Copilot Studio via "Copy to Copilot Studio"
+
+### Workshop werkvormen (suggesties):
+1. **Demo first**: toon verschil algemene chat vs. gerichte agent met dezelfde prompt
+2. **Hands-on**: deelnemers bouwen eigen agent via "describe" tab
+3. **Kennisbron koppelen**: website toevoegen als grounding (max 2 niveaus diep in URL)
+4. **Praktijkcase**: agent voor FAQ van hun eigen bedrijf of HR-beleid
+5. **Afsluiting**: researcher/analyst demo als "wow-moment" voor betaalde versie
+
+### Valkuilen om te benoemen:
+- Website URL mag niet meer dan 2 niveaus diep zijn (jamesclear.com/posts ✅, learn.microsoft.com/en-us/copilot/m365 ❌)
+- Verborgen content op websites (JavaScript-tabellen, embedded readers) wordt niet gelezen
+- Gratis versie: SharePoint-bestanden uploaden lijkt te werken maar geeft een foutmelding
+- Agent gedeeld met collega → collega heeft alleen toegang als hij/zij ook rechten heeft op de onderliggende bestanden
+
+---
+
 ## Wat ik nooit doe
 
 - Vage strategische praatjes zonder concrete output
