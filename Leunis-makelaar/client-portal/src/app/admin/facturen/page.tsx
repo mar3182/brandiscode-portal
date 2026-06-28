@@ -4,7 +4,8 @@ import { FormEvent, useEffect, useMemo, useState } from 'react'
 import StatCard from '@/components/StatCard'
 import StatusBadge from '@/components/StatusBadge'
 import type { Factuur, FactuurStatus } from '@/lib/types'
-import { Loader2, Plus, Receipt } from 'lucide-react'
+import { generateFactuurPDF, type FactuurClientInfo } from '@/lib/generateFactuurPDF'
+import { Download, Loader2, Plus, Receipt } from 'lucide-react'
 
 interface ClientLite {
   id: string
@@ -214,6 +215,22 @@ export default function AdminFacturenPage() {
     setSavingEdit(false)
   }
 
+  const handleDownloadPDF = (factuur: any) => {
+    const client: FactuurClientInfo | null = factuur.clients
+      ? {
+          name: factuur.clients.name ?? '',
+          company: factuur.clients.company ?? null,
+          billing_address_line1: factuur.clients.billing_address_line1 ?? null,
+          billing_address_line2: factuur.clients.billing_address_line2 ?? null,
+          billing_postal_code: factuur.clients.billing_postal_code ?? null,
+          billing_city: factuur.clients.billing_city ?? null,
+          billing_email: factuur.clients.billing_email ?? null,
+          btw_number: factuur.clients.btw_number ?? null,
+        }
+      : null
+    generateFactuurPDF(factuur as Factuur, client)
+  }
+
   const deleteFactuur = async (id: string) => {
     const ok = window.confirm('Weet je zeker dat je deze factuur wilt verwijderen?')
     if (!ok) return
@@ -374,6 +391,15 @@ export default function AdminFacturenPage() {
                         <option value="herinnering">Herinnering</option>
                         <option value="betaald">Betaald</option>
                       </select>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadPDF(factuur)}
+                        className="px-2 py-1 rounded-lg text-xs border border-brand-gold/30 text-brand-gold hover:bg-brand-gold/10 inline-flex items-center gap-1"
+                        title="Download PDF"
+                      >
+                        <Download className="w-3 h-3" />
+                        PDF
+                      </button>
                       <button
                         type="button"
                         onClick={() => openEditModal(factuur)}

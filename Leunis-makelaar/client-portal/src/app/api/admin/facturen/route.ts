@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
   let query = admin
     .from('facturen')
-    .select('*, clients(name, company), sprints(number, title)')
+    .select('*, clients(name, company, billing_address_line1, billing_address_line2, billing_postal_code, billing_city, billing_email, btw_number), sprints(number, title)')
     .order('created_at', { ascending: false })
 
   if (clientId) {
