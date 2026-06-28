@@ -67,6 +67,18 @@ export async function middleware(request: NextRequest) {
       url.pathname = '/dashboard/wachtwoord-wijzigen'
       return NextResponse.redirect(url)
     }
+
+    // Forceer onboarding als deze nog niet voltooid is (na wachtwoord wijzigen)
+    if (
+      user.email !== process.env.ADMIN_EMAIL &&
+      user.user_metadata?.password_changed &&
+      !user.user_metadata?.onboarding_completed &&
+      pathname !== '/dashboard/onboarding'
+    ) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard/onboarding'
+      return NextResponse.redirect(url)
+    }
   }
 
   // Bescherm /admin routes — vereist admin e-mail
