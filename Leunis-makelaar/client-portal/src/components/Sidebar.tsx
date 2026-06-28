@@ -16,16 +16,20 @@ export default function Sidebar() {
 
   useEffect(() => {
     async function loadOnboardingCount() {
-      const res = await fetch('/api/onboarding')
+      const res = await fetch('/api/training-intake')
       if (!res.ok) return
       const data = await res.json()
-      if (!Array.isArray(data)) return
 
-      const unanswered = data.filter(
-        (question: any) => question.is_required && !question.answer?.trim()
-      ).length
+      if (data?.completeness?.readyForTraining === true) {
+        setOpenOnboardingCount(0)
+        return
+      }
 
-      setOpenOnboardingCount(unanswered)
+      const missingCount = Array.isArray(data?.completeness?.missingRequiredFields)
+        ? data.completeness.missingRequiredFields.length
+        : 1
+
+      setOpenOnboardingCount(missingCount)
     }
 
     loadOnboardingCount()
@@ -52,13 +56,13 @@ export default function Sidebar() {
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Offertes', href: '/dashboard/offertes', icon: FileText },
     { name: 'Projectstatus', href: '/dashboard/projecten', icon: BarChart3 },
-    { name: 'Informatie', href: '/dashboard/onboarding', icon: ClipboardList, badge: openOnboardingCount },
+    { name: 'Training Intake', href: '/dashboard/onboarding', icon: ClipboardList, badge: openOnboardingCount },
     { name: 'Bedrijfsgegevens', href: '/dashboard/bedrijfsgegevens', icon: Building2 },
     { name: 'Facturen', href: '/dashboard/facturen', icon: Receipt, badge: openFacturenCount, badgeClass: 'bg-red-500/20 text-red-300' },
     { name: 'Feedback', href: '/dashboard/feedback', icon: MessageSquare },
     { name: 'Team', href: '/dashboard/team', icon: Users },
     { name: 'Wachtwoord', href: '/dashboard/wachtwoord-wijzigen', icon: ShieldCheck },
-  ], [openOnboardingCount])
+  ], [openFacturenCount, openOnboardingCount])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()

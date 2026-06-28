@@ -12,6 +12,8 @@ export default function DashboardPage() {
   const [offertes, setOffertes] = useState<Offerte[]>([])
   const [sprints, setSprints] = useState<Sprint[]>([])
   const [clientName, setClientName] = useState('')
+  const [trainingReady, setTrainingReady] = useState(false)
+  const [trainingMissing, setTrainingMissing] = useState<string[]>([])
   const supabase = createClient()
 
   useEffect(() => {
@@ -40,6 +42,13 @@ export default function DashboardPage() {
         .order('number', { ascending: true })
 
       if (sprintData) setSprints(sprintData)
+
+      const trainingRes = await fetch('/api/training-intake')
+      if (trainingRes.ok) {
+        const trainingData = await trainingRes.json()
+        setTrainingReady(Boolean(trainingData?.completeness?.readyForTraining))
+        setTrainingMissing(Array.isArray(trainingData?.completeness?.missingRequiredFields) ? trainingData.completeness.missingRequiredFields : [])
+      }
     }
 
     loadData()
@@ -88,6 +97,24 @@ export default function DashboardPage() {
           icon={Clock}
           color="pink"
         />
+      </div>
+
+      {/* Recent offertes */}
+      <div className={`glass-card p-6 mb-6 border ${trainingReady ? 'border-green-500/30' : 'border-yellow-500/30'}`}>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Training Intake</h2>
+            <p className={`text-sm mt-1 ${trainingReady ? 'text-green-300' : 'text-yellow-200'}`}>
+              {trainingReady ? 'Ready for training' : 'Nog niet compleet'}
+            </p>
+            {!trainingReady && trainingMissing.length > 0 ? (
+              <p className="text-xs text-white/60 mt-1">Ontbrekende velden: {trainingMissing.join(', ')}</p>
+            ) : null}
+          </div>
+          <Link href="/dashboard/onboarding" className="text-sm text-brand-gold hover:underline">
+            Intake openen →
+          </Link>
+        </div>
       </div>
 
       {/* Recent offertes */}

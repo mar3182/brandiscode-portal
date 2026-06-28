@@ -2,6 +2,8 @@ export type OfferteStatus = 'concept' | 'verstuurd' | 'bekeken' | 'getekend' | '
 export type SprintStatus = 'gepland' | 'actief' | 'review' | 'afgerond' | 'afgewezen'
 export type DeliverableStatus = 'todo' | 'in_progress' | 'review' | 'done'
 export type FactuurStatus = 'concept' | 'verstuurd' | 'betaald' | 'herinnering'
+export type TrainingIntakeStatus = 'draft' | 'submitted' | 'reviewed' | 'planned'
+export type TrainingSessionStatus = 'proposed' | 'confirmed' | 'completed' | 'cancelled'
 
 export interface Client {
   id: string
@@ -131,6 +133,59 @@ export interface Factuur {
   btw_amount: number
   total_amount: number
   sprint?: Sprint | null
+}
+
+export interface TrainingIntake {
+  id: string
+  client_id: string
+  status: TrainingIntakeStatus
+  training_duration: '2u' | '3u' | null
+  preferred_datetime: string | null
+  preferred_time_note: string | null
+  contact_person: string | null
+  contact_email: string | null
+  focus_area: string
+  privacy_constraints: string | null
+  data_usage_consent: boolean
+  trainer_notes: string | null
+  submitted_at: string | null
+  reviewed_at: string | null
+  planned_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface TrainingIntakeMember {
+  id: string
+  intake_id: string
+  client_id: string
+  full_name: string | null
+  role: string | null
+  top_tasks: string[]
+  bottleneck: string | null
+  kpi_goal: string | null
+  digital_skill: number | null
+  ai_experience: string | null
+  prompt_data_boundary: string | null
+  training_day_availability: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface TrainingSession {
+  id: string
+  intake_id: string
+  client_id: string
+  status: TrainingSessionStatus
+  session_start: string | null
+  session_end: string | null
+  proposed_duration_hours: number | null
+  location_or_link: string | null
+  agenda: string | null
+  admin_notes: string | null
+  created_at: string
+  updated_at: string
 }
 
 export function computeFactuurBedragen(factuur: Pick<Factuur, 'amount' | 'btw_percentage'>) {

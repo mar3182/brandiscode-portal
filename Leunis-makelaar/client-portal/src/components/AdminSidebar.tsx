@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, FileText, LogOut, ArrowLeft, Receipt, Menu, X } from 'lucide-react'
+import { LayoutDashboard, Users, FileText, LogOut, ArrowLeft, Receipt, Menu, X, ClipboardList } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function AdminSidebar() {
   const pathname = usePathname()
   const supabase = createClient()
   const [openFacturenCount, setOpenFacturenCount] = useState(0)
+  const [pendingTrainingCount, setPendingTrainingCount] = useState(0)
   const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => {
@@ -28,12 +29,27 @@ export default function AdminSidebar() {
     loadOpenFacturen()
   }, [])
 
+  useEffect(() => {
+    async function loadPendingTrainingIntakes() {
+      const res = await fetch('/api/admin/training-intakes', { cache: 'no-store' })
+      if (!res.ok) return
+      const data = await res.json()
+      if (!Array.isArray(data)) return
+
+      const pending = data.filter((intake: any) => intake.status !== 'planned').length
+      setPendingTrainingCount(pending)
+    }
+
+    loadPendingTrainingIntakes()
+  }, [])
+
   const adminNav = useMemo(() => [
     { name: 'Overzicht', href: '/admin', icon: LayoutDashboard },
     { name: 'Klanten', href: '/admin/clients', icon: Users },
     { name: 'Offertes & Sprints', href: '/admin/offertes', icon: FileText },
+    { name: 'Training Intakes', href: '/admin/training-intakes', icon: ClipboardList, badge: pendingTrainingCount },
     { name: 'Facturen', href: '/admin/facturen', icon: Receipt, badge: openFacturenCount },
-  ], [openFacturenCount])
+  ], [openFacturenCount, pendingTrainingCount])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()

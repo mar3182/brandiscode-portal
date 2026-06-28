@@ -18,6 +18,7 @@ interface RecentMessage {
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({ clients: 0, offertes: 0, signed: 0, feedback: 0 })
+  const [trainingStats, setTrainingStats] = useState({ total: 0, pending: 0, planned: 0 })
   const [recentOffertes, setRecentOffertes] = useState<any[]>([])
   const [recentMessages, setRecentMessages] = useState<RecentMessage[]>([])
 
@@ -73,6 +74,18 @@ export default function AdminDashboard() {
         setRecentOffertes(offertes.slice(0, 5))
         setRecentMessages(allMessages.slice(0, 10))
       }
+
+      const trainingRes = await fetch('/api/admin/training-intakes', { cache: 'no-store' })
+      if (trainingRes.ok) {
+        const training = await trainingRes.json()
+        if (Array.isArray(training)) {
+          setTrainingStats({
+            total: training.length,
+            pending: training.filter((item: any) => item.status !== 'planned').length,
+            planned: training.filter((item: any) => item.status === 'planned').length,
+          })
+        }
+      }
     }
     load()
   }, [])
@@ -103,6 +116,11 @@ export default function AdminDashboard() {
           <FileText className="w-8 h-8 text-brand-gold mb-3" />
           <h3 className="text-white font-semibold">Offerte aanmaken</h3>
           <p className="text-white/40 text-sm mt-1">Nieuwe offerte met sprints en deliverables.</p>
+        </Link>
+        <Link href="/admin/training-intakes" className="glass-card p-6 hover:border-brand-orange/30 transition-all group">
+          <MessageSquare className="w-8 h-8 text-brand-orange mb-3" />
+          <h3 className="text-white font-semibold">Training intakes</h3>
+          <p className="text-white/40 text-sm mt-1">{trainingStats.pending} openstaand, {trainingStats.planned} gepland.</p>
         </Link>
       </div>
 
