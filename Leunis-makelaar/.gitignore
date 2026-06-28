@@ -1,0 +1,119 @@
+# ==========================================
+# SENSITIVE DATA: Client & Project-Specific
+# ==========================================
+# All client folders - NEVER COMMIT
+brandiscode/
+paasdijkweg-bijlage/
+
+# Client documents and communications
+offerte-*.md
+offerte-*.pdf
+email-*.md
+voorbereiding-*.md
+Offerte-*.pdf
+Praktische-*.pdf
+AI-Advies-*.md
+
+# Marketing and internal materials
+*.pptx
+tarievenoverzicht-*.md
+analyse-*.md
+
+# ==========================================
+# ENVIRONMENT & CREDENTIALS
+# ==========================================
+.env
+.env.local
+.env*.local
+.env.production.local
+.env.*.local
+.secrets/
+
+# ==========================================
+# PYTHON
+# ==========================================
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ==========================================
+# NODE.JS
+# ==========================================
+node_modules/
+npm-debug.log*
+npm-error.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp
+.pnp.js
+
+# ==========================================
+# NEXT.JS
+# ==========================================
+.next/
+out/
+.vercel/
+next-env.d.ts
+
+# ==========================================
+# TYPESCRIPT
+# ==========================================
+*.tsbuildinfo
+dist/
+
+# ==========================================
+# IDE & EDITOR
+# ==========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.history/
+*.sublime-workspace
+*.sublime-project
+
+# ==========================================
+# TESTING & COVERAGE
+# ==========================================
+coverage/
+.nyc_output/
+
+# ==========================================
+# DATABASE & BACKUPS
+# ==========================================
+*.sql.backup
+*.db
+*.sqlite
+dump*.sql
+
+# ==========================================
+# BUILD & TEMP
+# ==========================================
+dist/
+build/
+tmp/
+temp/
+.temp/
+*.log
+
+# ==========================================
+# MISCELLANEOUS
+# ==========================================
+bfg.jar
+.DS_Store
+*.wpress
+*.bak
