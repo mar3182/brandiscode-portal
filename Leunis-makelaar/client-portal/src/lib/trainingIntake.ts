@@ -57,15 +57,6 @@ function isWhatsapp(value: string) {
   return /^\+?[0-9]{8,15}$/.test(normalized)
 }
 
-function hasWhatsappTemplatePortalLinkNote(value: string) {
-  const normalized = value.trim().toLowerCase()
-  if (!normalized) return false
-
-  const hasTemplate = normalized.includes('template')
-  const hasPortalLink = normalized.includes('portal-link') || normalized.includes('portal link')
-  return hasTemplate && hasPortalLink
-}
-
 export function validateCommunicationPreference(
   input: Pick<
     TrainingIntakeInput,
@@ -114,10 +105,6 @@ export function validateCommunicationPreference(
 
     if (input.portal_notifications_enabled || hasText(input.communication_email)) {
       errors.push('Bij kanaal WhatsApp is alleen een template-bericht met portal-link toegestaan.')
-    }
-
-    if (!hasWhatsappTemplatePortalLinkNote(input.communication_notes)) {
-      errors.push('Voor kanaal WhatsApp moet de notitie aangeven dat alleen een template-bericht met portal-link wordt verstuurd.')
     }
   }
 
@@ -181,10 +168,6 @@ export function computeTrainingCompleteness(input: TrainingIntakeInput): Trainin
     if (input.communication_channel === 'whatsapp') {
       if (!hasText(input.communication_whatsapp)) {
         missingRequiredFields.push('WhatsApp-nummer')
-      }
-
-      if (!hasWhatsappTemplatePortalLinkNote(input.communication_notes)) {
-        missingRequiredFields.push('Communicatie-notitie (template met portal-link)')
       }
     }
   }

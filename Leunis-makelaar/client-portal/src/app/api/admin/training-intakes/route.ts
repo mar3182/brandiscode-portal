@@ -352,6 +352,7 @@ export async function PATCH(req: NextRequest) {
       communication_email: String(nextCommunication.communication_email || ''),
       communication_whatsapp: String(nextCommunication.communication_whatsapp || ''),
       communication_consent: Boolean(nextCommunication.communication_consent),
+      communication_notes: String(nextCommunication.communication_notes ?? ''),
       portal_notifications_enabled: Boolean(nextCommunication.portal_notifications_enabled),
     })
 
