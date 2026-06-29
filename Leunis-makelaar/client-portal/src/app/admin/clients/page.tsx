@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Users, Plus, Loader2, Pencil, Save, X, RefreshCw, CheckCircle2, Clock } from 'lucide-react'
+import Link from 'next/link'
+import { Users, Plus, Loader2, Pencil, Save, X, RefreshCw, CheckCircle2, Clock, ExternalLink } from 'lucide-react'
 import type { Client } from '@/lib/types'
 import {
   type ProfileFieldErrors,
@@ -439,6 +440,13 @@ export default function AdminClientsPage() {
                         : <RefreshCw className="w-3.5 h-3.5" />}
                     <span className="hidden sm:inline">{triggerSuccess === client.id ? 'Getriggerd!' : 'Onboarding'}</span>
                   </button>
+                  <Link
+                    href={`/admin/clients/${client.id}`}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-orange/20 hover:bg-brand-orange/30 text-brand-orange text-sm"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    <span className="hidden sm:inline">Bekijken</span>
+                  </Link>
                   <button
                     onClick={() => {
                       setEditForm(toEditForm(client))
