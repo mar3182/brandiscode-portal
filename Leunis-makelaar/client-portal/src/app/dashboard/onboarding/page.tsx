@@ -11,6 +11,7 @@ import {
 import {
   DEFAULT_FOCUS_AREA,
   computeTrainingCompleteness,
+  validateCommunicationPreference,
   validateTrainingIntake,
   type TrainingIntakeInput,
   type TrainingIntakeMemberInput,
@@ -35,6 +36,13 @@ const STEPS = [
   { id: 4, label: 'Samenvatting' },
   { id: 5, label: 'Klaar' },
 ]
+
+const STATUS_LABELS: Record<'draft' | 'submitted' | 'reviewed' | 'planned', string> = {
+  draft: 'Concept',
+  submitted: 'Ingediend',
+  reviewed: 'Beoordeeld',
+  planned: 'Gepland',
+}
 
 interface BillingForm {
   contact_person: string
@@ -86,6 +94,7 @@ export default function OnboardingPage() {
   const [successMessage, setSuccessMessage] = useState('')
   const [fieldErrors, setFieldErrors] = useState<ProfileFieldErrors>({})
   const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const [channelTouched, setChannelTouched] = useState(false)
   const [status, setStatus] = useState<'draft' | 'submitted' | 'reviewed' | 'planned'>('draft')
 
   const [billing, setBilling] = useState<BillingForm>(emptyBilling)
@@ -98,8 +107,14 @@ export default function OnboardingPage() {
     focus_area: DEFAULT_FOCUS_AREA,
     privacy_constraints: '',
     data_usage_consent: false,
+    communication_channel: '',
+    communication_email: '',
+    communication_whatsapp: '',
+    portal_notifications_enabled: false,
     trainer_notes: '',
     members: [createEmptyMember(0)],
+      communication_consent: false,
+      communication_notes: '',
   })
 
   useEffect(() => {
@@ -141,6 +156,14 @@ export default function OnboardingPage() {
             focus_area: intakeData.intake.focus_area ?? DEFAULT_FOCUS_AREA,
             privacy_constraints: intakeData.intake.privacy_constraints ?? '',
             data_usage_consent: Boolean(intakeData.intake.data_usage_consent),
+            communication_channel: intakeData.intake.communication_channel === 'portal' || intakeData.intake.communication_channel === 'email' || intakeData.intake.communication_channel === 'whatsapp'
+              ? intakeData.intake.communication_channel
+              : '',
+            communication_email: intakeData.intake.communication_email ?? '',
+            communication_whatsapp: intakeData.intake.communication_whatsapp ?? '',
+              communication_consent: Boolean(intakeData.intake.communication_consent),
+              communication_notes: intakeData.intake.communication_notes ?? '',
+            portal_notifications_enabled: Boolean(intakeData.intake.portal_notifications_enabled),
             trainer_notes: intakeData.intake.trainer_notes ?? '',
             members: Array.isArray(intakeData.members) && intakeData.members.length > 0
               ? intakeData.members.map((member: any, index: number) => ({
@@ -171,6 +194,7 @@ export default function OnboardingPage() {
   }, [])
 
   const completeness = useMemo(() => computeTrainingCompleteness(training), [training])
+  const communicationErrors = useMemo(() => validateCommunicationPreference(training), [training])
 
   async function saveBilling() {
     const res = await fetch('/api/onboarding/wizard', {
@@ -229,6 +253,7 @@ export default function OnboardingPage() {
   async function handleSubmitIntake() {
     setSaving(true)
     setError('')
+    setChannelTouched(true)
 
     const localErrors = validateTrainingIntake(training)
     if (localErrors.length > 0) {
@@ -374,7 +399,7 @@ export default function OnboardingPage() {
             <ClipboardList className="w-5 h-5 text-brand-gold" />
             <div>
               <h2 className="text-xl font-bold text-white">Training Intake (klantniveau)</h2>
-              <p className="text-white/50 text-sm">Status: {status}</p>
+              <p className="text-white/50 text-sm">Status: {STATUS_LABELS[status]}</p>
             </div>
           </div>
 
@@ -418,6 +443,135 @@ export default function OnboardingPage() {
             <input type="checkbox" checked={training.data_usage_consent} onChange={(e) => setTraining((prev) => ({ ...prev, data_usage_consent: e.target.checked }))} className="mt-1" />
             Ik ga akkoord dat deze data gebruikt wordt voor trainingsvoorbereiding.
           </label>
+
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+            <div>
+              <h3 className="text-white font-semibold">Communicatievoorkeur</h3>
+              <p className="text-xs text-white/50 mt-1">Kies hoe je trainingsvoorstellen en bevestigingen wilt ontvangen.</p>
+            </div>
+
+            <fieldset>
+              <legend className="text-sm text-white/70 mb-2">Voorkeurskanaal *</legend>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {[
+                  { value: 'portal', label: 'Portal' },
+                  { value: 'email', label: 'E-mail' },
+                  { value: 'whatsapp', label: 'WhatsApp' },
+                ].map((option) => (
+                  <label key={option.value} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 cursor-pointer transition ${training.communication_channel === option.value ? 'border-brand-gold/60 bg-brand-gold/10 text-white' : 'border-white/15 bg-white/5 text-white/80 hover:bg-white/10'}`}>
+                    <input
+                      type="radio"
+                      name="communication-channel"
+                      value={option.value}
+                      checked={training.communication_channel === option.value}
+                      onChange={(e) => {
+                        const channel = e.target.value as 'portal' | 'email' | 'whatsapp'
+                        setChannelTouched(true)
+                        setTraining((prev) => ({
+                          ...prev,
+                          communication_channel: channel,
+                          communication_email: channel === 'email' ? prev.communication_email : '',
+                          communication_whatsapp: channel === 'whatsapp' ? prev.communication_whatsapp : '',
+                          communication_notes:
+                            channel === 'whatsapp'
+                              ? prev.communication_notes || 'Alleen template-bericht met portal-link versturen.'
+                              : '',
+                          portal_notifications_enabled: channel === 'portal',
+                        }))
+                      }}
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            {training.communication_channel === 'portal' ? (
+              <label className="flex items-start gap-3 text-sm text-white/80">
+                <input
+                  type="checkbox"
+                  checked={training.portal_notifications_enabled}
+                  onChange={(e) => {
+                    setChannelTouched(true)
+                    setTraining((prev) => ({ ...prev, portal_notifications_enabled: e.target.checked }))
+                  }}
+                  className="mt-1"
+                />
+                Ik wil meldingen in het portal ontvangen voor nieuwe voorstellen en bevestigingen.
+              </label>
+            ) : null}
+
+            {training.communication_channel === 'email' ? (
+              <div>
+                <label className="block text-sm text-white/60 mb-1.5">E-mailadres voor communicatie *</label>
+                <input
+                  type="email"
+                  className={INPUT_CLASS}
+                  value={training.communication_email}
+                  onChange={(e) => {
+                    setChannelTouched(true)
+                    setTraining((prev) => ({ ...prev, communication_email: e.target.value }))
+                  }}
+                  placeholder="bijv. planning@bedrijf.nl"
+                />
+              </div>
+            ) : null}
+
+            {training.communication_channel === 'whatsapp' ? (
+              <div className="space-y-3">
+                <label className="block text-sm text-white/60 mb-1.5">WhatsApp-nummer *</label>
+                <input
+                  type="tel"
+                  className={INPUT_CLASS}
+                  value={training.communication_whatsapp}
+                  onChange={(e) => {
+                    setChannelTouched(true)
+                    setTraining((prev) => ({ ...prev, communication_whatsapp: e.target.value }))
+                  }}
+                  placeholder="bijv. +31612345678"
+                />
+
+                <div>
+                  <label className="block text-sm text-white/60 mb-1.5">Template-notitie *</label>
+                  <textarea
+                    className={`${INPUT_CLASS} min-h-20`}
+                    value={training.communication_notes}
+                    onChange={(e) => {
+                      setChannelTouched(true)
+                      setTraining((prev) => ({ ...prev, communication_notes: e.target.value }))
+                    }}
+                    placeholder="Bevestig dat alleen een template-bericht met portal-link wordt verstuurd."
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {training.communication_channel ? (
+              <label className="flex items-start gap-3 text-sm text-white/80">
+                <input
+                  type="checkbox"
+                  checked={training.communication_consent}
+                  onChange={(e) => {
+                    setChannelTouched(true)
+                    setTraining((prev) => ({ ...prev, communication_consent: e.target.checked }))
+                  }}
+                  className="mt-1"
+                />
+                Ik geef toestemming om voorstellen en bevestigingen via dit kanaal te ontvangen.
+              </label>
+            ) : null}
+
+            {channelTouched && communicationErrors.length > 0 ? (
+              <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3" role="status" aria-live="polite">
+                <p className="text-red-200 text-sm font-medium">Controleer je communicatievoorkeur:</p>
+                <ul className="mt-1 list-disc pl-5 text-xs text-red-100 space-y-1">
+                  {communicationErrors.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
             <button onClick={handleDraftSave} disabled={saving} className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 text-white hover:bg-white/20">
@@ -492,12 +646,18 @@ export default function OnboardingPage() {
             <p><strong className="text-white">Trainingsduur:</strong> {training.training_duration || '-'}</p>
             <p><strong className="text-white">Voorkeursmoment:</strong> {training.preferred_datetime || '-'}</p>
             <p><strong className="text-white">Contact:</strong> {training.contact_person || '-'} ({training.contact_email || '-'})</p>
+            <p><strong className="text-white">Communicatiekanaal:</strong> {training.communication_channel || '-'}</p>
+            <p><strong className="text-white">Kanaaltoestemming:</strong> {training.communication_consent ? 'Ja' : 'Nee'}</p>
+            {training.communication_channel === 'email' ? <p><strong className="text-white">Kanaal e-mail:</strong> {training.communication_email || '-'}</p> : null}
+            {training.communication_channel === 'whatsapp' ? <p><strong className="text-white">WhatsApp:</strong> {training.communication_whatsapp || '-'}</p> : null}
+            {training.communication_channel === 'whatsapp' ? <p><strong className="text-white">Template-notitie:</strong> {training.communication_notes || '-'}</p> : null}
+            {training.communication_channel === 'portal' ? <p><strong className="text-white">Portalmeldingen:</strong> {training.portal_notifications_enabled ? 'Aan' : 'Uit'}</p> : null}
             <p><strong className="text-white">Focus:</strong> {training.focus_area}</p>
             <p><strong className="text-white">Teamleden:</strong> {training.members.length}</p>
           </div>
 
           <div className={`rounded-xl p-4 border ${completeness.readyForTraining ? 'border-green-500/40 bg-green-500/10 text-green-200' : 'border-yellow-500/40 bg-yellow-500/10 text-yellow-100'}`}>
-            <p className="font-semibold">{completeness.readyForTraining ? 'Ready for training' : 'Nog niet compleet'}</p>
+            <p className="font-semibold">{completeness.readyForTraining ? 'Ready for training' : 'Nog niet klaar voor planning'}</p>
             {!completeness.readyForTraining ? (
               <ul className="mt-2 text-sm list-disc pl-5 space-y-1">
                 {completeness.missingRequiredFields.map((item) => (
@@ -533,7 +693,7 @@ export default function OnboardingPage() {
             <CheckCircle2 className="w-7 h-7 text-green-400" />
           </div>
           <h2 className="text-2xl font-bold text-white">Intake ingediend</h2>
-          <p className="text-white/60">Bedankt! We gebruiken deze gegevens om de Copilot-workshop voor jullie team te personaliseren.</p>
+          <p className="text-white/60">Bedankt. De status staat nu op <span className="text-white font-medium">Ingediend</span>. Ons team beoordeelt jullie intake en plant daarna de trainingssessie. Je ontvangt hiervan een update.</p>
           <button onClick={() => router.push('/dashboard')} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-brand-gold text-black font-semibold">
             Naar dashboard <ArrowRight className="w-4 h-4" />
           </button>

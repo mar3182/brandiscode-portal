@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
+import { validateCommunicationPreference } from '@/lib/trainingIntake'
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -34,6 +35,27 @@ function getMissingFields(intake: Record<string, unknown>, memberCount: number) 
   if (!intake.focus_area) missing.push('Focusgebied')
   if (!intake.privacy_constraints) missing.push('Privacy/security randvoorwaarden')
   if (!intake.data_usage_consent) missing.push('Akkoord datagebruik')
+
+  const channel = intake.communication_channel
+  if (channel !== 'portal' && channel !== 'email' && channel !== 'whatsapp') {
+    missing.push('Communicatiekanaal')
+  } else if (!intake.communication_consent) {
+    missing.push('Communicatie-toestemming')
+  } else if (channel === 'portal' && !intake.portal_notifications_enabled) {
+    missing.push('Portalmeldingen')
+  } else if (channel === 'email' && !intake.communication_email) {
+    missing.push('Communicatie e-mail')
+  } else if (channel === 'whatsapp' && !intake.communication_whatsapp) {
+    missing.push('WhatsApp-nummer')
+  } else if (
+    channel === 'whatsapp' &&
+    (!String(intake.communication_notes || '').toLowerCase().includes('template') ||
+      (!String(intake.communication_notes || '').toLowerCase().includes('portal-link') &&
+        !String(intake.communication_notes || '').toLowerCase().includes('portal link')))
+  ) {
+    missing.push('Communicatie-notitie (template met portal-link)')
+  }
+
   if (memberCount === 0) missing.push('Teamlidgegevens')
 
   return missing
@@ -150,6 +172,12 @@ export async function PATCH(req: NextRequest) {
     intake_id?: string
     status?: 'draft' | 'submitted' | 'reviewed' | 'planned'
     trainer_notes?: string
+    communication_channel?: 'portal' | 'email' | 'whatsapp'
+    communication_email?: string
+    communication_whatsapp?: string
+    communication_consent?: boolean
+    communication_notes?: string
+    portal_notifications_enabled?: boolean
     session?: {
       status?: 'proposed' | 'confirmed' | 'completed' | 'cancelled'
       session_start?: string
@@ -167,7 +195,7 @@ export async function PATCH(req: NextRequest) {
 
   const { data: intake, error: intakeError } = await admin
     .from('training_intakes')
-    .select('id, client_id, status, training_duration, preferred_datetime, contact_person, contact_email, focus_area, privacy_constraints, data_usage_consent')
+    .select('id, client_id, status, training_duration, preferred_datetime, contact_person, contact_email, focus_area, privacy_constraints, data_usage_consent, communication_channel, communication_email, communication_whatsapp, communication_consent, communication_notes, portal_notifications_enabled')
     .eq('id', body.intake_id)
     .single()
 
@@ -180,7 +208,7 @@ export async function PATCH(req: NextRequest) {
 
   if (memberCountError) return noStore({ error: memberCountError.message }, 500)
 
-  const missingRequiredFields = getMissingFields(
+  let missingRequiredFields = getMissingFields(
     intake as unknown as Record<string, unknown>,
     memberCount || 0
   )
@@ -188,6 +216,93 @@ export async function PATCH(req: NextRequest) {
   const updatePayload: Record<string, unknown> = {
     updated_by: user.id,
     updated_at: new Date().toISOString(),
+  }
+
+  const nextCommunication = {
+    communication_channel: body.communication_channel ?? intake.communication_channel,
+    communication_email: body.communication_email ?? intake.communication_email ?? '',
+    communication_whatsapp: body.communication_whatsapp ?? intake.communication_whatsapp ?? '',
+    communication_consent: typeof body.communication_consent === 'boolean' ? body.communication_consent : Boolean(intake.communication_consent),
+    communication_notes: body.communication_notes ?? intake.communication_notes ?? '',
+    portal_notifications_enabled:
+      typeof body.portal_notifications_enabled === 'boolean'
+        ? body.portal_notifications_enabled
+        : Boolean(intake.portal_notifications_enabled),
+  }
+
+  const communicationFieldsTouched =
+    body.communication_channel !== undefined ||
+    body.communication_email !== undefined ||
+    body.communication_whatsapp !== undefined ||
+    body.communication_consent !== undefined ||
+    body.communication_notes !== undefined ||
+    body.portal_notifications_enabled !== undefined
+
+  if (communicationFieldsTouched) {
+    const communicationErrors = validateCommunicationPreference(nextCommunication)
+    if (communicationErrors.length > 0) {
+      return noStore(
+        {
+          error: 'Communicatievoorkeur is onvolledig of ongeldig.',
+          validationErrors: communicationErrors,
+        },
+        422
+      )
+    }
+
+    updatePayload.communication_channel = nextCommunication.communication_channel || null
+    updatePayload.communication_consent = nextCommunication.communication_consent
+    updatePayload.communication_notes = nextCommunication.communication_notes?.trim() || null
+
+    if (nextCommunication.communication_channel === 'portal') {
+      updatePayload.portal_notifications_enabled = true
+      updatePayload.communication_email = null
+      updatePayload.communication_whatsapp = null
+      missingRequiredFields = getMissingFields(
+        {
+          ...intake,
+          communication_channel: 'portal',
+          communication_consent: nextCommunication.communication_consent,
+          communication_notes: nextCommunication.communication_notes,
+          portal_notifications_enabled: true,
+          communication_email: null,
+          communication_whatsapp: null,
+        },
+        memberCount || 0
+      )
+    } else if (nextCommunication.communication_channel === 'email') {
+      updatePayload.portal_notifications_enabled = false
+      updatePayload.communication_email = nextCommunication.communication_email.trim().toLowerCase() || null
+      updatePayload.communication_whatsapp = null
+      missingRequiredFields = getMissingFields(
+        {
+          ...intake,
+          communication_channel: 'email',
+          communication_consent: nextCommunication.communication_consent,
+          communication_notes: nextCommunication.communication_notes,
+          portal_notifications_enabled: false,
+          communication_email: nextCommunication.communication_email.trim().toLowerCase() || null,
+          communication_whatsapp: null,
+        },
+        memberCount || 0
+      )
+    } else if (nextCommunication.communication_channel === 'whatsapp') {
+      updatePayload.portal_notifications_enabled = false
+      updatePayload.communication_email = null
+      updatePayload.communication_whatsapp = nextCommunication.communication_whatsapp.trim() || null
+      missingRequiredFields = getMissingFields(
+        {
+          ...intake,
+          communication_channel: 'whatsapp',
+          communication_consent: nextCommunication.communication_consent,
+          communication_notes: nextCommunication.communication_notes,
+          portal_notifications_enabled: false,
+          communication_email: null,
+          communication_whatsapp: nextCommunication.communication_whatsapp.trim() || null,
+        },
+        memberCount || 0
+      )
+    }
   }
 
   if (typeof body.status === 'string') {
@@ -231,6 +346,30 @@ export async function PATCH(req: NextRequest) {
   if (updateError) return noStore({ error: updateError.message }, 500)
 
   if (body.session) {
+    const hasCommunicationGap = missingRequiredFields.some((field) =>
+      ['Communicatiekanaal', 'Communicatie-toestemming', 'Portalmeldingen', 'Communicatie e-mail', 'WhatsApp-nummer', 'Communicatie-notitie (template met portal-link)'].includes(field)
+    )
+
+    const communicationErrors = validateCommunicationPreference({
+      communication_channel: (nextCommunication.communication_channel as 'portal' | 'email' | 'whatsapp' | '') || '',
+      communication_email: String(nextCommunication.communication_email || ''),
+      communication_whatsapp: String(nextCommunication.communication_whatsapp || ''),
+      communication_consent: Boolean(nextCommunication.communication_consent),
+      communication_notes: String(nextCommunication.communication_notes || ''),
+      portal_notifications_enabled: Boolean(nextCommunication.portal_notifications_enabled),
+    })
+
+    if (hasCommunicationGap || communicationErrors.length > 0) {
+      return noStore(
+        {
+          error: 'Voorstel versturen kan nog niet: communicatievoorkeur is incompleet.',
+          missingRequiredFields,
+          validationErrors: communicationErrors,
+        },
+        422
+      )
+    }
+
     const { error: sessionError } = await admin.from('training_sessions').insert({
       intake_id: body.intake_id,
       client_id: intake.client_id,
