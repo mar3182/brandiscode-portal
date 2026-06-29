@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { validateCommunicationPreference } from '@/lib/trainingIntake'
 import { createClient } from '@/lib/supabase/server'
+import { sendTrainingProposalEmail } from '@/lib/email'
 import { NextRequest, NextResponse } from 'next/server'
 
 type IntakeStatus = 'draft' | 'submitted' | 'reviewed' | 'planned'
@@ -47,13 +48,6 @@ function getMissingFields(intake: Record<string, unknown>, memberCount: number) 
     missing.push('Communicatie e-mail')
   } else if (channel === 'whatsapp' && !intake.communication_whatsapp) {
     missing.push('WhatsApp-nummer')
-  } else if (
-    channel === 'whatsapp' &&
-    (!String(intake.communication_notes || '').toLowerCase().includes('template') ||
-      (!String(intake.communication_notes || '').toLowerCase().includes('portal-link') &&
-        !String(intake.communication_notes || '').toLowerCase().includes('portal link')))
-  ) {
-    missing.push('Communicatie-notitie (template met portal-link)')
   }
 
   if (memberCount === 0) missing.push('Teamlidgegevens')
@@ -193,13 +187,16 @@ export async function PATCH(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  const { data: intake, error: intakeError } = await admin
+  const { data: intakeWithClient, error: intakeError } = await admin
     .from('training_intakes')
-    .select('id, client_id, status, training_duration, preferred_datetime, contact_person, contact_email, focus_area, privacy_constraints, data_usage_consent, communication_channel, communication_email, communication_whatsapp, communication_consent, communication_notes, portal_notifications_enabled')
+    .select('id, client_id, status, training_duration, preferred_datetime, contact_person, contact_email, focus_area, privacy_constraints, data_usage_consent, communication_channel, communication_email, communication_whatsapp, communication_consent, communication_notes, portal_notifications_enabled, clients(name, company, email)')
     .eq('id', body.intake_id)
     .single()
 
   if (intakeError) return noStore({ error: intakeError.message }, 500)
+
+  const intake = intakeWithClient as Omit<typeof intakeWithClient, 'clients'>
+  const clientData = intakeWithClient?.clients as { name?: string; company?: string; email?: string } | null
 
   const { count: memberCount, error: memberCountError } = await admin
     .from('training_intake_members')
@@ -347,7 +344,7 @@ export async function PATCH(req: NextRequest) {
 
   if (body.session) {
     const hasCommunicationGap = missingRequiredFields.some((field) =>
-      ['Communicatiekanaal', 'Communicatie-toestemming', 'Portalmeldingen', 'Communicatie e-mail', 'WhatsApp-nummer', 'Communicatie-notitie (template met portal-link)'].includes(field)
+      ['Communicatiekanaal', 'Communicatie-toestemming', 'Portalmeldingen', 'Communicatie e-mail', 'WhatsApp-nummer'].includes(field)
     )
 
     const communicationErrors = validateCommunicationPreference({
@@ -355,7 +352,6 @@ export async function PATCH(req: NextRequest) {
       communication_email: String(nextCommunication.communication_email || ''),
       communication_whatsapp: String(nextCommunication.communication_whatsapp || ''),
       communication_consent: Boolean(nextCommunication.communication_consent),
-      communication_notes: String(nextCommunication.communication_notes || ''),
       portal_notifications_enabled: Boolean(nextCommunication.portal_notifications_enabled),
     })
 
@@ -386,6 +382,44 @@ export async function PATCH(req: NextRequest) {
     })
 
     if (sessionError) return noStore({ error: sessionError.message }, 500)
+
+    // Auto-trigger: stuur e-mail zodra sessie aangemaakt wordt bij 'planned' status
+    if (updatePayload.status === 'planned' || (intake.status === 'planned' && !updatePayload.status)) {
+      try {
+        const { data: newSession } = await admin
+          .from('training_sessions')
+          .select('confirm_token, session_start, proposed_duration_hours, location_or_link, agenda')
+          .eq('intake_id', body.intake_id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+
+        if (newSession) {
+          const channel = intake.communication_channel as string | null
+          const contactEmail =
+            channel === 'email' && intake.communication_email
+              ? String(intake.communication_email)
+              : String(clientData?.email ?? '')
+
+          if (contactEmail) {
+            await sendTrainingProposalEmail({
+              to: contactEmail,
+              contactName: String(intake.contact_person ?? clientData?.name ?? 'Klant'),
+              companyName: String(clientData?.company ?? clientData?.name ?? 'Uw bedrijf'),
+              sessionStart: newSession.session_start as string | null,
+              durationHours: newSession.proposed_duration_hours as number | null,
+              locationOrLink: newSession.location_or_link as string | null,
+              agenda: newSession.agenda as string | null,
+              confirmToken: newSession.confirm_token as string,
+            }).catch(() => {
+              // e-mail fout blokkeert de response niet — admin kan handmatig opnieuw sturen
+            })
+          }
+        }
+      } catch {
+        // zwijgend falen: sessie is wél aangemaakt
+      }
+    }
   }
 
   return noStore({ success: true })

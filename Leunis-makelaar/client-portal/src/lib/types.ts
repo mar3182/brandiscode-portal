@@ -3,7 +3,7 @@ export type SprintStatus = 'gepland' | 'actief' | 'review' | 'afgerond' | 'afgew
 export type DeliverableStatus = 'todo' | 'in_progress' | 'review' | 'done'
 export type FactuurStatus = 'concept' | 'verstuurd' | 'betaald' | 'herinnering'
 export type TrainingIntakeStatus = 'draft' | 'submitted' | 'reviewed' | 'planned'
-export type TrainingSessionStatus = 'proposed' | 'confirmed' | 'completed' | 'cancelled'
+export type TrainingSessionStatus = 'proposed' | 'confirmed' | 'completed' | 'cancelled' | 'rescheduled'
 export type CommunicationChannel = 'portal' | 'email' | 'whatsapp'
 
 export interface Client {
