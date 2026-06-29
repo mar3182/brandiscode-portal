@@ -24,6 +24,7 @@ import type { Client, Factuur, FactuurStatus, Offerte, OfferteStatus, Sprint, Tr
 // ── local sub-types ───────────────────────────────────────────────────────────
 interface TrainingRow extends TrainingIntake {
   completeness: number
+  readyForTraining: boolean
   memberCount: number
   sessionCount: number
 }

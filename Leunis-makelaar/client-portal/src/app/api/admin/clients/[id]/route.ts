@@ -55,9 +55,12 @@ export async function GET(
   const trainingen = (trainingRes.data || []).map((t: Record<string, unknown>) => {
     const members = Array.isArray(t.training_intake_members) ? t.training_intake_members : []
     const sessions = Array.isArray(t.training_sessions) ? t.training_sessions : []
+    const comp = computeTrainingCompleteness({ ...t, members } as import('@/lib/trainingIntake').TrainingIntakeInput)
+    const completenessPercent = (comp.intakeFieldsComplete ? 50 : 0) + (comp.membersComplete ? 50 : 0)
     return {
       ...t,
-      completeness: computeTrainingCompleteness({ ...t, members } as import('@/lib/trainingIntake').TrainingIntakeInput),
+      completeness: completenessPercent,
+      readyForTraining: comp.readyForTraining,
       memberCount: members.length,
       sessionCount: sessions.length,
     }
