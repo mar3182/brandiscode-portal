@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { Users, Plus, Loader2, Pencil, Save, X, RefreshCw, CheckCircle2, Clock, ExternalLink } from 'lucide-react'
 import type { Client } from '@/lib/types'
 import {
@@ -54,6 +55,11 @@ const initialForm: ClientForm = {
 const INPUT_CLASS = 'w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-brand-blue/50 transition-all'
 
 export default function AdminClientsPage() {
+  const searchParams = useSearchParams()
+  const preferredTab = searchParams.get('tab')
+  const detailTab = preferredTab === 'offertes' || preferredTab === 'training' || preferredTab === 'facturen' || preferredTab === 'overzicht'
+    ? preferredTab
+    : 'overzicht'
   const [clients, setClients] = useState<Client[]>([])
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -441,7 +447,7 @@ export default function AdminClientsPage() {
                     <span className="hidden sm:inline">{triggerSuccess === client.id ? 'Getriggerd!' : 'Onboarding'}</span>
                   </button>
                   <Link
-                    href={`/admin/clients/${client.id}`}
+                    href={`/admin/clients/${client.id}?tab=${detailTab}`}
                     className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-orange/20 hover:bg-brand-orange/30 text-brand-orange text-sm"
                   >
                     <ExternalLink className="w-4 h-4" />

@@ -62,7 +62,7 @@ function mapIntakePayload(payload: Record<string, unknown>): TrainingIntakeInput
     communication_email: typeof payload.communication_email === 'string' ? payload.communication_email : '',
     communication_whatsapp: typeof payload.communication_whatsapp === 'string' ? payload.communication_whatsapp : '',
     communication_consent: Boolean(payload.communication_consent),
-    communication_notes: typeof payload.communication_notes === 'string' ? payload.communication_notes : '',
+    communication_notes: '',
     portal_notifications_enabled: Boolean(payload.portal_notifications_enabled),
     trainer_notes: typeof payload.trainer_notes === 'string' ? payload.trainer_notes : '',
     members: members.map((member, index) => {
@@ -155,7 +155,7 @@ async function getIntakeForClient(clientId: string) {
     communication_email: intake.communication_email || '',
     communication_whatsapp: intake.communication_whatsapp || '',
     communication_consent: Boolean(intake.communication_consent),
-    communication_notes: intake.communication_notes || '',
+    communication_notes: '',
     portal_notifications_enabled: Boolean(intake.portal_notifications_enabled),
     trainer_notes: intake.trainer_notes || '',
     members: (members || []).map((member) => ({
@@ -266,7 +266,6 @@ export async function PUT(req: NextRequest) {
     communication_email: communicationEmail,
     communication_whatsapp: communicationWhatsapp,
     communication_consent: input.communication_consent,
-    communication_notes: input.communication_notes.trim() || null,
     portal_notifications_enabled: portalNotificationsEnabled,
     submitted_at: isSubmit ? new Date().toISOString() : null,
     updated_by: caller.userId,

@@ -14,7 +14,16 @@ export default function DashboardPage() {
   const [clientName, setClientName] = useState('')
   const [trainingReady, setTrainingReady] = useState(false)
   const [trainingMissing, setTrainingMissing] = useState<string[]>([])
+  const [trainingStatus, setTrainingStatus] = useState<'draft' | 'submitted' | 'reviewed' | 'planned' | null>(null)
+  const [trainingPlannedAt, setTrainingPlannedAt] = useState<string | null>(null)
   const supabase = createClient()
+
+  const trainingStatusLabel: Record<'draft' | 'submitted' | 'reviewed' | 'planned', string> = {
+    draft: 'Concept',
+    submitted: 'Ingediend',
+    reviewed: 'Beoordeeld',
+    planned: 'Gepland',
+  }
 
   useEffect(() => {
     async function loadData() {
@@ -48,6 +57,12 @@ export default function DashboardPage() {
         const trainingData = await trainingRes.json()
         setTrainingReady(Boolean(trainingData?.completeness?.readyForTraining))
         setTrainingMissing(Array.isArray(trainingData?.completeness?.missingRequiredFields) ? trainingData.completeness.missingRequiredFields : [])
+        setTrainingStatus(trainingData?.intake?.status ?? null)
+
+        const sessionDate = Array.isArray(trainingData?.sessions) && trainingData.sessions.length > 0
+          ? trainingData.sessions.find((session: any) => Boolean(session?.session_start))?.session_start ?? null
+          : null
+        setTrainingPlannedAt(sessionDate)
       }
     }
 
@@ -104,16 +119,39 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-white">Training Intake</h2>
+            {trainingStatus ? (
+              <p className="text-sm mt-1 text-white/70">
+                Status: <span className="text-white font-medium">{trainingStatusLabel[trainingStatus]}</span>
+              </p>
+            ) : null}
             <p className={`text-sm mt-1 ${trainingReady ? 'text-green-300' : 'text-yellow-200'}`}>
               {trainingReady ? 'Ready for training' : 'Nog niet compleet'}
             </p>
+            {trainingStatus === 'planned' && trainingPlannedAt ? (
+              <p className="text-xs text-green-200 mt-1">
+                Gepland op {new Date(trainingPlannedAt).toLocaleString('nl-NL', {
+                  day: '2-digit',
+                  month: 'long',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </p>
+            ) : null}
             {!trainingReady && trainingMissing.length > 0 ? (
               <p className="text-xs text-white/60 mt-1">Ontbrekende velden: {trainingMissing.join(', ')}</p>
             ) : null}
           </div>
-          <Link href="/dashboard/onboarding" className="text-sm text-brand-gold hover:underline">
-            Intake openen →
-          </Link>
+          <div className="flex flex-col items-end gap-2">
+            <Link href="/dashboard/onboarding" className="text-sm text-brand-gold hover:underline">
+              Intake openen →
+            </Link>
+            {trainingStatus === 'planned' ? (
+              <Link href="/dashboard/training-bevestiging" className="text-xs text-green-300 hover:underline">
+                Sessie bevestigen →
+              </Link>
+            ) : null}
+          </div>
         </div>
       </div>
 

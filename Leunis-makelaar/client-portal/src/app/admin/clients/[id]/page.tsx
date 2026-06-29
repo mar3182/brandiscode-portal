@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -325,10 +325,18 @@ function FacturenTab({ facturen, clientId }: { facturen: Factuur[]; clientId: st
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [data, setData] = useState<ClientDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tab, setTab] = useState<Tab>('overzicht')
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab')
+    if (requestedTab === 'overzicht' || requestedTab === 'offertes' || requestedTab === 'training' || requestedTab === 'facturen') {
+      setTab(requestedTab)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     async function load() {

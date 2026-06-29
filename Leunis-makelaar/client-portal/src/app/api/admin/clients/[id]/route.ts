@@ -73,3 +73,70 @@ export async function GET(
     facturen,
   })
 }
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const user = await checkAdmin()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { id: clientId } = params
+  const body = (await req.json()) as {
+    intake_id?: string
+    communication_consent?: boolean
+    communication_notes?: string
+  }
+
+  if (typeof body.communication_consent !== 'boolean' && typeof body.communication_notes !== 'string') {
+    return NextResponse.json({ error: 'Geen geldige velden om bij te werken' }, { status: 400 })
+  }
+
+  const admin = createAdminClient()
+
+  const { data: existing, error: existingError } = await admin
+    .from('training_intakes')
+    .select('id')
+    .eq('client_id', clientId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (existingError) return NextResponse.json({ error: existingError.message }, { status: 500 })
+
+  const now = new Date().toISOString()
+  const payload: Record<string, unknown> = {
+    updated_at: now,
+    updated_by: user.id,
+  }
+
+  if (typeof body.communication_consent === 'boolean') {
+    payload.communication_consent = body.communication_consent
+  }
+
+  if (typeof body.communication_notes === 'string') {
+    payload.communication_notes = body.communication_notes.trim() || null
+  }
+
+  const { data: intake, error: upsertError } = existing
+    ? await admin
+      .from('training_intakes')
+      .update(payload)
+      .eq('id', existing.id)
+      .select('id, client_id, communication_consent, communication_notes, updated_at')
+      .single()
+    : await admin
+      .from('training_intakes')
+      .insert({
+        client_id: clientId,
+        status: 'draft',
+        created_by: user.id,
+        ...payload,
+      })
+      .select('id, client_id, communication_consent, communication_notes, updated_at')
+      .single()
+
+  if (upsertError) return NextResponse.json({ error: upsertError.message }, { status: 500 })
+
+  return NextResponse.json({ intake })
+}
