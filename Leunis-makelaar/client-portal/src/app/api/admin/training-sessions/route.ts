@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
 
   if (intakeError) return noStore({ error: 'Intake niet gevonden' }, 404)
 
-  const clientData = (intake?.clients as Record<string, unknown>) || null
+  const clientData = (intake?.clients as unknown as Record<string, unknown>) || null
 
   // Maak sessie aan
   const { data: newSession, error: sessionError } = await admin
