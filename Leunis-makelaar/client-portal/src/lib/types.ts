@@ -4,6 +4,7 @@ export type DeliverableStatus = 'todo' | 'in_progress' | 'review' | 'done'
 export type FactuurStatus = 'concept' | 'verstuurd' | 'betaald' | 'herinnering'
 export type TrainingIntakeStatus = 'draft' | 'submitted' | 'reviewed' | 'planned'
 export type TrainingSessionStatus = 'proposed' | 'confirmed' | 'completed' | 'cancelled'
+export type CommunicationChannel = 'portal' | 'email' | 'whatsapp'
 
 export interface Client {
   id: string
@@ -147,6 +148,12 @@ export interface TrainingIntake {
   focus_area: string
   privacy_constraints: string | null
   data_usage_consent: boolean
+  communication_channel: CommunicationChannel | null
+  communication_email: string | null
+  communication_whatsapp: string | null
+  communication_consent: boolean
+  communication_notes: string | null
+  portal_notifications_enabled: boolean
   trainer_notes: string | null
   submitted_at: string | null
   reviewed_at: string | null

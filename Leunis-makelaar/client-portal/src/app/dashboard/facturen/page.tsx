@@ -68,8 +68,8 @@ export default function FacturenPage() {
     [openFacturen]
   )
 
-  const handleDownload = (factuur: Factuur) => {
-    generateFactuurPDF(factuur, clientInfo)
+  const handleDownload = async (factuur: Factuur) => {
+    await generateFactuurPDF(factuur, clientInfo)
   }
 
   if (loading) {

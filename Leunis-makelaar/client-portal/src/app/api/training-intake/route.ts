@@ -6,6 +6,7 @@ import {
   normalizeTopTasks,
   type TrainingIntakeInput,
   type TrainingIntakeMemberInput,
+  validateCommunicationPreference,
   validateTrainingIntake,
 } from '@/lib/trainingIntake'
 import { NextRequest, NextResponse } from 'next/server'
@@ -54,6 +55,15 @@ function mapIntakePayload(payload: Record<string, unknown>): TrainingIntakeInput
     focus_area: typeof payload.focus_area === 'string' && payload.focus_area.trim() ? payload.focus_area : DEFAULT_FOCUS_AREA,
     privacy_constraints: typeof payload.privacy_constraints === 'string' ? payload.privacy_constraints : '',
     data_usage_consent: Boolean(payload.data_usage_consent),
+    communication_channel:
+      payload.communication_channel === 'portal' || payload.communication_channel === 'email' || payload.communication_channel === 'whatsapp'
+        ? payload.communication_channel
+        : '',
+    communication_email: typeof payload.communication_email === 'string' ? payload.communication_email : '',
+    communication_whatsapp: typeof payload.communication_whatsapp === 'string' ? payload.communication_whatsapp : '',
+    communication_consent: Boolean(payload.communication_consent),
+    communication_notes: typeof payload.communication_notes === 'string' ? payload.communication_notes : '',
+    portal_notifications_enabled: Boolean(payload.portal_notifications_enabled),
     trainer_notes: typeof payload.trainer_notes === 'string' ? payload.trainer_notes : '',
     members: members.map((member, index) => {
       const item = member as Record<string, unknown>
@@ -95,6 +105,12 @@ async function getIntakeForClient(clientId: string) {
       focus_area: DEFAULT_FOCUS_AREA,
       privacy_constraints: '',
       data_usage_consent: false,
+      communication_channel: '',
+      communication_email: '',
+      communication_whatsapp: '',
+      communication_consent: false,
+      communication_notes: '',
+      portal_notifications_enabled: false,
       trainer_notes: '',
       members: [],
     }
@@ -132,6 +148,15 @@ async function getIntakeForClient(clientId: string) {
     focus_area: intake.focus_area || DEFAULT_FOCUS_AREA,
     privacy_constraints: intake.privacy_constraints || '',
     data_usage_consent: Boolean(intake.data_usage_consent),
+    communication_channel:
+      intake.communication_channel === 'portal' || intake.communication_channel === 'email' || intake.communication_channel === 'whatsapp'
+        ? intake.communication_channel
+        : '',
+    communication_email: intake.communication_email || '',
+    communication_whatsapp: intake.communication_whatsapp || '',
+    communication_consent: Boolean(intake.communication_consent),
+    communication_notes: intake.communication_notes || '',
+    portal_notifications_enabled: Boolean(intake.portal_notifications_enabled),
     trainer_notes: intake.trainer_notes || '',
     members: (members || []).map((member) => ({
       id: member.id,
@@ -176,6 +201,18 @@ export async function PUT(req: NextRequest) {
   const body = (await req.json()) as Record<string, unknown>
   const input = mapIntakePayload(body)
   const isSubmit = body.submit === true
+  const communicationErrors = validateCommunicationPreference(input)
+
+  if (input.communication_channel && communicationErrors.length > 0) {
+    return noStore(
+      {
+        error: 'Communicatievoorkeur is onvolledig of ongeldig.',
+        validationErrors: communicationErrors,
+        completeness: computeTrainingCompleteness(input),
+      },
+      422
+    )
+  }
 
   if (isSubmit) {
     const submitErrors = validateTrainingIntake(input)
@@ -198,6 +235,22 @@ export async function PUT(req: NextRequest) {
 
   if (existingError) return noStore({ error: existingError.message }, 500)
 
+  let communicationEmail: string | null = input.communication_email.trim().toLowerCase() || null
+  let communicationWhatsapp: string | null = input.communication_whatsapp.trim() || null
+  let portalNotificationsEnabled = input.portal_notifications_enabled
+
+  if (input.communication_channel === 'portal') {
+    communicationEmail = null
+    communicationWhatsapp = null
+    portalNotificationsEnabled = true
+  } else if (input.communication_channel === 'email') {
+    communicationWhatsapp = null
+    portalNotificationsEnabled = false
+  } else if (input.communication_channel === 'whatsapp') {
+    communicationEmail = null
+    portalNotificationsEnabled = false
+  }
+
   const intakePayload = {
     client_id: caller.clientId,
     status: isSubmit ? 'submitted' : 'draft',
@@ -209,6 +262,12 @@ export async function PUT(req: NextRequest) {
     focus_area: input.focus_area.trim() || DEFAULT_FOCUS_AREA,
     privacy_constraints: input.privacy_constraints.trim() || null,
     data_usage_consent: input.data_usage_consent,
+    communication_channel: input.communication_channel || null,
+    communication_email: communicationEmail,
+    communication_whatsapp: communicationWhatsapp,
+    communication_consent: input.communication_consent,
+    communication_notes: input.communication_notes.trim() || null,
+    portal_notifications_enabled: portalNotificationsEnabled,
     submitted_at: isSubmit ? new Date().toISOString() : null,
     updated_by: caller.userId,
     updated_at: new Date().toISOString(),

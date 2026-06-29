@@ -215,7 +215,7 @@ export default function AdminFacturenPage() {
     setSavingEdit(false)
   }
 
-  const handleDownloadPDF = (factuur: any) => {
+  const handleDownloadPDF = async (factuur: any) => {
     const client: FactuurClientInfo | null = factuur.clients
       ? {
           name: factuur.clients.name ?? '',
@@ -228,7 +228,7 @@ export default function AdminFacturenPage() {
           btw_number: factuur.clients.btw_number ?? null,
         }
       : null
-    generateFactuurPDF(factuur as Factuur, client)
+    await generateFactuurPDF(factuur as Factuur, client)
   }
 
   const deleteFactuur = async (id: string) => {
