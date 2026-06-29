@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   BookOpen,
   Building2,
+  CalendarPlus,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -27,6 +28,13 @@ interface TrainingRow extends TrainingIntake {
   readyForTraining: boolean
   memberCount: number
   sessionCount: number
+  training_sessions?: Array<{
+    id: string
+    status: string
+    session_start: string | null
+    proposed_duration_hours: number | null
+    location_or_link: string | null
+  }>
 }
 
 interface OfferteRow extends Offerte {
@@ -216,7 +224,70 @@ function OffertesTab({ offertes, clientId }: { offertes: OfferteRow[]; clientId:
   )
 }
 
-function TrainingTab({ trainingen, clientId }: { trainingen: TrainingRow[]; clientId: string }) {
+function TrainingTab({
+  trainingen,
+  clientId,
+  onSessionPlanned,
+}: {
+  trainingen: TrainingRow[]
+  clientId: string
+  onSessionPlanned: () => Promise<void>
+}) {
+  const [planningIntakeId, setPlanningIntakeId] = useState<string | null>(null)
+  const [sessionStart, setSessionStart] = useState('')
+  const [sessionDuration, setSessionDuration] = useState<2 | 3 | ''>('')
+  const [sessionLocation, setSessionLocation] = useState('')
+  const [sessionSaving, setSessionSaving] = useState(false)
+  const [sessionError, setSessionError] = useState('')
+  const [sessionSuccess, setSessionSuccess] = useState('')
+
+  function openPlanningForm(intakeId: string, trainingDuration: string | null) {
+    setPlanningIntakeId(intakeId)
+    setSessionStart('')
+    setSessionDuration(trainingDuration === '2u' ? 2 : trainingDuration === '3u' ? 3 : '')
+    setSessionLocation('')
+    setSessionError('')
+    setSessionSuccess('')
+  }
+
+  async function handleScheduleSession(e: React.FormEvent) {
+    e.preventDefault()
+    if (!planningIntakeId) return
+
+    setSessionSaving(true)
+    setSessionError('')
+    setSessionSuccess('')
+
+    if (!sessionStart) {
+      setSessionError('Kies eerst een datum en tijd voor het voorstel.')
+      setSessionSaving(false)
+      return
+    }
+
+    const res = await fetch('/api/admin/training-sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        intake_id: planningIntakeId,
+        session_start: new Date(sessionStart).toISOString(),
+        proposed_duration_hours: sessionDuration || undefined,
+        location_or_link: sessionLocation || undefined,
+      }),
+    })
+
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setSessionError(data.error || 'Sessie inplannen is mislukt.')
+      setSessionSaving(false)
+      return
+    }
+
+    setSessionSuccess('Sessievoorstel is opgeslagen en verstuurd.')
+    await onSessionPlanned()
+    setPlanningIntakeId(null)
+    setSessionSaving(false)
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
@@ -269,6 +340,83 @@ function TrainingTab({ trainingen, clientId }: { trainingen: TrainingRow[]; clie
               <span className="flex items-center gap-1"><Clock size={11} /> {fmtDate(t.preferred_datetime)}</span>
             )}
           </div>
+
+          {t.status === 'reviewed' && !((t.training_sessions || []).some((session) => session.status === 'proposed')) ? (
+            <div className="mt-4 border-t border-white/10 pt-4">
+              <button
+                onClick={() => openPlanningForm(t.id, t.training_duration)}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-orange/20 hover:bg-brand-orange/30 text-brand-orange text-sm"
+              >
+                <CalendarPlus className="w-4 h-4" /> Sessie inplannen
+              </button>
+            </div>
+          ) : null}
+
+          {planningIntakeId === t.id ? (
+            <form onSubmit={handleScheduleSession} className="mt-4 space-y-3 border-t border-white/10 pt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor={`session-start-${t.id}`} className="block text-xs text-white/50 mb-1">Datum en tijd *</label>
+                  <input
+                    id={`session-start-${t.id}`}
+                    type="datetime-local"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-brand-orange/50"
+                    value={sessionStart}
+                    onChange={(e) => setSessionStart(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label htmlFor={`session-duration-${t.id}`} className="block text-xs text-white/50 mb-1">Duur</label>
+                  <select
+                    id={`session-duration-${t.id}`}
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-brand-orange/50"
+                    value={sessionDuration}
+                    onChange={(e) => setSessionDuration((e.target.value ? Number(e.target.value) : '') as 2 | 3 | '')}
+                  >
+                    <option value="">Kies duur</option>
+                    <option value="2">2 uur</option>
+                    <option value="3">3 uur</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor={`session-location-${t.id}`} className="block text-xs text-white/50 mb-1">Locatie / link</label>
+                <input
+                  id={`session-location-${t.id}`}
+                  type="text"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-brand-orange/50"
+                  value={sessionLocation}
+                  onChange={(e) => setSessionLocation(e.target.value)}
+                  placeholder="Bijv. Teams-link of kantoorlocatie"
+                />
+              </div>
+
+              {sessionError ? (
+                <p className="text-xs text-red-300" role="alert" aria-live="assertive">{sessionError}</p>
+              ) : null}
+              {sessionSuccess ? (
+                <p className="text-xs text-green-300" role="status" aria-live="polite">{sessionSuccess}</p>
+              ) : null}
+
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  type="submit"
+                  disabled={sessionSaving}
+                  className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-brand-orange text-white text-sm disabled:opacity-60"
+                >
+                  {sessionSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarPlus className="w-4 h-4" />} Voorstel opslaan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPlanningIntakeId(null)}
+                  className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-white/10 text-white/80 text-sm"
+                >
+                  Annuleren
+                </button>
+              </div>
+            </form>
+          ) : null}
         </div>
       ))}
     </div>
@@ -331,6 +479,19 @@ export default function ClientDetailPage() {
   const [error, setError] = useState('')
   const [tab, setTab] = useState<Tab>('overzicht')
 
+  async function loadClientDetail() {
+    setLoading(true)
+    const res = await fetch(`/api/admin/clients/${id}`)
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      setError(body.error || 'Kon klant niet laden')
+      setLoading(false)
+      return
+    }
+    setData(await res.json())
+    setLoading(false)
+  }
+
   useEffect(() => {
     const requestedTab = searchParams.get('tab')
     if (requestedTab === 'overzicht' || requestedTab === 'offertes' || requestedTab === 'training' || requestedTab === 'facturen') {
@@ -339,19 +500,7 @@ export default function ClientDetailPage() {
   }, [searchParams])
 
   useEffect(() => {
-    async function load() {
-      setLoading(true)
-      const res = await fetch(`/api/admin/clients/${id}`)
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        setError(body.error || 'Kon klant niet laden')
-        setLoading(false)
-        return
-      }
-      setData(await res.json())
-      setLoading(false)
-    }
-    if (id) load()
+    if (id) loadClientDetail()
   }, [id])
 
   if (loading) {
@@ -437,7 +586,7 @@ export default function ClientDetailPage() {
         <div>
           {tab === 'overzicht' && <OverzichtTab client={client} />}
           {tab === 'offertes' && <OffertesTab offertes={offertes} clientId={client.id} />}
-          {tab === 'training' && <TrainingTab trainingen={trainingen} clientId={client.id} />}
+          {tab === 'training' && <TrainingTab trainingen={trainingen} clientId={client.id} onSessionPlanned={loadClientDetail} />}
           {tab === 'facturen' && <FacturenTab facturen={facturen} clientId={client.id} />}
         </div>
       </div>
