@@ -12,6 +12,12 @@ CREATE TABLE IF NOT EXISTS training_intakes (
   focus_area TEXT NOT NULL DEFAULT 'huizenbeschrijvingen-agent',
   privacy_constraints TEXT,
   data_usage_consent BOOLEAN NOT NULL DEFAULT false,
+  communication_channel TEXT CHECK (communication_channel IN ('portal', 'email', 'whatsapp')),
+  communication_email TEXT,
+  communication_whatsapp TEXT,
+  communication_consent BOOLEAN NOT NULL DEFAULT false,
+  communication_notes TEXT,
+  portal_notifications_enabled BOOLEAN NOT NULL DEFAULT false,
   trainer_notes TEXT,
   submitted_at TIMESTAMPTZ,
   reviewed_at TIMESTAMPTZ,
@@ -71,6 +77,13 @@ CREATE INDEX IF NOT EXISTS idx_training_sessions_client_id ON training_sessions(
 ALTER TABLE training_intakes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE training_intake_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE training_sessions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Clients read own training intakes" ON training_intakes;
+DROP POLICY IF EXISTS "Clients create own training intakes" ON training_intakes;
+DROP POLICY IF EXISTS "Clients update own training intakes" ON training_intakes;
+DROP POLICY IF EXISTS "Clients read own training members" ON training_intake_members;
+DROP POLICY IF EXISTS "Clients manage own training members" ON training_intake_members;
+DROP POLICY IF EXISTS "Clients read own training sessions" ON training_sessions;
 
 CREATE POLICY "Clients read own training intakes" ON training_intakes
   FOR SELECT USING (
