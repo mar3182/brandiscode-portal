@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=20 <21"
+    "node": ">=20"
   },
   "description": "Brand is Code — Client Portal: offertes, digitale handtekening, projectstatus & feedback",
   "scripts": {
