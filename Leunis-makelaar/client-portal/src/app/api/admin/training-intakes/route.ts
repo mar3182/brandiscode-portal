@@ -2,6 +2,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
+type IntakeStatus = 'draft' | 'submitted' | 'reviewed' | 'planned'
+
 function noStore(payload: unknown, status = 200) {
   return NextResponse.json(payload, {
     status,
@@ -37,6 +39,20 @@ function getMissingFields(intake: Record<string, unknown>, memberCount: number) 
   return missing
 }
 
+function canTransition(from: IntakeStatus, to: IntakeStatus) {
+  if (from === to) return true
+  if (to === 'draft') return true
+
+  const allowed: Record<IntakeStatus, IntakeStatus[]> = {
+    draft: ['submitted'],
+    submitted: ['reviewed'],
+    reviewed: ['planned'],
+    planned: [],
+  }
+
+  return allowed[from].includes(to)
+}
+
 export async function GET(req: NextRequest) {
   const user = await checkAdmin()
   if (!user) return noStore({ error: 'Unauthorized' }, 401)
@@ -66,6 +82,66 @@ export async function GET(req: NextRequest) {
   return noStore(mapped)
 }
 
+export async function POST(req: NextRequest) {
+  const user = await checkAdmin()
+  if (!user) return noStore({ error: 'Unauthorized' }, 401)
+
+  const body = (await req.json()) as { client_id?: string }
+  const clientId = typeof body.client_id === 'string' ? body.client_id.trim() : ''
+
+  if (!clientId) return noStore({ error: 'client_id is verplicht' }, 400)
+
+  const admin = createAdminClient()
+
+  const { data: client, error: clientError } = await admin
+    .from('clients')
+    .select('id')
+    .eq('id', clientId)
+    .maybeSingle()
+
+  if (clientError) return noStore({ error: clientError.message }, 500)
+  if (!client) return noStore({ error: 'Klant niet gevonden' }, 404)
+
+  const { data: existing, error: existingError } = await admin
+    .from('training_intakes')
+    .select('id')
+    .eq('client_id', clientId)
+    .maybeSingle()
+
+  if (existingError) return noStore({ error: existingError.message }, 500)
+
+  if (existing) {
+    return noStore({
+      success: true,
+      created: false,
+      intake_id: existing.id,
+      message: 'Er bestaat al een intake voor deze klant.',
+    })
+  }
+
+  const now = new Date().toISOString()
+  const { data: created, error: createError } = await admin
+    .from('training_intakes')
+    .insert({
+      client_id: clientId,
+      status: 'draft',
+      updated_by: user.id,
+      created_by: user.id,
+      updated_at: now,
+    })
+    .select('id')
+    .single()
+
+  if (createError) return noStore({ error: createError.message }, 500)
+
+  return noStore({
+    success: true,
+    created: true,
+    intake_id: created.id,
+    message: 'Concept-intake aangemaakt.',
+  })
+}
+
 export async function PATCH(req: NextRequest) {
   const user = await checkAdmin()
   if (!user) return noStore({ error: 'Unauthorized' }, 401)
@@ -91,11 +167,23 @@ export async function PATCH(req: NextRequest) {
 
   const { data: intake, error: intakeError } = await admin
     .from('training_intakes')
-    .select('id, client_id')
+    .select('id, client_id, status, training_duration, preferred_datetime, contact_person, contact_email, focus_area, privacy_constraints, data_usage_consent')
     .eq('id', body.intake_id)
     .single()
 
   if (intakeError) return noStore({ error: intakeError.message }, 500)
+
+  const { count: memberCount, error: memberCountError } = await admin
+    .from('training_intake_members')
+    .select('id', { count: 'exact', head: true })
+    .eq('intake_id', body.intake_id)
+
+  if (memberCountError) return noStore({ error: memberCountError.message }, 500)
+
+  const missingRequiredFields = getMissingFields(
+    intake as unknown as Record<string, unknown>,
+    memberCount || 0
+  )
 
   const updatePayload: Record<string, unknown> = {
     updated_by: user.id,
@@ -103,6 +191,29 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (typeof body.status === 'string') {
+    const currentStatus = intake.status as IntakeStatus
+    const nextStatus = body.status as IntakeStatus
+
+    if (!canTransition(currentStatus, nextStatus)) {
+      return noStore(
+        {
+          error: `Ongeldige statusovergang van ${currentStatus} naar ${nextStatus}.`,
+          details: 'Gebruik de volgorde: draft -> submitted -> reviewed -> planned.',
+        },
+        422
+      )
+    }
+
+    if (nextStatus === 'planned' && missingRequiredFields.length > 0) {
+      return noStore(
+        {
+          error: 'Kan niet plannen: intake is nog niet compleet.',
+          missingRequiredFields,
+        },
+        422
+      )
+    }
+
     updatePayload.status = body.status
     if (body.status === 'reviewed') updatePayload.reviewed_at = new Date().toISOString()
     if (body.status === 'planned') updatePayload.planned_at = new Date().toISOString()
