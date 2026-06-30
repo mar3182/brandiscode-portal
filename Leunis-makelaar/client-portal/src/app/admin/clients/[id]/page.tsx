@@ -30,10 +30,11 @@ interface TrainingRow extends TrainingIntake {
   sessionCount: number
   training_sessions?: Array<{
     id: string
-    status: string
+    status: 'proposed' | 'confirmed' | 'rescheduled' | 'completed' | 'cancelled' | string
     session_start: string | null
     proposed_duration_hours: number | null
     location_or_link: string | null
+    confirmed_at: string | null
   }>
 }
 
@@ -95,6 +96,22 @@ const FACTUUR_STATUS_COLOR: Record<FactuurStatus, string> = {
   herinnering: 'bg-red-500/20 text-red-300',
 }
 
+const SESSION_STATUS_LABELS: Record<'proposed' | 'confirmed' | 'rescheduled' | 'completed' | 'cancelled', string> = {
+  proposed: 'Voorgesteld',
+  confirmed: 'Bevestigd',
+  rescheduled: 'Verplaatst',
+  completed: 'Afgerond',
+  cancelled: 'Geannuleerd',
+}
+
+const SESSION_STATUS_COLOR: Record<'proposed' | 'confirmed' | 'rescheduled' | 'completed' | 'cancelled', string> = {
+  proposed: 'bg-blue-500/20 text-blue-300',
+  confirmed: 'bg-green-500/20 text-green-300',
+  rescheduled: 'bg-yellow-500/20 text-yellow-300',
+  completed: 'bg-emerald-500/20 text-emerald-300',
+  cancelled: 'bg-red-500/20 text-red-300',
+}
+
 function StatusBadge({ label, colorClass }: { label: string; colorClass: string }) {
   return (
     <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>
@@ -110,6 +127,17 @@ function fmt(amount: number) {
 function fmtDate(iso: string | null) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function fmtDateTime(iso: string | null) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('nl-NL', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 // ── tabs ──────────────────────────────────────────────────────────────────────
@@ -338,6 +366,41 @@ function TrainingTab({
             <span className="flex items-center gap-1"><BookOpen size={11} /> {t.sessionCount} sessies</span>
             {t.preferred_datetime && (
               <span className="flex items-center gap-1"><Clock size={11} /> {fmtDate(t.preferred_datetime)}</span>
+            )}
+          </div>
+
+          <div className="mt-4 border-t border-white/10 pt-4">
+            <p className="text-xs text-white/40 mb-2">Sessieoverzicht</p>
+            {Array.isArray(t.training_sessions) && t.training_sessions.length > 0 ? (
+              <div className="space-y-2">
+                {t.training_sessions
+                  .slice()
+                  .sort((a, b) => {
+                    const aDate = a.session_start ? new Date(a.session_start).getTime() : 0
+                    const bDate = b.session_start ? new Date(b.session_start).getTime() : 0
+                    return bDate - aDate
+                  })
+                  .map((session) => {
+                    const statusKey = session.status as 'proposed' | 'confirmed' | 'rescheduled' | 'completed' | 'cancelled'
+                    const statusLabel = SESSION_STATUS_LABELS[statusKey] || session.status
+                    const statusColor = SESSION_STATUS_COLOR[statusKey] || 'bg-white/10 text-white/70'
+
+                    return (
+                      <div key={session.id} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <StatusBadge label={statusLabel} colorClass={statusColor} />
+                          <p className="text-xs text-white/70">{fmtDateTime(session.session_start)}</p>
+                        </div>
+                        <p className="text-xs text-white/60 mt-2">Locatie: {session.location_or_link || 'Nog niet ingevuld'}</p>
+                        {session.status === 'confirmed' ? (
+                          <p className="text-xs text-green-200 mt-1">Bevestigd op: {fmtDateTime(session.confirmed_at)}</p>
+                        ) : null}
+                      </div>
+                    )
+                  })}
+              </div>
+            ) : (
+              <p className="text-xs text-white/40">Nog geen sessies voor deze intake.</p>
             )}
           </div>
 
