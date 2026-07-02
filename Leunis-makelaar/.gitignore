@@ -1,4 +1,11 @@
 # ==========================================
+# GOOGLE CLOUD CREDENTIALS — NEVER COMMIT
+# ==========================================
+*-credentials.json
+*-service-account.json
+brandiscode-calendar-*.json
+
+# ==========================================
 # SENSITIVE DATA: Client & Project-Specific
 # ==========================================
 # All client folders - NEVER COMMIT

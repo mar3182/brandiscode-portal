@@ -191,6 +191,9 @@ export interface TrainingSession {
   location_or_link: string | null
   agenda: string | null
   admin_notes: string | null
+  google_calendar_id: string | null
+  google_event_id: string | null
+  google_attendee_email: string | null
   created_at: string
   updated_at: string
 }
