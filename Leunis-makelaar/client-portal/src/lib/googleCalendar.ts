@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { google, calendar_v3 } from 'googleapis'
+import { randomUUID } from 'node:crypto'
 
 const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar'
 const FULL_SYNC_LOOKBACK_DAYS = 180
@@ -24,6 +25,15 @@ export interface GoogleCalendarSyncResult {
   reason?: string
 }
 
+export interface GoogleCalendarWatchRenewResult {
+  ok: boolean
+  calendarId: string
+  channelId: string
+  resourceId: string | null
+  resourceUri: string | null
+  expiration: string | null
+}
+
 interface GoogleCalendarWatchStateRow {
   calendar_id: string
   channel_id: string | null
@@ -32,6 +42,7 @@ interface GoogleCalendarWatchStateRow {
   sync_token: string | null
   expiration: string | null
   last_message_number: number | null
+  last_synced_at: string | null
 }
 
 interface ClientRow {
@@ -305,7 +316,7 @@ async function loadWatchState(calendarId: string): Promise<GoogleCalendarWatchSt
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('google_calendar_watch_state')
-    .select('calendar_id, channel_id, resource_id, resource_uri, sync_token, expiration, last_message_number')
+    .select('calendar_id, channel_id, resource_id, resource_uri, sync_token, expiration, last_message_number, last_synced_at')
     .eq('calendar_id', calendarId)
     .maybeSingle()
 
@@ -330,6 +341,58 @@ async function saveWatchState(calendarId: string, headers: GoogleWebhookHeaders,
     }, { onConflict: 'calendar_id' })
 
   if (error) throw new Error(`Watch state opslaan mislukt: ${error.message}`)
+}
+
+export async function renewGoogleCalendarWatch(): Promise<GoogleCalendarWatchRenewResult> {
+  const calendarId = requiredEnv('GOOGLE_CALENDAR_ID')
+  const webhookUrl = requiredEnv('GOOGLE_CALENDAR_WEBHOOK_URL')
+  const webhookSecret = requiredEnv('GOOGLE_CALENDAR_WEBHOOK_SECRET')
+
+  const calendarApi = await getCalendarApi()
+  const channelId = randomUUID()
+
+  const watchResponse = await calendarApi.events.watch({
+    calendarId,
+    requestBody: {
+      id: channelId,
+      type: 'web_hook',
+      address: webhookUrl,
+      token: webhookSecret,
+    },
+  })
+
+  const expiration = watchResponse.data.expiration
+    ? new Date(Number(watchResponse.data.expiration)).toISOString()
+    : null
+
+  const persistedChannelId = watchResponse.data.id ?? channelId
+  const currentState = await loadWatchState(calendarId)
+  const admin = createAdminClient()
+
+  const { error } = await admin
+    .from('google_calendar_watch_state')
+    .upsert({
+      calendar_id: calendarId,
+      channel_id: persistedChannelId,
+      resource_id: watchResponse.data.resourceId ?? null,
+      resource_uri: watchResponse.data.resourceUri ?? null,
+      expiration,
+      sync_token: currentState?.sync_token ?? null,
+      last_message_number: currentState?.last_message_number ?? null,
+      last_synced_at: currentState?.last_synced_at ?? null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'calendar_id' })
+
+  if (error) throw new Error(`Watch renew opslaan mislukt: ${error.message}`)
+
+  return {
+    ok: true,
+    calendarId,
+    channelId: persistedChannelId,
+    resourceId: watchResponse.data.resourceId ?? null,
+    resourceUri: watchResponse.data.resourceUri ?? null,
+    expiration,
+  }
 }
 
 export async function syncGoogleCalendarSessions(headers: GoogleWebhookHeaders): Promise<GoogleCalendarSyncResult> {

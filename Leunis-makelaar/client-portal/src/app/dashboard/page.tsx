@@ -9,6 +9,7 @@ import type { Offerte, Sprint } from '@/lib/types'
 import Link from 'next/link'
 
 export default function DashboardPage() {
+  const BOOKING_URL = 'https://calendar.app.google/Lne23LdkexK5SKY98'
   const [offertes, setOffertes] = useState<Offerte[]>([])
   const [sprints, setSprints] = useState<Sprint[]>([])
   const [clientName, setClientName] = useState('')
@@ -146,10 +147,20 @@ export default function DashboardPage() {
             <Link href="/dashboard/onboarding" className="text-sm text-brand-gold hover:underline">
               Intake openen →
             </Link>
-            {trainingStatus === 'planned' ? (
-              <Link href="/dashboard/training-bevestiging" className="text-xs text-green-300 hover:underline">
-                Sessie bevestigen →
-              </Link>
+            {(trainingStatus === 'reviewed' || trainingStatus === 'planned') ? (
+              <>
+                <a
+                  href={BOOKING_URL}
+                  target="_blank"
+                  rel="noopener"
+                  className="inline-flex items-center justify-center rounded-lg bg-brand-gold px-3 py-2 text-xs font-semibold text-black hover:opacity-90"
+                >
+                  Sessie inplannen
+                </a>
+                <p className="max-w-[18rem] text-right text-[11px] text-white/60">
+                  Kies een datum en tijd in onze agenda. De bevestiging verschijnt daarna automatisch in jouw portal.
+                </p>
+              </>
             ) : null}
           </div>
         </div>

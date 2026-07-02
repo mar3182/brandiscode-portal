@@ -1,3 +1,9 @@
 {
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/cron/renew-google-watch",
+      "schedule": "0 3 */6 * *"
+    }
+  ]
 }
