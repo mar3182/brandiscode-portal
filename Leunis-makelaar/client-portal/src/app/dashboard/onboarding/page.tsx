@@ -22,10 +22,22 @@ import {
   CheckCircle2,
   ChevronRight,
   ClipboardList,
+  Info,
   Loader2,
   Save,
   Users,
 } from 'lucide-react'
+
+function InfoTooltip({ text }: { text: string }) {
+  return (
+    <span className="relative inline-block group ml-1.5 align-middle">
+      <Info className="w-3.5 h-3.5 text-white/35 hover:text-brand-gold cursor-help inline" aria-hidden="true" />
+      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 rounded-lg bg-black/90 border border-white/10 px-3 py-2 text-xs text-white/80 opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-normal text-left shadow-lg">
+        {text}
+      </span>
+    </span>
+  )
+}
 
 const INPUT_CLASS = 'w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-brand-gold/50 transition-all'
 
@@ -252,11 +264,7 @@ export default function OnboardingPage() {
   }
 
   function validateStepTwo() {
-    const errors: string[] = []
-    if (!training.privacy_constraints.trim()) {
-      errors.push('Privacy/security randvoorwaarden zijn verplicht voordat je doorgaat.')
-    }
-    return errors
+    return [] as string[]
   }
 
   function handleStepTwoNext() {
@@ -446,14 +454,19 @@ export default function OnboardingPage() {
           </div>
 
           <div>
-            <label className="block text-sm text-white/60 mb-1.5">Focusgebied *</label>
+            <label className="flex items-center text-sm text-white/60 mb-1.5">
+              Focusgebied *
+              <InfoTooltip text="Welk onderdeel van het werk wil je met AI verbeteren? Bijv. 'woningbeschrijvingen schrijven' of 'klantemails opstellen'." />
+            </label>
             <input className={INPUT_CLASS} value={training.focus_area} onChange={(e) => setTraining((prev) => ({ ...prev, focus_area: e.target.value }))} />
           </div>
 
           <div>
-            <label className="block text-sm text-white/60 mb-1.5">Privacy/security randvoorwaarden *</label>
-            <textarea className={`${INPUT_CLASS} min-h-24`} value={training.privacy_constraints} onChange={(e) => setTraining((prev) => ({ ...prev, privacy_constraints: e.target.value }))} />
-            <p className="text-xs text-white/50 mt-1">Bijv. geen persoonsgegevens of klantdossiers in prompts, alleen geanonimiseerde voorbeelden.</p>
+            <label className="flex items-center text-sm text-white/60 mb-1.5">
+              Privacy/security randvoorwaarden
+              <InfoTooltip text="Geef aan of er regels gelden voor AI-gebruik tijdens de training. Geen beperkingen? Dan mag alles in de prompt." />
+            </label>
+            <textarea className={`${INPUT_CLASS} min-h-24`} value={training.privacy_constraints} onChange={(e) => setTraining((prev) => ({ ...prev, privacy_constraints: e.target.value }))} placeholder="Bijv. geen klantdata in prompts, geen opnames — laat leeg als er geen beperkingen zijn." />
           </div>
 
           {stepTwoErrors.length > 0 ? (
@@ -634,30 +647,88 @@ export default function OnboardingPage() {
                     <button onClick={() => removeMember(index)} className="text-xs text-red-300">Verwijderen</button>
                   ) : null}
                 </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <input className={INPUT_CLASS} placeholder="Naam *" value={member.full_name} onChange={(e) => updateMember(index, { full_name: e.target.value })} />
-                  <input className={INPUT_CLASS} placeholder="Rol *" value={member.role} onChange={(e) => updateMember(index, { role: e.target.value })} />
+                  <div>
+                    <label className="block text-xs text-white/50 mb-1">Naam *</label>
+                    <input className={INPUT_CLASS} placeholder="Volledige naam" value={member.full_name} onChange={(e) => updateMember(index, { full_name: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="flex items-center text-xs text-white/50 mb-1">
+                      Rol
+                      <InfoTooltip text="Bijv. 'makelaar', 'woningfotograaf', 'kantoormanager'." />
+                    </label>
+                    <input className={INPUT_CLASS} placeholder="Functie of rol (optioneel)" value={member.role} onChange={(e) => updateMember(index, { role: e.target.value })} />
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {member.top_tasks.map((task, taskIndex) => (
-                    <input key={taskIndex} className={INPUT_CLASS} placeholder={`Top taak ${taskIndex + 1} *`} value={task} onChange={(e) => {
-                      const nextTasks = [...member.top_tasks]
-                      nextTasks[taskIndex] = e.target.value
-                      updateMember(index, { top_tasks: nextTasks })
-                    }} />
-                  ))}
+
+                <div>
+                  <label className="flex items-center text-xs text-white/50 mb-1.5">
+                    Top-taken (0–3)
+                    <InfoTooltip text="Beschrijf maximaal 3 taken die dit teamlid dagelijks doet en waarbij AI kan helpen. Laat velden leeg die niet van toepassing zijn." />
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {member.top_tasks.map((task, taskIndex) => (
+                      <input key={taskIndex} className={INPUT_CLASS} placeholder={`Taak ${taskIndex + 1} (optioneel)`} value={task} onChange={(e) => {
+                        const nextTasks = [...member.top_tasks]
+                        nextTasks[taskIndex] = e.target.value
+                        updateMember(index, { top_tasks: nextTasks })
+                      }} />
+                    ))}
+                  </div>
                 </div>
-                <textarea className={`${INPUT_CLASS} min-h-20`} placeholder="Grootste knelpunt *" value={member.bottleneck} onChange={(e) => updateMember(index, { bottleneck: e.target.value })} />
-                <textarea className={`${INPUT_CLASS} min-h-20`} placeholder="KPI/doelresultaat *" value={member.kpi_goal} onChange={(e) => updateMember(index, { kpi_goal: e.target.value })} />
+
+                <div>
+                  <label className="flex items-center text-xs text-white/50 mb-1">
+                    Grootste knelpunt
+                    <InfoTooltip text="Wat kost dit teamlid het meeste tijd of energie? Bijv. 'teksten herschrijven voor Funda'." />
+                  </label>
+                  <textarea className={`${INPUT_CLASS} min-h-20`} placeholder="Bijv. teksten herschrijven, e-mails opstellen (optioneel)" value={member.bottleneck} onChange={(e) => updateMember(index, { bottleneck: e.target.value })} />
+                </div>
+
+                <div>
+                  <label className="flex items-center text-xs text-white/50 mb-1">
+                    KPI / doelresultaat
+                    <InfoTooltip text="Welk meetbaar resultaat wil dit teamlid behalen? Bijv. '50% minder tijd voor een woningbeschrijving'." />
+                  </label>
+                  <textarea className={`${INPUT_CLASS} min-h-20`} placeholder="Bijv. 50% sneller woningbeschrijvingen (optioneel)" value={member.kpi_goal} onChange={(e) => updateMember(index, { kpi_goal: e.target.value })} />
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <select className={INPUT_CLASS} value={member.digital_skill ?? ''} onChange={(e) => updateMember(index, { digital_skill: e.target.value ? Number(e.target.value) : null })}>
-                    <option value="">Digitale vaardigheid (1-5) *</option>
-                    {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}
-                  </select>
-                  <input className={INPUT_CLASS} placeholder="AI-ervaring *" value={member.ai_experience} onChange={(e) => updateMember(index, { ai_experience: e.target.value })} />
+                  <div>
+                    <label className="flex items-center text-xs text-white/50 mb-1">
+                      Digitale vaardigheid (1–5)
+                      <InfoTooltip text="Hoe comfortabel is dit teamlid met digitale tools? 1 = beginner, 5 = digitaal zeer vaardig." />
+                    </label>
+                    <select className={INPUT_CLASS} value={member.digital_skill ?? ''} onChange={(e) => updateMember(index, { digital_skill: e.target.value ? Number(e.target.value) : null })}>
+                      <option value="">Kies niveau (optioneel)</option>
+                      {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="flex items-center text-xs text-white/50 mb-1">
+                      AI-ervaring
+                      <InfoTooltip text="Heeft dit teamlid al eerder met ChatGPT of andere AI-tools gewerkt? Zo ja, hoe?" />
+                    </label>
+                    <input className={INPUT_CLASS} placeholder="Bijv. soms ChatGPT, nooit AI gebruikt (optioneel)" value={member.ai_experience} onChange={(e) => updateMember(index, { ai_experience: e.target.value })} />
+                  </div>
                 </div>
-                <textarea className={`${INPUT_CLASS} min-h-20`} placeholder="Datagrens (wat mag niet in prompts) *" value={member.prompt_data_boundary} onChange={(e) => updateMember(index, { prompt_data_boundary: e.target.value })} />
-                <input className={INPUT_CLASS} placeholder="Beschikbaarheid trainingsdag *" value={member.training_day_availability} onChange={(e) => updateMember(index, { training_day_availability: e.target.value })} />
+
+                <div>
+                  <label className="flex items-center text-xs text-white/50 mb-1">
+                    Datagrens
+                    <InfoTooltip text="Wat mag dit teamlid NIET in een AI-prompt invoeren? Bijv. BSN-nummers, klant­dossiers, interne prijsafspraken." />
+                  </label>
+                  <textarea className={`${INPUT_CLASS} min-h-20`} placeholder="Bijv. geen klantgegevens, geen interne prijzen (optioneel)" value={member.prompt_data_boundary} onChange={(e) => updateMember(index, { prompt_data_boundary: e.target.value })} />
+                </div>
+
+                <div>
+                  <label className="flex items-center text-xs text-white/50 mb-1">
+                    Beschikbaarheid trainingsdag
+                    <InfoTooltip text="Is dit teamlid aanwezig op de geplande trainingsdag? Bijv. 'Ja' of 'Niet op vrijdag'." />
+                  </label>
+                  <input className={INPUT_CLASS} placeholder="Bijv. aanwezig, niet op vrijdag (optioneel)" value={member.training_day_availability} onChange={(e) => updateMember(index, { training_day_availability: e.target.value })} />
+                </div>
               </div>
             ))}
           </div>
