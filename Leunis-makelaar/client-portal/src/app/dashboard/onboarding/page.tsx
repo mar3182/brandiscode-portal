@@ -95,6 +95,7 @@ export default function OnboardingPage() {
   const [fieldErrors, setFieldErrors] = useState<ProfileFieldErrors>({})
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [channelTouched, setChannelTouched] = useState(false)
+  const [stepTwoErrors, setStepTwoErrors] = useState<string[]>([])
   const [status, setStatus] = useState<'draft' | 'submitted' | 'reviewed' | 'planned'>('draft')
 
   const [billing, setBilling] = useState<BillingForm>(emptyBilling)
@@ -110,11 +111,11 @@ export default function OnboardingPage() {
     communication_channel: '',
     communication_email: '',
     communication_whatsapp: '',
+    communication_consent: false,
+    communication_notes: '',
     portal_notifications_enabled: false,
     trainer_notes: '',
-    members: [createEmptyMember(0)],
-      communication_consent: false,
-      communication_notes: '',
+    members: [],
   })
 
   useEffect(() => {
@@ -161,8 +162,8 @@ export default function OnboardingPage() {
               : '',
             communication_email: intakeData.intake.communication_email ?? '',
             communication_whatsapp: intakeData.intake.communication_whatsapp ?? '',
-              communication_consent: Boolean(intakeData.intake.communication_consent),
-              communication_notes: intakeData.intake.communication_notes ?? '',
+            communication_consent: Boolean(intakeData.intake.communication_consent),
+            communication_notes: intakeData.intake.communication_notes ?? '',
             portal_notifications_enabled: Boolean(intakeData.intake.portal_notifications_enabled),
             trainer_notes: intakeData.intake.trainer_notes ?? '',
             members: Array.isArray(intakeData.members) && intakeData.members.length > 0
@@ -181,7 +182,7 @@ export default function OnboardingPage() {
                 training_day_availability: member.training_day_availability ?? '',
                 sort_order: typeof member.sort_order === 'number' ? member.sort_order : index,
               }))
-              : [createEmptyMember(0)],
+              : [],
           })
           setStatus(intakeData.intake.status ?? 'draft')
         }
@@ -250,6 +251,21 @@ export default function OnboardingPage() {
     setSaving(false)
   }
 
+  function validateStepTwo() {
+    const errors: string[] = []
+    if (!training.privacy_constraints.trim()) {
+      errors.push('Privacy/security randvoorwaarden zijn verplicht voordat je doorgaat.')
+    }
+    return errors
+  }
+
+  function handleStepTwoNext() {
+    const errors = validateStepTwo()
+    setStepTwoErrors(errors)
+    if (errors.length > 0) return
+    setStep(3)
+  }
+
   async function handleSubmitIntake() {
     setSaving(true)
     setError('')
@@ -290,7 +306,7 @@ export default function OnboardingPage() {
       const members = prev.members.filter((_, idx) => idx !== index)
       return {
         ...prev,
-        members: members.length > 0 ? members : [createEmptyMember(0)],
+        members,
       }
     })
   }
@@ -437,7 +453,18 @@ export default function OnboardingPage() {
           <div>
             <label className="block text-sm text-white/60 mb-1.5">Privacy/security randvoorwaarden *</label>
             <textarea className={`${INPUT_CLASS} min-h-24`} value={training.privacy_constraints} onChange={(e) => setTraining((prev) => ({ ...prev, privacy_constraints: e.target.value }))} />
+            <p className="text-xs text-white/50 mt-1">Bijv. geen persoonsgegevens of klantdossiers in prompts, alleen geanonimiseerde voorbeelden.</p>
           </div>
+
+          {stepTwoErrors.length > 0 ? (
+            <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3" role="alert" aria-live="assertive">
+              <ul className="text-sm text-red-200 list-disc pl-5 space-y-1">
+                {stepTwoErrors.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           <label className="flex items-start gap-3 text-sm text-white/70">
             <input type="checkbox" checked={training.data_usage_consent} onChange={(e) => setTraining((prev) => ({ ...prev, data_usage_consent: e.target.checked }))} className="mt-1" />
@@ -574,10 +601,11 @@ export default function OnboardingPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
+            <button onClick={() => setStep(1)} className="px-4 py-2.5 rounded-xl bg-white/10 text-white hover:bg-white/20">Vorige</button>
             <button onClick={handleDraftSave} disabled={saving} className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 text-white hover:bg-white/20">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Opslaan als concept
             </button>
-            <button onClick={() => setStep(3)} className="px-4 py-2.5 rounded-xl bg-brand-gold text-black font-semibold">Volgende: teamleden</button>
+            <button onClick={handleStepTwoNext} className="px-4 py-2.5 rounded-xl bg-brand-gold text-black font-semibold">Volgende: teamleden</button>
           </div>
         </div>
       )}
@@ -593,6 +621,11 @@ export default function OnboardingPage() {
           </div>
 
           <div className="space-y-4">
+            {training.members.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-white/20 bg-white/5 p-4 text-sm text-white/60">
+                Nog geen teamleden toegevoegd. Dit onderdeel is optioneel.
+              </div>
+            ) : null}
             {training.members.map((member, index) => (
               <div key={index} className="rounded-xl border border-white/10 p-4 space-y-3 bg-white/5">
                 <div className="flex items-center justify-between">
@@ -630,6 +663,7 @@ export default function OnboardingPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
+            <button onClick={() => setStep(2)} className="px-4 py-2.5 rounded-xl bg-white/10 text-white hover:bg-white/20">Vorige</button>
             <button onClick={handleDraftSave} disabled={saving} className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 text-white hover:bg-white/20">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Opslaan als concept
             </button>
@@ -677,6 +711,7 @@ export default function OnboardingPage() {
           ) : null}
 
           <div className="flex flex-col sm:flex-row gap-3">
+            <button onClick={() => setStep(3)} className="px-4 py-2.5 rounded-xl bg-white/10 text-white hover:bg-white/20">Vorige</button>
             <button onClick={handleDraftSave} disabled={saving} className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 text-white hover:bg-white/20">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Opslaan als concept
             </button>

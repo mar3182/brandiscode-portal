@@ -53,6 +53,14 @@ const initialForm: ClientForm = {
 }
 
 const INPUT_CLASS = 'w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-brand-blue/50 transition-all'
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function validateRequiredEmail(value: string, label: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return `${label} is verplicht.`
+  if (!EMAIL_REGEX.test(trimmed)) return `Vul een geldig ${label.toLowerCase()} in.`
+  return ''
+}
 
 export default function AdminClientsPage() {
   const searchParams = useSearchParams()
@@ -67,6 +75,8 @@ export default function AdminClientsPage() {
   const [actionError, setActionError] = useState('')
   const [createFieldErrors, setCreateFieldErrors] = useState<ProfileFieldErrors>({})
   const [editFieldErrors, setEditFieldErrors] = useState<ProfileFieldErrors>({})
+  const [createEmailErrors, setCreateEmailErrors] = useState<{ email?: string; billing_email?: string }>({})
+  const [editEmailErrors, setEditEmailErrors] = useState<{ billing_email?: string }>({})
   const [form, setForm] = useState<ClientForm>(initialForm)
   const [editForm, setEditForm] = useState<ClientForm | null>(null)
   const [triggeringId, setTriggeringId] = useState<string | null>(null)
@@ -123,11 +133,32 @@ export default function AdminClientsPage() {
     mark_completed: Boolean(client.onboarding_completed_at),
   })
 
+  function validateCreateEmails(source: Pick<ClientForm, 'email' | 'billing_email'>) {
+    const errors: { email?: string; billing_email?: string } = {}
+    const emailError = validateRequiredEmail(source.email, 'E-mailadres')
+    const billingError = validateRequiredEmail(source.billing_email, 'Factuur e-mailadres')
+    if (emailError) errors.email = emailError
+    if (billingError) errors.billing_email = billingError
+    return errors
+  }
+
+  function validateEditBillingEmail(value: string) {
+    const error = validateRequiredEmail(value, 'Factuur e-mailadres')
+    return error ? { billing_email: error } : {}
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setActionError('')
     setCreateFieldErrors({})
+
+    const emailErrors = validateCreateEmails(form)
+    setCreateEmailErrors(emailErrors)
+    if (Object.keys(emailErrors).length > 0) {
+      setLoading(false)
+      return
+    }
 
     const validation = validateCompanyProfileFields({
       email: form.email,
@@ -170,6 +201,13 @@ export default function AdminClientsPage() {
     setSavingEdit(true)
     setActionError('')
     setEditFieldErrors({})
+
+    const billingEmailError = validateEditBillingEmail(editForm.billing_email)
+    setEditEmailErrors(billingEmailError)
+    if (Object.keys(billingEmailError).length > 0) {
+      setSavingEdit(false)
+      return
+    }
 
     const validation = validateCompanyProfileFields({
       billing_email: editForm.billing_email,
@@ -239,6 +277,7 @@ export default function AdminClientsPage() {
           onClick={() => {
             setShowForm(!showForm)
             setActionError('')
+            setCreateEmailErrors({})
           }}
           className="flex items-center gap-2 px-4 py-2.5 bg-brand-blue text-white font-medium rounded-xl hover:opacity-90 transition-all text-sm"
         >
@@ -269,11 +308,15 @@ export default function AdminClientsPage() {
                   placeholder="Volledige naam"
                 />
               </Field>
-              <Field label="E-mail *">
+              <Field label="E-mail *" error={createEmailErrors.email || createFieldErrors.email}>
                 <input
                   type="email"
                   value={form.email}
-                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                  onChange={e => {
+                    const email = e.target.value
+                    setForm(f => ({ ...f, email }))
+                    setCreateEmailErrors(validateCreateEmails({ email, billing_email: form.billing_email }))
+                  }}
                   required
                   className={INPUT_CLASS}
                   placeholder="klant@email.nl"
@@ -315,11 +358,15 @@ export default function AdminClientsPage() {
                   placeholder="NL001234567B01"
                 />
               </Field>
-              <Field label="Factuur e-mail" error={createFieldErrors.billing_email}>
+              <Field label="Factuur e-mail" error={createEmailErrors.billing_email || createFieldErrors.billing_email}>
                 <input
                   type="email"
                   value={form.billing_email}
-                  onChange={e => setForm(f => ({ ...f, billing_email: e.target.value }))}
+                  onChange={e => {
+                    const billingEmail = e.target.value
+                    setForm(f => ({ ...f, billing_email: billingEmail }))
+                    setCreateEmailErrors(validateCreateEmails({ email: form.email, billing_email: billingEmail }))
+                  }}
                   className={INPUT_CLASS}
                 />
               </Field>
@@ -457,6 +504,7 @@ export default function AdminClientsPage() {
                     onClick={() => {
                       setEditForm(toEditForm(client))
                       setActionError('')
+                      setEditEmailErrors({})
                     }}
                     className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white/80 text-sm"
                   >
@@ -507,8 +555,17 @@ export default function AdminClientsPage() {
                 <Field label="BTW nummer" error={editFieldErrors.btw_number}>
                   <input className={INPUT_CLASS} value={editForm.btw_number} onChange={(e) => setEditForm((prev) => prev ? ({ ...prev, btw_number: formatBtwInput(e.target.value) }) : prev)} />
                 </Field>
-                <Field label="Factuur e-mail" error={editFieldErrors.billing_email}>
-                  <input className={INPUT_CLASS} type="email" value={editForm.billing_email} onChange={(e) => setEditForm((prev) => prev ? ({ ...prev, billing_email: e.target.value }) : prev)} />
+                <Field label="Factuur e-mail" error={editEmailErrors.billing_email || editFieldErrors.billing_email}>
+                  <input
+                    className={INPUT_CLASS}
+                    type="email"
+                    value={editForm.billing_email}
+                    onChange={(e) => {
+                      const billingEmail = e.target.value
+                      setEditForm((prev) => prev ? ({ ...prev, billing_email: billingEmail }) : prev)
+                      setEditEmailErrors(validateEditBillingEmail(billingEmail))
+                    }}
+                  />
                 </Field>
                 <Field label="IBAN" error={editFieldErrors.iban}>
                   <input className={INPUT_CLASS} value={editForm.iban} onChange={(e) => setEditForm((prev) => prev ? ({ ...prev, iban: formatIbanInput(e.target.value) }) : prev)} />

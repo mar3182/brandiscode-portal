@@ -173,8 +173,8 @@ export function computeTrainingCompleteness(input: TrainingIntakeInput): Trainin
   }
 
   const memberErrors = input.members.flatMap((member, index) => validateMember(member, index))
-  const membersComplete = input.members.length > 0 && memberErrors.length === 0
-  if (!membersComplete) missingRequiredFields.push('Teamlidinformatie is niet volledig')
+  const membersComplete = input.members.length === 0 || memberErrors.length === 0
+  if (input.members.length > 0 && !membersComplete) missingRequiredFields.push('Teamlidinformatie is niet volledig')
 
   return {
     intakeFieldsComplete: missingRequiredFields.length === 0 || (missingRequiredFields.length === 1 && missingRequiredFields[0] === 'Teamlidinformatie is niet volledig'),
@@ -195,7 +195,6 @@ export function validateTrainingIntake(input: TrainingIntakeInput) {
   if (!hasText(input.privacy_constraints)) errors.push('Privacy/security randvoorwaarden zijn verplicht.')
   if (!input.data_usage_consent) errors.push('Akkoord op datagebruik is verplicht.')
   errors.push(...validateCommunicationPreference(input))
-  if (input.members.length === 0) errors.push('Voeg minimaal 1 teamlid toe.')
 
   input.members.forEach((member, index) => {
     errors.push(...validateMember(member, index))
