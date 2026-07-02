@@ -456,7 +456,7 @@ export default function OnboardingPage() {
           <div>
             <label className="flex items-center text-sm text-white/60 mb-1.5">
               Focusgebied *
-              <InfoTooltip text="Welk onderdeel van het werk wil je met AI verbeteren? Bijv. 'woningbeschrijvingen schrijven' of 'klantemails opstellen'." />
+              <InfoTooltip text="Waar wil je AI het eerst voor inzetten in jullie werkproces? Bijv. 'e-mails opstellen', 'rapporten samenvatten' of 'offertes schrijven'." />
             </label>
             <input className={INPUT_CLASS} value={training.focus_area} onChange={(e) => setTraining((prev) => ({ ...prev, focus_area: e.target.value }))} />
           </div>
@@ -464,7 +464,7 @@ export default function OnboardingPage() {
           <div>
             <label className="flex items-center text-sm text-white/60 mb-1.5">
               Privacy/security randvoorwaarden
-              <InfoTooltip text="Geef aan of er regels gelden voor AI-gebruik tijdens de training. Geen beperkingen? Dan mag alles in de prompt." />
+              <InfoTooltip text="Geef aan of er regels gelden voor AI-gebruik tijdens de training. Bijv. geen persoonsgegevens in prompts, geen opnames. Geen beperkingen? Laat dit veld leeg." />
             </label>
             <textarea className={`${INPUT_CLASS} min-h-24`} value={training.privacy_constraints} onChange={(e) => setTraining((prev) => ({ ...prev, privacy_constraints: e.target.value }))} placeholder="Bijv. geen klantdata in prompts, geen opnames — laat leeg als er geen beperkingen zijn." />
           </div>
@@ -656,7 +656,7 @@ export default function OnboardingPage() {
                   <div>
                     <label className="flex items-center text-xs text-white/50 mb-1">
                       Rol
-                      <InfoTooltip text="Bijv. 'makelaar', 'woningfotograaf', 'kantoormanager'." />
+                      <InfoTooltip text="Wat is de functie of rol van dit teamlid? Bijv. 'accountmanager', 'medewerker klantenservice', 'officemanager'." />
                     </label>
                     <input className={INPUT_CLASS} placeholder="Functie of rol (optioneel)" value={member.role} onChange={(e) => updateMember(index, { role: e.target.value })} />
                   </div>
@@ -665,7 +665,7 @@ export default function OnboardingPage() {
                 <div>
                   <label className="flex items-center text-xs text-white/50 mb-1.5">
                     Top-taken (0–3)
-                    <InfoTooltip text="Beschrijf maximaal 3 taken die dit teamlid dagelijks doet en waarbij AI kan helpen. Laat velden leeg die niet van toepassing zijn." />
+                    <InfoTooltip text="Beschrijf maximaal 3 taken die dit teamlid regelmatig uitvoert en waarbij AI tijd kan besparen. Bijv. 'e-mails schrijven', 'rapporten samenvatten', 'offertes opstellen'. Laat velden leeg die niet van toepassing zijn." />
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {member.top_tasks.map((task, taskIndex) => (
@@ -681,7 +681,7 @@ export default function OnboardingPage() {
                 <div>
                   <label className="flex items-center text-xs text-white/50 mb-1">
                     Grootste knelpunt
-                    <InfoTooltip text="Wat kost dit teamlid het meeste tijd of energie? Bijv. 'teksten herschrijven voor Funda'." />
+                    <InfoTooltip text="Welke taak kost dit teamlid het meeste tijd of energie? Bijv. 'steeds dezelfde e-mails schrijven', 'lange documenten doorlezen', 'verslagen uitwerken'." />
                   </label>
                   <textarea className={`${INPUT_CLASS} min-h-20`} placeholder="Bijv. teksten herschrijven, e-mails opstellen (optioneel)" value={member.bottleneck} onChange={(e) => updateMember(index, { bottleneck: e.target.value })} />
                 </div>
@@ -689,7 +689,7 @@ export default function OnboardingPage() {
                 <div>
                   <label className="flex items-center text-xs text-white/50 mb-1">
                     KPI / doelresultaat
-                    <InfoTooltip text="Welk meetbaar resultaat wil dit teamlid behalen? Bijv. '50% minder tijd voor een woningbeschrijving'." />
+                    <InfoTooltip text="Welk concreet resultaat wil dit teamlid behalen met AI? Bijv. '30% tijdsbesparing op tekstwerk', 'minder terugkerende vragen afhandelen', 'sneller offertes opstellen'." />
                   </label>
                   <textarea className={`${INPUT_CLASS} min-h-20`} placeholder="Bijv. 50% sneller woningbeschrijvingen (optioneel)" value={member.kpi_goal} onChange={(e) => updateMember(index, { kpi_goal: e.target.value })} />
                 </div>
@@ -717,7 +717,7 @@ export default function OnboardingPage() {
                 <div>
                   <label className="flex items-center text-xs text-white/50 mb-1">
                     Datagrens
-                    <InfoTooltip text="Wat mag dit teamlid NIET in een AI-prompt invoeren? Bijv. BSN-nummers, klant­dossiers, interne prijsafspraken." />
+                    <InfoTooltip text="Welke gegevens mogen NIET in een externe AI-tool ingevoerd worden? Bijv. geen persoonsgegevens, geen financiële data, geen vertrouwelijke klantinformatie." />
                   </label>
                   <textarea className={`${INPUT_CLASS} min-h-20`} placeholder="Bijv. geen klantgegevens, geen interne prijzen (optioneel)" value={member.prompt_data_boundary} onChange={(e) => updateMember(index, { prompt_data_boundary: e.target.value })} />
                 </div>
