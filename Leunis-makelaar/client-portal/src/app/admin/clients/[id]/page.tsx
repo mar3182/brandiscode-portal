@@ -382,6 +382,17 @@ function TrainingTab({
           Nieuwe intake <ChevronRight size={12} />
         </Link>
       </div>
+      {trainingen.length === 0 ? (
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <p className="text-sm text-white/60">Nog geen intake voor deze klant.</p>
+          <Link
+            href={`/admin/clients/${clientId}/intake`}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-orange/20 hover:bg-brand-orange/30 text-brand-orange text-sm"
+          >
+            Intake invullen als admin <ChevronRight size={12} />
+          </Link>
+        </div>
+      ) : null}
       {intakes.length === 0 && (
         <p className="text-white/40 text-sm text-center py-8">Geen training intakes voor deze klant</p>
       )}
@@ -641,6 +652,9 @@ export default function ClientDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tab, setTab] = useState<Tab>('overzicht')
+  const [visitNotes, setVisitNotes] = useState('')
+  const [visitNotesSavedAt, setVisitNotesSavedAt] = useState<string | null>(null)
+  const [visitNotesSaving, setVisitNotesSaving] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deletingClient, setDeletingClient] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -654,7 +668,9 @@ export default function ClientDetailPage() {
       setLoading(false)
       return
     }
-    setData(await res.json())
+    const payload = await res.json()
+    setData(payload)
+    setVisitNotes(payload?.client?.visit_notes || '')
     setLoading(false)
   }
 
@@ -668,6 +684,43 @@ export default function ClientDetailPage() {
   useEffect(() => {
     if (id) loadClientDetail()
   }, [id])
+
+  useEffect(() => {
+    if (!data?.client?.id) return
+
+    const timeout = setTimeout(async () => {
+      if (visitNotes === (data.client.visit_notes || '')) return
+
+      setVisitNotesSaving(true)
+
+      const res = await fetch(`/api/admin/clients/${data.client.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visit_notes: visitNotes }),
+      })
+
+      if (res.ok) {
+        const now = new Date()
+        const hh = String(now.getHours()).padStart(2, '0')
+        const mm = String(now.getMinutes()).padStart(2, '0')
+        setVisitNotesSavedAt(`${hh}:${mm}`)
+        setData((prev) => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            client: {
+              ...prev.client,
+              visit_notes: visitNotes || null,
+            },
+          }
+        })
+      }
+
+      setVisitNotesSaving(false)
+    }, 2000)
+
+    return () => clearTimeout(timeout)
+  }, [visitNotes, data?.client?.id, data?.client?.visit_notes])
 
   async function handleDeleteClient() {
     if (!data?.client?.id) return
@@ -776,6 +829,23 @@ export default function ClientDetailPage() {
           {tab === 'training' && <TrainingTab trainingen={trainingen} clientId={client.id} onSessionPlanned={loadClientDetail} />}
           {tab === 'facturen' && <FacturenTab facturen={facturen} clientId={client.id} />}
         </div>
+
+        {tab === 'overzicht' ? (
+          <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-4">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h3 className="text-white font-semibold">Bezoeknotities</h3>
+              <span className="text-xs text-white/50">
+                {visitNotesSaving ? 'Opslaan...' : visitNotesSavedAt ? `Opgeslagen om ${visitNotesSavedAt}` : ''}
+              </span>
+            </div>
+            <textarea
+              value={visitNotes}
+              onChange={(e) => setVisitNotes(e.target.value)}
+              className="w-full min-h-28 px-4 py-3 bg-slate-900/70 border border-white/10 rounded-lg text-white text-sm placeholder-white/25 focus:outline-none focus:border-brand-orange/50"
+              placeholder="Notities van het klantbezoek, aandachtspunten, afspraken en opvolgacties..."
+            />
+          </div>
+        ) : null}
 
         {tab === 'overzicht' ? (
           <div className="mt-6 border-t border-white/10 pt-6">

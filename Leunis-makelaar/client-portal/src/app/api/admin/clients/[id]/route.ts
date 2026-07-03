@@ -86,9 +86,14 @@ export async function PATCH(
     intake_id?: string
     communication_consent?: boolean
     communication_notes?: string
+    visit_notes?: string
   }
 
-  if (typeof body.communication_consent !== 'boolean' && typeof body.communication_notes !== 'string') {
+  if (
+    typeof body.communication_consent !== 'boolean' &&
+    typeof body.communication_notes !== 'string' &&
+    typeof body.visit_notes !== 'string'
+  ) {
     return NextResponse.json({ error: 'Geen geldige velden om bij te werken' }, { status: 400 })
   }
 
@@ -116,6 +121,17 @@ export async function PATCH(
 
   if (typeof body.communication_notes === 'string') {
     payload.communication_notes = body.communication_notes.trim() || null
+  }
+
+  if (typeof body.visit_notes === 'string') {
+    const { error: visitNotesUpdateError } = await admin
+      .from('clients')
+      .update({ visit_notes: body.visit_notes.trim() || null })
+      .eq('id', clientId)
+
+    if (visitNotesUpdateError) {
+      return NextResponse.json({ error: visitNotesUpdateError.message }, { status: 500 })
+    }
   }
 
   const { data: intake, error: upsertError } = existing

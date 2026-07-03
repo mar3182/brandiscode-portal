@@ -22,6 +22,7 @@ export interface Client {
   billing_postal_code: string | null
   billing_city: string | null
   billing_country: string | null
+  visit_notes: string | null
   onboarding_completed_at: string | null
   created_at: string
 }
