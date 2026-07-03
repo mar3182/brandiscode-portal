@@ -18,6 +18,7 @@ import {
   Loader2,
   Mail,
   Phone,
+  Save,
   User,
 } from 'lucide-react'
 import type { Client, Factuur, FactuurStatus, Offerte, OfferteStatus, Sprint, TrainingIntake, TrainingIntakeStatus } from '@/lib/types'
@@ -269,6 +270,61 @@ function TrainingTab({
   const [sessionError, setSessionError] = useState('')
   const [sessionSuccess, setSessionSuccess] = useState('')
 
+  // ── status management ─────────────────────────────────────────────────────
+  const [intakes, setIntakes] = useState<TrainingRow[]>(trainingen)
+  const [statusSaving, setStatusSaving] = useState<string | null>(null)
+  const [statusErrors, setStatusErrors] = useState<Record<string, string>>({})
+  const [trainerNotes, setTrainerNotes] = useState<Record<string, string>>(() =>
+    Object.fromEntries(trainingen.map((t) => [t.id, t.trainer_notes ?? '']))
+  )
+  const [notesSaving, setNotesSaving] = useState<string | null>(null)
+
+  useEffect(() => {
+    setIntakes(trainingen)
+    setTrainerNotes((prev) => {
+      const next = { ...prev }
+      trainingen.forEach((t) => {
+        if (!(t.id in next)) next[t.id] = t.trainer_notes ?? ''
+      })
+      return next
+    })
+  }, [trainingen])
+
+  async function handleStatusChange(intakeId: string, nextStatus: TrainingIntakeStatus) {
+    const originalStatus = intakes.find((t) => t.id === intakeId)?.status
+    setIntakes((prev) => prev.map((t) => (t.id === intakeId ? { ...t, status: nextStatus } : t)))
+    setStatusErrors((prev) => ({ ...prev, [intakeId]: '' }))
+    setStatusSaving(intakeId)
+
+    const res = await fetch('/api/admin/training-intakes', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ intake_id: intakeId, status: nextStatus }),
+    })
+    const data = await res.json().catch(() => ({}))
+
+    if (!res.ok) {
+      setIntakes((prev) => prev.map((t) => (t.id === intakeId ? { ...t, status: originalStatus ?? t.status } : t)))
+      setStatusErrors((prev) => ({ ...prev, [intakeId]: data.error ?? 'Statuswijziging mislukt.' }))
+    }
+    setStatusSaving(null)
+  }
+
+  async function handleSaveTrainerNotes(intakeId: string) {
+    setNotesSaving(intakeId)
+    const res = await fetch('/api/admin/training-intakes', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ intake_id: intakeId, trainer_notes: trainerNotes[intakeId] ?? '' }),
+    })
+    const data = await res.json().catch(() => ({}))
+    setNotesSaving(null)
+    if (!res.ok) {
+      setStatusErrors((prev) => ({ ...prev, [intakeId]: data.error ?? 'Notities opslaan mislukt.' }))
+    }
+  }
+
+  // ── session planning ──────────────────────────────────────────────────────
   function openPlanningForm(intakeId: string, trainingDuration: string | null) {
     setPlanningIntakeId(intakeId)
     setSessionStart('')
@@ -326,10 +382,10 @@ function TrainingTab({
           Nieuwe intake <ChevronRight size={12} />
         </Link>
       </div>
-      {trainingen.length === 0 && (
+      {intakes.length === 0 && (
         <p className="text-white/40 text-sm text-center py-8">Geen training intakes voor deze klant</p>
       )}
-      {trainingen.map(t => (
+      {intakes.map(t => (
         <div key={t.id} className="bg-white/5 border border-white/10 rounded-xl p-4">
           <div className="flex items-start justify-between gap-2 mb-3">
             <div className="flex items-center gap-2">
@@ -404,6 +460,51 @@ function TrainingTab({
             )}
           </div>
 
+          {/* ── status actions ─────────────────────────────────────────────── */}
+          {t.status === 'submitted' && (
+            <div className="mt-4 border-t border-white/10 pt-4">
+              <button
+                onClick={() => handleStatusChange(t.id, 'reviewed')}
+                disabled={statusSaving === t.id}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 text-sm disabled:opacity-60"
+              >
+                {statusSaving === t.id
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <CheckCircle2 className="w-4 h-4" />}
+                Markeer als beoordeeld
+              </button>
+            </div>
+          )}
+
+          {statusErrors[t.id] ? (
+            <p className="mt-2 text-xs text-red-300" role="alert">{statusErrors[t.id]}</p>
+          ) : null}
+
+          {/* ── trainer notes (visible when reviewed or planned) ───────────── */}
+          {(t.status === 'reviewed' || t.status === 'planned') && (
+            <div className="mt-4 border-t border-white/10 pt-4 space-y-2">
+              <label className="block text-xs text-white/40">Reviewernotitie (intern)</label>
+              <textarea
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-white/25 focus:outline-none focus:border-brand-orange/50 min-h-20 resize-y disabled:opacity-50"
+                placeholder="Aantekeningen voor de trainer — niet zichtbaar voor de klant"
+                value={trainerNotes[t.id] ?? ''}
+                disabled={t.status === 'planned'}
+                onChange={(e) => setTrainerNotes((prev) => ({ ...prev, [t.id]: e.target.value }))}
+              />
+              {t.status === 'reviewed' && (
+                <button
+                  onClick={() => handleSaveTrainerNotes(t.id)}
+                  disabled={notesSaving === t.id}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white/80 text-xs disabled:opacity-60"
+                >
+                  {notesSaving === t.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                  Notitie opslaan
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* ── session planning ──────────────────────────────────────────── */}
           {t.status === 'reviewed' && !((t.training_sessions || []).some((session) => session.status === 'proposed')) ? (
             <div className="mt-4 border-t border-white/10 pt-4">
               <button
@@ -485,7 +586,6 @@ function TrainingTab({
     </div>
   )
 }
-
 function FacturenTab({ facturen, clientId }: { facturen: Factuur[]; clientId: string }) {
   const totaalOpenstaand = facturen
     .filter(f => f.status === 'verstuurd' || f.status === 'herinnering')
