@@ -641,6 +641,9 @@ export default function ClientDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tab, setTab] = useState<Tab>('overzicht')
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deletingClient, setDeletingClient] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   async function loadClientDetail() {
     setLoading(true)
@@ -665,6 +668,27 @@ export default function ClientDetailPage() {
   useEffect(() => {
     if (id) loadClientDetail()
   }, [id])
+
+  async function handleDeleteClient() {
+    if (!data?.client?.id) return
+
+    setDeletingClient(true)
+    setDeleteError('')
+
+    const res = await fetch(`/api/admin/clients/${data.client.id}`, {
+      method: 'DELETE',
+    })
+
+    const body = await res.json().catch(() => ({}))
+
+    if (!res.ok) {
+      setDeleteError(body.error || 'Klant verwijderen is mislukt.')
+      setDeletingClient(false)
+      return
+    }
+
+    router.push('/admin/clients')
+  }
 
   if (loading) {
     return (
@@ -752,7 +776,52 @@ export default function ClientDetailPage() {
           {tab === 'training' && <TrainingTab trainingen={trainingen} clientId={client.id} onSessionPlanned={loadClientDetail} />}
           {tab === 'facturen' && <FacturenTab facturen={facturen} clientId={client.id} />}
         </div>
+
+        {tab === 'overzicht' ? (
+          <div className="mt-6 border-t border-white/10 pt-6">
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="px-4 py-2.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 text-sm font-medium"
+            >
+              Verwijder klant
+            </button>
+          </div>
+        ) : null}
       </div>
+
+      {showDeleteModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70" onClick={() => !deletingClient && setShowDeleteModal(false)} />
+          <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
+            <h2 className="text-lg font-semibold text-white mb-2">Klant verwijderen?</h2>
+            <p className="text-sm text-white/70">
+              Weet je zeker dat je {displayName} wilt verwijderen? Dit verwijdert ook alle intakes, sessies en offertes.
+            </p>
+
+            {deleteError ? (
+              <p className="mt-3 text-sm text-red-300" role="alert">{deleteError}</p>
+            ) : null}
+
+            <div className="mt-5 flex flex-col sm:flex-row gap-2 sm:justify-end">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deletingClient}
+                className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white/80 text-sm disabled:opacity-60"
+              >
+                Annuleren
+              </button>
+              <button
+                onClick={handleDeleteClient}
+                disabled={deletingClient}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-medium disabled:opacity-60"
+              >
+                {deletingClient ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                Definitief verwijderen
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
