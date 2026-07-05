@@ -18,7 +18,6 @@ import {
   Loader2,
   Mail,
   Phone,
-  Save,
   User,
 } from 'lucide-react'
 import type { Client, Factuur, FactuurStatus, Offerte, OfferteStatus, Sprint, TrainingIntake, TrainingIntakeStatus } from '@/lib/types'
@@ -270,61 +269,6 @@ function TrainingTab({
   const [sessionError, setSessionError] = useState('')
   const [sessionSuccess, setSessionSuccess] = useState('')
 
-  // ── status management ─────────────────────────────────────────────────────
-  const [intakes, setIntakes] = useState<TrainingRow[]>(trainingen)
-  const [statusSaving, setStatusSaving] = useState<string | null>(null)
-  const [statusErrors, setStatusErrors] = useState<Record<string, string>>({})
-  const [trainerNotes, setTrainerNotes] = useState<Record<string, string>>(() =>
-    Object.fromEntries(trainingen.map((t) => [t.id, t.trainer_notes ?? '']))
-  )
-  const [notesSaving, setNotesSaving] = useState<string | null>(null)
-
-  useEffect(() => {
-    setIntakes(trainingen)
-    setTrainerNotes((prev) => {
-      const next = { ...prev }
-      trainingen.forEach((t) => {
-        if (!(t.id in next)) next[t.id] = t.trainer_notes ?? ''
-      })
-      return next
-    })
-  }, [trainingen])
-
-  async function handleStatusChange(intakeId: string, nextStatus: TrainingIntakeStatus) {
-    const originalStatus = intakes.find((t) => t.id === intakeId)?.status
-    setIntakes((prev) => prev.map((t) => (t.id === intakeId ? { ...t, status: nextStatus } : t)))
-    setStatusErrors((prev) => ({ ...prev, [intakeId]: '' }))
-    setStatusSaving(intakeId)
-
-    const res = await fetch('/api/admin/training-intakes', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ intake_id: intakeId, status: nextStatus }),
-    })
-    const data = await res.json().catch(() => ({}))
-
-    if (!res.ok) {
-      setIntakes((prev) => prev.map((t) => (t.id === intakeId ? { ...t, status: originalStatus ?? t.status } : t)))
-      setStatusErrors((prev) => ({ ...prev, [intakeId]: data.error ?? 'Statuswijziging mislukt.' }))
-    }
-    setStatusSaving(null)
-  }
-
-  async function handleSaveTrainerNotes(intakeId: string) {
-    setNotesSaving(intakeId)
-    const res = await fetch('/api/admin/training-intakes', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ intake_id: intakeId, trainer_notes: trainerNotes[intakeId] ?? '' }),
-    })
-    const data = await res.json().catch(() => ({}))
-    setNotesSaving(null)
-    if (!res.ok) {
-      setStatusErrors((prev) => ({ ...prev, [intakeId]: data.error ?? 'Notities opslaan mislukt.' }))
-    }
-  }
-
-  // ── session planning ──────────────────────────────────────────────────────
   function openPlanningForm(intakeId: string, trainingDuration: string | null) {
     setPlanningIntakeId(intakeId)
     setSessionStart('')
@@ -382,21 +326,10 @@ function TrainingTab({
           Nieuwe intake <ChevronRight size={12} />
         </Link>
       </div>
-      {trainingen.length === 0 ? (
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <p className="text-sm text-white/60">Nog geen intake voor deze klant.</p>
-          <Link
-            href={`/admin/clients/${clientId}/intake`}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-orange/20 hover:bg-brand-orange/30 text-brand-orange text-sm"
-          >
-            Intake invullen als admin <ChevronRight size={12} />
-          </Link>
-        </div>
-      ) : null}
-      {intakes.length === 0 && (
+      {trainingen.length === 0 && (
         <p className="text-white/40 text-sm text-center py-8">Geen training intakes voor deze klant</p>
       )}
-      {intakes.map(t => (
+      {trainingen.map(t => (
         <div key={t.id} className="bg-white/5 border border-white/10 rounded-xl p-4">
           <div className="flex items-start justify-between gap-2 mb-3">
             <div className="flex items-center gap-2">
@@ -471,51 +404,6 @@ function TrainingTab({
             )}
           </div>
 
-          {/* ── status actions ─────────────────────────────────────────────── */}
-          {t.status === 'submitted' && (
-            <div className="mt-4 border-t border-white/10 pt-4">
-              <button
-                onClick={() => handleStatusChange(t.id, 'reviewed')}
-                disabled={statusSaving === t.id}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 text-sm disabled:opacity-60"
-              >
-                {statusSaving === t.id
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : <CheckCircle2 className="w-4 h-4" />}
-                Markeer als beoordeeld
-              </button>
-            </div>
-          )}
-
-          {statusErrors[t.id] ? (
-            <p className="mt-2 text-xs text-red-300" role="alert">{statusErrors[t.id]}</p>
-          ) : null}
-
-          {/* ── trainer notes (visible when reviewed or planned) ───────────── */}
-          {(t.status === 'reviewed' || t.status === 'planned') && (
-            <div className="mt-4 border-t border-white/10 pt-4 space-y-2">
-              <label className="block text-xs text-white/40">Reviewernotitie (intern)</label>
-              <textarea
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-white/25 focus:outline-none focus:border-brand-orange/50 min-h-20 resize-y disabled:opacity-50"
-                placeholder="Aantekeningen voor de trainer — niet zichtbaar voor de klant"
-                value={trainerNotes[t.id] ?? ''}
-                disabled={t.status === 'planned'}
-                onChange={(e) => setTrainerNotes((prev) => ({ ...prev, [t.id]: e.target.value }))}
-              />
-              {t.status === 'reviewed' && (
-                <button
-                  onClick={() => handleSaveTrainerNotes(t.id)}
-                  disabled={notesSaving === t.id}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white/80 text-xs disabled:opacity-60"
-                >
-                  {notesSaving === t.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                  Notitie opslaan
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* ── session planning ──────────────────────────────────────────── */}
           {t.status === 'reviewed' && !((t.training_sessions || []).some((session) => session.status === 'proposed')) ? (
             <div className="mt-4 border-t border-white/10 pt-4">
               <button
@@ -597,6 +485,7 @@ function TrainingTab({
     </div>
   )
 }
+
 function FacturenTab({ facturen, clientId }: { facturen: Factuur[]; clientId: string }) {
   const totaalOpenstaand = facturen
     .filter(f => f.status === 'verstuurd' || f.status === 'herinnering')
@@ -652,12 +541,6 @@ export default function ClientDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tab, setTab] = useState<Tab>('overzicht')
-  const [visitNotes, setVisitNotes] = useState('')
-  const [visitNotesSavedAt, setVisitNotesSavedAt] = useState<string | null>(null)
-  const [visitNotesSaving, setVisitNotesSaving] = useState(false)
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [deletingClient, setDeletingClient] = useState(false)
-  const [deleteError, setDeleteError] = useState('')
 
   async function loadClientDetail() {
     setLoading(true)
@@ -668,9 +551,7 @@ export default function ClientDetailPage() {
       setLoading(false)
       return
     }
-    const payload = await res.json()
-    setData(payload)
-    setVisitNotes(payload?.client?.visit_notes || '')
+    setData(await res.json())
     setLoading(false)
   }
 
@@ -684,64 +565,6 @@ export default function ClientDetailPage() {
   useEffect(() => {
     if (id) loadClientDetail()
   }, [id])
-
-  useEffect(() => {
-    if (!data?.client?.id) return
-
-    const timeout = setTimeout(async () => {
-      if (visitNotes === (data.client.visit_notes || '')) return
-
-      setVisitNotesSaving(true)
-
-      const res = await fetch(`/api/admin/clients/${data.client.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ visit_notes: visitNotes }),
-      })
-
-      if (res.ok) {
-        const now = new Date()
-        const hh = String(now.getHours()).padStart(2, '0')
-        const mm = String(now.getMinutes()).padStart(2, '0')
-        setVisitNotesSavedAt(`${hh}:${mm}`)
-        setData((prev) => {
-          if (!prev) return prev
-          return {
-            ...prev,
-            client: {
-              ...prev.client,
-              visit_notes: visitNotes || null,
-            },
-          }
-        })
-      }
-
-      setVisitNotesSaving(false)
-    }, 2000)
-
-    return () => clearTimeout(timeout)
-  }, [visitNotes, data?.client?.id, data?.client?.visit_notes])
-
-  async function handleDeleteClient() {
-    if (!data?.client?.id) return
-
-    setDeletingClient(true)
-    setDeleteError('')
-
-    const res = await fetch(`/api/admin/clients/${data.client.id}`, {
-      method: 'DELETE',
-    })
-
-    const body = await res.json().catch(() => ({}))
-
-    if (!res.ok) {
-      setDeleteError(body.error || 'Klant verwijderen is mislukt.')
-      setDeletingClient(false)
-      return
-    }
-
-    router.push('/admin/clients')
-  }
 
   if (loading) {
     return (
@@ -829,69 +652,7 @@ export default function ClientDetailPage() {
           {tab === 'training' && <TrainingTab trainingen={trainingen} clientId={client.id} onSessionPlanned={loadClientDetail} />}
           {tab === 'facturen' && <FacturenTab facturen={facturen} clientId={client.id} />}
         </div>
-
-        {tab === 'overzicht' ? (
-          <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-4">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <h3 className="text-white font-semibold">Bezoeknotities</h3>
-              <span className="text-xs text-white/50">
-                {visitNotesSaving ? 'Opslaan...' : visitNotesSavedAt ? `Opgeslagen om ${visitNotesSavedAt}` : ''}
-              </span>
-            </div>
-            <textarea
-              value={visitNotes}
-              onChange={(e) => setVisitNotes(e.target.value)}
-              className="w-full min-h-28 px-4 py-3 bg-slate-900/70 border border-white/10 rounded-lg text-white text-sm placeholder-white/25 focus:outline-none focus:border-brand-orange/50"
-              placeholder="Notities van het klantbezoek, aandachtspunten, afspraken en opvolgacties..."
-            />
-          </div>
-        ) : null}
-
-        {tab === 'overzicht' ? (
-          <div className="mt-6 border-t border-white/10 pt-6">
-            <button
-              onClick={() => setShowDeleteModal(true)}
-              className="px-4 py-2.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 text-sm font-medium"
-            >
-              Verwijder klant
-            </button>
-          </div>
-        ) : null}
       </div>
-
-      {showDeleteModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/70" onClick={() => !deletingClient && setShowDeleteModal(false)} />
-          <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
-            <h2 className="text-lg font-semibold text-white mb-2">Klant verwijderen?</h2>
-            <p className="text-sm text-white/70">
-              Weet je zeker dat je {displayName} wilt verwijderen? Dit verwijdert ook alle intakes, sessies en offertes.
-            </p>
-
-            {deleteError ? (
-              <p className="mt-3 text-sm text-red-300" role="alert">{deleteError}</p>
-            ) : null}
-
-            <div className="mt-5 flex flex-col sm:flex-row gap-2 sm:justify-end">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                disabled={deletingClient}
-                className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white/80 text-sm disabled:opacity-60"
-              >
-                Annuleren
-              </button>
-              <button
-                onClick={handleDeleteClient}
-                disabled={deletingClient}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-medium disabled:opacity-60"
-              >
-                {deletingClient ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                Definitief verwijderen
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   )
 }

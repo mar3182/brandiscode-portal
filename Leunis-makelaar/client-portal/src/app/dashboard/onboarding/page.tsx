@@ -22,22 +22,10 @@ import {
   CheckCircle2,
   ChevronRight,
   ClipboardList,
-  Info,
   Loader2,
   Save,
   Users,
 } from 'lucide-react'
-
-function InfoTooltip({ text }: { text: string }) {
-  return (
-    <span className="relative inline-block group ml-1.5 align-middle">
-      <Info className="w-3.5 h-3.5 text-white/35 hover:text-brand-gold cursor-help inline" aria-hidden="true" />
-      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 rounded-lg bg-black/90 border border-white/10 px-3 py-2 text-xs text-white/80 opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-normal text-left shadow-lg">
-        {text}
-      </span>
-    </span>
-  )
-}
 
 const INPUT_CLASS = 'w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-brand-gold/50 transition-all'
 
@@ -107,7 +95,6 @@ export default function OnboardingPage() {
   const [fieldErrors, setFieldErrors] = useState<ProfileFieldErrors>({})
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [channelTouched, setChannelTouched] = useState(false)
-  const [stepTwoErrors, setStepTwoErrors] = useState<string[]>([])
   const [status, setStatus] = useState<'draft' | 'submitted' | 'reviewed' | 'planned'>('draft')
 
   const [billing, setBilling] = useState<BillingForm>(emptyBilling)
@@ -123,11 +110,11 @@ export default function OnboardingPage() {
     communication_channel: '',
     communication_email: '',
     communication_whatsapp: '',
-    communication_consent: false,
-    communication_notes: '',
     portal_notifications_enabled: false,
     trainer_notes: '',
-    members: [],
+    members: [createEmptyMember(0)],
+      communication_consent: false,
+      communication_notes: '',
   })
 
   useEffect(() => {
@@ -174,8 +161,8 @@ export default function OnboardingPage() {
               : '',
             communication_email: intakeData.intake.communication_email ?? '',
             communication_whatsapp: intakeData.intake.communication_whatsapp ?? '',
-            communication_consent: Boolean(intakeData.intake.communication_consent),
-            communication_notes: intakeData.intake.communication_notes ?? '',
+              communication_consent: Boolean(intakeData.intake.communication_consent),
+              communication_notes: intakeData.intake.communication_notes ?? '',
             portal_notifications_enabled: Boolean(intakeData.intake.portal_notifications_enabled),
             trainer_notes: intakeData.intake.trainer_notes ?? '',
             members: Array.isArray(intakeData.members) && intakeData.members.length > 0
@@ -194,7 +181,7 @@ export default function OnboardingPage() {
                 training_day_availability: member.training_day_availability ?? '',
                 sort_order: typeof member.sort_order === 'number' ? member.sort_order : index,
               }))
-              : [],
+              : [createEmptyMember(0)],
           })
           setStatus(intakeData.intake.status ?? 'draft')
         }
@@ -263,17 +250,6 @@ export default function OnboardingPage() {
     setSaving(false)
   }
 
-  function validateStepTwo() {
-    return [] as string[]
-  }
-
-  function handleStepTwoNext() {
-    const errors = validateStepTwo()
-    setStepTwoErrors(errors)
-    if (errors.length > 0) return
-    setStep(3)
-  }
-
   async function handleSubmitIntake() {
     setSaving(true)
     setError('')
@@ -314,7 +290,7 @@ export default function OnboardingPage() {
       const members = prev.members.filter((_, idx) => idx !== index)
       return {
         ...prev,
-        members,
+        members: members.length > 0 ? members : [createEmptyMember(0)],
       }
     })
   }
@@ -454,30 +430,14 @@ export default function OnboardingPage() {
           </div>
 
           <div>
-            <label className="flex items-center text-sm text-white/60 mb-1.5">
-              Focusgebied *
-              <InfoTooltip text="Waar wil je AI het eerst voor inzetten in jullie werkproces? Bijv. 'e-mails opstellen', 'rapporten samenvatten' of 'offertes schrijven'." />
-            </label>
+            <label className="block text-sm text-white/60 mb-1.5">Focusgebied *</label>
             <input className={INPUT_CLASS} value={training.focus_area} onChange={(e) => setTraining((prev) => ({ ...prev, focus_area: e.target.value }))} />
           </div>
 
           <div>
-            <label className="flex items-center text-sm text-white/60 mb-1.5">
-              Privacy/security randvoorwaarden
-              <InfoTooltip text="Geef aan of er regels gelden voor AI-gebruik tijdens de training. Bijv. geen persoonsgegevens in prompts, geen opnames. Geen beperkingen? Laat dit veld leeg." />
-            </label>
-            <textarea className={`${INPUT_CLASS} min-h-24`} value={training.privacy_constraints} onChange={(e) => setTraining((prev) => ({ ...prev, privacy_constraints: e.target.value }))} placeholder="Bijv. geen klantdata in prompts, geen opnames — laat leeg als er geen beperkingen zijn." />
+            <label className="block text-sm text-white/60 mb-1.5">Privacy/security randvoorwaarden *</label>
+            <textarea className={`${INPUT_CLASS} min-h-24`} value={training.privacy_constraints} onChange={(e) => setTraining((prev) => ({ ...prev, privacy_constraints: e.target.value }))} />
           </div>
-
-          {stepTwoErrors.length > 0 ? (
-            <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3" role="alert" aria-live="assertive">
-              <ul className="text-sm text-red-200 list-disc pl-5 space-y-1">
-                {stepTwoErrors.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
 
           <label className="flex items-start gap-3 text-sm text-white/70">
             <input type="checkbox" checked={training.data_usage_consent} onChange={(e) => setTraining((prev) => ({ ...prev, data_usage_consent: e.target.checked }))} className="mt-1" />
@@ -614,11 +574,10 @@ export default function OnboardingPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
-            <button onClick={() => setStep(1)} className="px-4 py-2.5 rounded-xl bg-white/10 text-white hover:bg-white/20">Vorige</button>
             <button onClick={handleDraftSave} disabled={saving} className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 text-white hover:bg-white/20">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Opslaan als concept
             </button>
-            <button onClick={handleStepTwoNext} className="px-4 py-2.5 rounded-xl bg-brand-gold text-black font-semibold">Volgende: teamleden</button>
+            <button onClick={() => setStep(3)} className="px-4 py-2.5 rounded-xl bg-brand-gold text-black font-semibold">Volgende: teamleden</button>
           </div>
         </div>
       )}
@@ -634,11 +593,6 @@ export default function OnboardingPage() {
           </div>
 
           <div className="space-y-4">
-            {training.members.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-white/20 bg-white/5 p-4 text-sm text-white/60">
-                Nog geen teamleden toegevoegd. Dit onderdeel is optioneel.
-              </div>
-            ) : null}
             {training.members.map((member, index) => (
               <div key={index} className="rounded-xl border border-white/10 p-4 space-y-3 bg-white/5">
                 <div className="flex items-center justify-between">
@@ -647,94 +601,35 @@ export default function OnboardingPage() {
                     <button onClick={() => removeMember(index)} className="text-xs text-red-300">Verwijderen</button>
                   ) : null}
                 </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-white/50 mb-1">Naam *</label>
-                    <input className={INPUT_CLASS} placeholder="Volledige naam" value={member.full_name} onChange={(e) => updateMember(index, { full_name: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className="flex items-center text-xs text-white/50 mb-1">
-                      Rol
-                      <InfoTooltip text="Wat is de functie of rol van dit teamlid? Bijv. 'accountmanager', 'medewerker klantenservice', 'officemanager'." />
-                    </label>
-                    <input className={INPUT_CLASS} placeholder="Functie of rol (optioneel)" value={member.role} onChange={(e) => updateMember(index, { role: e.target.value })} />
-                  </div>
+                  <input className={INPUT_CLASS} placeholder="Naam *" value={member.full_name} onChange={(e) => updateMember(index, { full_name: e.target.value })} />
+                  <input className={INPUT_CLASS} placeholder="Rol *" value={member.role} onChange={(e) => updateMember(index, { role: e.target.value })} />
                 </div>
-
-                <div>
-                  <label className="flex items-center text-xs text-white/50 mb-1.5">
-                    Top-taken (0–3)
-                    <InfoTooltip text="Beschrijf maximaal 3 taken die dit teamlid regelmatig uitvoert en waarbij AI tijd kan besparen. Bijv. 'e-mails schrijven', 'rapporten samenvatten', 'offertes opstellen'. Laat velden leeg die niet van toepassing zijn." />
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {member.top_tasks.map((task, taskIndex) => (
-                      <input key={taskIndex} className={INPUT_CLASS} placeholder={`Taak ${taskIndex + 1} (optioneel)`} value={task} onChange={(e) => {
-                        const nextTasks = [...member.top_tasks]
-                        nextTasks[taskIndex] = e.target.value
-                        updateMember(index, { top_tasks: nextTasks })
-                      }} />
-                    ))}
-                  </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {member.top_tasks.map((task, taskIndex) => (
+                    <input key={taskIndex} className={INPUT_CLASS} placeholder={`Top taak ${taskIndex + 1} *`} value={task} onChange={(e) => {
+                      const nextTasks = [...member.top_tasks]
+                      nextTasks[taskIndex] = e.target.value
+                      updateMember(index, { top_tasks: nextTasks })
+                    }} />
+                  ))}
                 </div>
-
-                <div>
-                  <label className="flex items-center text-xs text-white/50 mb-1">
-                    Grootste knelpunt
-                    <InfoTooltip text="Welke taak kost dit teamlid het meeste tijd of energie? Bijv. 'steeds dezelfde e-mails schrijven', 'lange documenten doorlezen', 'verslagen uitwerken'." />
-                  </label>
-                  <textarea className={`${INPUT_CLASS} min-h-20`} placeholder="Bijv. teksten herschrijven, e-mails opstellen (optioneel)" value={member.bottleneck} onChange={(e) => updateMember(index, { bottleneck: e.target.value })} />
-                </div>
-
-                <div>
-                  <label className="flex items-center text-xs text-white/50 mb-1">
-                    KPI / doelresultaat
-                    <InfoTooltip text="Welk concreet resultaat wil dit teamlid behalen met AI? Bijv. '30% tijdsbesparing op tekstwerk', 'minder terugkerende vragen afhandelen', 'sneller offertes opstellen'." />
-                  </label>
-                  <textarea className={`${INPUT_CLASS} min-h-20`} placeholder="Bijv. 50% sneller woningbeschrijvingen (optioneel)" value={member.kpi_goal} onChange={(e) => updateMember(index, { kpi_goal: e.target.value })} />
-                </div>
-
+                <textarea className={`${INPUT_CLASS} min-h-20`} placeholder="Grootste knelpunt *" value={member.bottleneck} onChange={(e) => updateMember(index, { bottleneck: e.target.value })} />
+                <textarea className={`${INPUT_CLASS} min-h-20`} placeholder="KPI/doelresultaat *" value={member.kpi_goal} onChange={(e) => updateMember(index, { kpi_goal: e.target.value })} />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="flex items-center text-xs text-white/50 mb-1">
-                      Digitale vaardigheid (1–5)
-                      <InfoTooltip text="Hoe comfortabel is dit teamlid met digitale tools? 1 = beginner, 5 = digitaal zeer vaardig." />
-                    </label>
-                    <select className={INPUT_CLASS} value={member.digital_skill ?? ''} onChange={(e) => updateMember(index, { digital_skill: e.target.value ? Number(e.target.value) : null })}>
-                      <option value="">Kies niveau (optioneel)</option>
-                      {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="flex items-center text-xs text-white/50 mb-1">
-                      AI-ervaring
-                      <InfoTooltip text="Heeft dit teamlid al eerder met ChatGPT of andere AI-tools gewerkt? Zo ja, hoe?" />
-                    </label>
-                    <input className={INPUT_CLASS} placeholder="Bijv. soms ChatGPT, nooit AI gebruikt (optioneel)" value={member.ai_experience} onChange={(e) => updateMember(index, { ai_experience: e.target.value })} />
-                  </div>
+                  <select className={INPUT_CLASS} value={member.digital_skill ?? ''} onChange={(e) => updateMember(index, { digital_skill: e.target.value ? Number(e.target.value) : null })}>
+                    <option value="">Digitale vaardigheid (1-5) *</option>
+                    {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}
+                  </select>
+                  <input className={INPUT_CLASS} placeholder="AI-ervaring *" value={member.ai_experience} onChange={(e) => updateMember(index, { ai_experience: e.target.value })} />
                 </div>
-
-                <div>
-                  <label className="flex items-center text-xs text-white/50 mb-1">
-                    Datagrens
-                    <InfoTooltip text="Welke gegevens mogen NIET in een externe AI-tool ingevoerd worden? Bijv. geen persoonsgegevens, geen financiële data, geen vertrouwelijke klantinformatie." />
-                  </label>
-                  <textarea className={`${INPUT_CLASS} min-h-20`} placeholder="Bijv. geen klantgegevens, geen interne prijzen (optioneel)" value={member.prompt_data_boundary} onChange={(e) => updateMember(index, { prompt_data_boundary: e.target.value })} />
-                </div>
-
-                <div>
-                  <label className="flex items-center text-xs text-white/50 mb-1">
-                    Beschikbaarheid trainingsdag
-                    <InfoTooltip text="Is dit teamlid aanwezig op de geplande trainingsdag? Bijv. 'Ja' of 'Niet op vrijdag'." />
-                  </label>
-                  <input className={INPUT_CLASS} placeholder="Bijv. aanwezig, niet op vrijdag (optioneel)" value={member.training_day_availability} onChange={(e) => updateMember(index, { training_day_availability: e.target.value })} />
-                </div>
+                <textarea className={`${INPUT_CLASS} min-h-20`} placeholder="Datagrens (wat mag niet in prompts) *" value={member.prompt_data_boundary} onChange={(e) => updateMember(index, { prompt_data_boundary: e.target.value })} />
+                <input className={INPUT_CLASS} placeholder="Beschikbaarheid trainingsdag *" value={member.training_day_availability} onChange={(e) => updateMember(index, { training_day_availability: e.target.value })} />
               </div>
             ))}
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
-            <button onClick={() => setStep(2)} className="px-4 py-2.5 rounded-xl bg-white/10 text-white hover:bg-white/20">Vorige</button>
             <button onClick={handleDraftSave} disabled={saving} className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 text-white hover:bg-white/20">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Opslaan als concept
             </button>
@@ -782,7 +677,6 @@ export default function OnboardingPage() {
           ) : null}
 
           <div className="flex flex-col sm:flex-row gap-3">
-            <button onClick={() => setStep(3)} className="px-4 py-2.5 rounded-xl bg-white/10 text-white hover:bg-white/20">Vorige</button>
             <button onClick={handleDraftSave} disabled={saving} className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 text-white hover:bg-white/20">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Opslaan als concept
             </button>

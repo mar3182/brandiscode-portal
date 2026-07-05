@@ -1,2 +1,0 @@
-ALTER TABLE clients
-ADD COLUMN IF NOT EXISTS visit_notes TEXT;

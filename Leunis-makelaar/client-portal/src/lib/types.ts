@@ -22,7 +22,6 @@ export interface Client {
   billing_postal_code: string | null
   billing_city: string | null
   billing_country: string | null
-  visit_notes: string | null
   onboarding_completed_at: string | null
   created_at: string
 }
@@ -192,9 +191,6 @@ export interface TrainingSession {
   location_or_link: string | null
   agenda: string | null
   admin_notes: string | null
-  google_calendar_id: string | null
-  google_event_id: string | null
-  google_attendee_email: string | null
   created_at: string
   updated_at: string
 }

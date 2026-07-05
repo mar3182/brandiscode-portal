@@ -122,6 +122,16 @@ export function validateMember(member: TrainingIntakeMemberInput, index: number)
   const errors: string[] = []
 
   if (!hasText(member.full_name)) errors.push(`Teamlid ${index + 1}: naam is verplicht.`)
+  if (!hasText(member.role)) errors.push(`Teamlid ${index + 1}: rol is verplicht.`)
+  if (normalizeTopTasks(member.top_tasks).length !== 3) errors.push(`Teamlid ${index + 1}: vul precies 3 top-taken in.`)
+  if (!hasText(member.bottleneck)) errors.push(`Teamlid ${index + 1}: grootste knelpunt is verplicht.`)
+  if (!hasText(member.kpi_goal)) errors.push(`Teamlid ${index + 1}: KPI/doelresultaat is verplicht.`)
+  if (typeof member.digital_skill !== 'number' || member.digital_skill < 1 || member.digital_skill > 5) {
+    errors.push(`Teamlid ${index + 1}: digitale vaardigheid moet tussen 1 en 5 liggen.`)
+  }
+  if (!hasText(member.ai_experience)) errors.push(`Teamlid ${index + 1}: AI-ervaring is verplicht.`)
+  if (!hasText(member.prompt_data_boundary)) errors.push(`Teamlid ${index + 1}: datagrens is verplicht.`)
+  if (!hasText(member.training_day_availability)) errors.push(`Teamlid ${index + 1}: beschikbaarheid op trainingsdag is verplicht.`)
 
   return errors
 }
@@ -134,6 +144,7 @@ export function computeTrainingCompleteness(input: TrainingIntakeInput): Trainin
   if (!hasText(input.contact_person)) missingRequiredFields.push('Contactpersoon')
   if (!hasText(input.contact_email)) missingRequiredFields.push('Contact e-mailadres')
   if (!hasText(input.focus_area)) missingRequiredFields.push('Focusgebied')
+  if (!hasText(input.privacy_constraints)) missingRequiredFields.push('Privacy/security randvoorwaarden')
   if (!input.data_usage_consent) missingRequiredFields.push('Akkoord datagebruik')
 
   const communicationErrors = validateCommunicationPreference(input)
@@ -162,8 +173,8 @@ export function computeTrainingCompleteness(input: TrainingIntakeInput): Trainin
   }
 
   const memberErrors = input.members.flatMap((member, index) => validateMember(member, index))
-  const membersComplete = input.members.length === 0 || memberErrors.length === 0
-  if (input.members.length > 0 && !membersComplete) missingRequiredFields.push('Teamlidinformatie is niet volledig')
+  const membersComplete = input.members.length > 0 && memberErrors.length === 0
+  if (!membersComplete) missingRequiredFields.push('Teamlidinformatie is niet volledig')
 
   return {
     intakeFieldsComplete: missingRequiredFields.length === 0 || (missingRequiredFields.length === 1 && missingRequiredFields[0] === 'Teamlidinformatie is niet volledig'),
@@ -181,8 +192,10 @@ export function validateTrainingIntake(input: TrainingIntakeInput) {
   if (!hasText(input.contact_person)) errors.push('Contactpersoon is verplicht.')
   if (!hasText(input.contact_email) || !input.contact_email.includes('@')) errors.push('Een geldig contact e-mailadres is verplicht.')
   if (!hasText(input.focus_area)) errors.push('Focusgebied is verplicht.')
+  if (!hasText(input.privacy_constraints)) errors.push('Privacy/security randvoorwaarden zijn verplicht.')
   if (!input.data_usage_consent) errors.push('Akkoord op datagebruik is verplicht.')
   errors.push(...validateCommunicationPreference(input))
+  if (input.members.length === 0) errors.push('Voeg minimaal 1 teamlid toe.')
 
   input.members.forEach((member, index) => {
     errors.push(...validateMember(member, index))
