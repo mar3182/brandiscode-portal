@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Users, Plus, Loader2, Pencil, Save, X, RefreshCw, CheckCircle2, Clock, ExternalLink } from 'lucide-react'
+import { Users, Plus, Loader2, Pencil, Save, X, RefreshCw, CheckCircle2, Clock, ExternalLink, Trash2 } from 'lucide-react'
 import type { Client } from '@/lib/types'
 import {
   type ProfileFieldErrors,
@@ -81,6 +81,9 @@ export default function AdminClientsPage() {
   const [editForm, setEditForm] = useState<ClientForm | null>(null)
   const [triggeringId, setTriggeringId] = useState<string | null>(null)
   const [triggerSuccess, setTriggerSuccess] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Client | null>(null)
+  const [deletingClientId, setDeletingClientId] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState('')
 
   useEffect(() => {
     void loadClients()
@@ -269,6 +272,28 @@ export default function AdminClientsPage() {
     }
 
     setTriggeringId(null)
+  }
+
+  async function handleConfirmDeleteClient() {
+    if (!deleteTarget) return
+
+    setDeletingClientId(deleteTarget.id)
+    setDeleteError('')
+
+    const res = await fetch(`/api/admin/clients/${deleteTarget.id}`, {
+      method: 'DELETE',
+    })
+
+    const err = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setDeleteError(err.error || 'Klant verwijderen is mislukt')
+      setDeletingClientId(null)
+      return
+    }
+
+    setClients((prev) => prev.filter((client) => client.id !== deleteTarget.id))
+    setDeleteTarget(null)
+    setDeletingClientId(null)
   }
 
   return (
@@ -516,6 +541,17 @@ export default function AdminClientsPage() {
                     <Pencil className="w-4 h-4" />
                     <span className="hidden sm:inline">Bewerken</span>
                   </button>
+                  <button
+                    onClick={() => {
+                      setDeleteTarget(client)
+                      setDeleteError('')
+                    }}
+                    title="Klant verwijderen"
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-300 text-sm"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span className="hidden sm:inline">Verwijderen</span>
+                  </button>
                 </div>
               </div>
               <div className="mt-3 text-sm text-white/45">
@@ -615,6 +651,41 @@ export default function AdminClientsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md glass-card p-6 border border-white/10">
+            <h3 className="text-white text-lg font-semibold">Klant verwijderen?</h3>
+            <p className="text-sm text-white/70 mt-2">
+              Weet je zeker dat je {deleteTarget.company || deleteTarget.name} wilt verwijderen? Dit verwijdert ook alle intakes, sessies en offertes.
+            </p>
+
+            {deleteError ? (
+              <p className="text-sm text-red-300 mt-3" role="alert">{deleteError}</p>
+            ) : null}
+
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deletingClientId === deleteTarget.id}
+                className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white/80 text-sm disabled:opacity-60"
+              >
+                Annuleren
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteClient}
+                disabled={deletingClientId === deleteTarget.id}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-medium disabled:opacity-60"
+              >
+                {deletingClientId === deleteTarget.id ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                Definitief verwijderen
+              </button>
+            </div>
           </div>
         </div>
       )}
