@@ -24,6 +24,17 @@ export async function GET() {
 
   const admin = createAdminClient()
 
+  const { data: client, error: clientError } = await admin
+    .from('clients')
+    .select(
+      'id, email, name, company, phone, contact_person, kvk_number, btw_number, iban, billing_email, ' +
+      'billing_address_line1, billing_address_line2, billing_postal_code, billing_city, billing_country, onboarding_completed_at, created_at'
+    )
+    .eq('id', clientId)
+    .single()
+
+  if (clientError) return NextResponse.json({ error: clientError.message }, { status: 500 })
+
   const { data: offertes, error: offertesError } = await admin
     .from('offertes')
     .select('id')
@@ -32,7 +43,15 @@ export async function GET() {
   if (offertesError) return NextResponse.json({ error: offertesError.message }, { status: 500 })
 
   const offerteIds = (offertes || []).map((o) => o.id)
-  if (offerteIds.length === 0) return NextResponse.json([], { status: 200 })
+  if (offerteIds.length === 0) {
+    return NextResponse.json(
+      {
+        client: client ?? null,
+        questions: [],
+      },
+      { status: 200 }
+    )
+  }
 
   const { data: questions, error: questionsError } = await admin
     .from('onboarding_questions')
@@ -59,7 +78,10 @@ export async function GET() {
     answer: answerMap.get(q.id) ?? null,
   }))
 
-  return NextResponse.json(merged)
+  return NextResponse.json({
+    client: client ?? null,
+    questions: merged,
+  })
 }
 
 export async function POST(req: NextRequest) {
