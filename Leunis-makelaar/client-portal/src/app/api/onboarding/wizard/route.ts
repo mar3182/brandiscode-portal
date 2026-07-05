@@ -38,7 +38,7 @@ export async function GET() {
   const { data, error } = await admin
     .from('clients')
     .select(
-      'company, contact_person, kvk_number, btw_number, iban, billing_email, ' +
+      'company, email, contact_person, kvk_number, btw_number, iban, billing_email, ' +
       'billing_address_line1, billing_address_line2, billing_postal_code, ' +
       'billing_city, billing_country, onboarding_completed_at'
     )
@@ -49,6 +49,7 @@ export async function GET() {
 
   const client = data as unknown as {
     company: string | null
+    email: string | null
     contact_person: string | null
     kvk_number: string | null
     btw_number: string | null

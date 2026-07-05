@@ -126,9 +126,15 @@ export default function OnboardingPage() {
         fetch('/api/training-intake'),
       ])
 
+      let profileContactPerson = ''
+      let profileContactEmail = ''
+
       if (billingRes.ok) {
         const billingData = await billingRes.json()
         if (billingData.client) {
+          profileContactPerson = billingData.client.contact_person ?? ''
+          profileContactEmail = billingData.client.billing_email ?? billingData.client.email ?? ''
+
           setBilling({
             contact_person: billingData.client.contact_person ?? '',
             kvk_number: billingData.client.kvk_number ?? '',
@@ -147,12 +153,15 @@ export default function OnboardingPage() {
       if (intakeRes.ok) {
         const intakeData = await intakeRes.json()
         if (intakeData.intake) {
+          const intakeContactPerson = intakeData.intake.contact_person ?? ''
+          const intakeContactEmail = intakeData.intake.contact_email ?? ''
+
           setTraining({
             training_duration: intakeData.intake.training_duration ?? '',
             preferred_datetime: intakeData.intake.preferred_datetime ?? '',
             preferred_time_note: intakeData.intake.preferred_time_note ?? '',
-            contact_person: intakeData.intake.contact_person ?? '',
-            contact_email: intakeData.intake.contact_email ?? '',
+            contact_person: intakeContactPerson || profileContactPerson,
+            contact_email: intakeContactEmail || profileContactEmail,
             focus_area: intakeData.intake.focus_area ?? DEFAULT_FOCUS_AREA,
             privacy_constraints: intakeData.intake.privacy_constraints ?? '',
             data_usage_consent: Boolean(intakeData.intake.data_usage_consent),
@@ -184,6 +193,12 @@ export default function OnboardingPage() {
               : [createEmptyMember(0)],
           })
           setStatus(intakeData.intake.status ?? 'draft')
+        } else {
+          setTraining((prev) => ({
+            ...prev,
+            contact_person: prev.contact_person || profileContactPerson,
+            contact_email: prev.contact_email || profileContactEmail,
+          }))
         }
       }
 
