@@ -1,14 +1,19 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
-export const runtime = 'edge';
+export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  return NextResponse.json(
-    {
+  try {
+    const supabase = await createClient()
+    // Simpele ping query om Supabase free tier wakker te houden
+    await supabase.from('clients').select('id').limit(1)
+    return NextResponse.json({
       status: 'ok',
       timestamp: new Date().toISOString(),
       version: process.env.npm_package_version ?? 'unknown',
-    },
-    { status: 200 }
-  );
+    })
+  } catch {
+    return NextResponse.json({ status: 'error' }, { status: 500 })
+  }
 }

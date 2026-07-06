@@ -540,7 +540,14 @@ export default function ClientDetailPage() {
   const [data, setData] = useState<ClientDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [tab, setTab] = useState<Tab>('overzicht')
+
+  // Derive active tab directly from URL — avoids state-reset race with searchParams effect
+  const rawTab = searchParams.get('tab')
+  const tab: Tab = (rawTab === 'overzicht' || rawTab === 'offertes' || rawTab === 'training' || rawTab === 'facturen') ? rawTab : 'overzicht'
+
+  function handleTabChange(tabId: Tab) {
+    router.replace(`/admin/clients/${id}?tab=${tabId}`)
+  }
 
   async function loadClientDetail() {
     setLoading(true)
@@ -554,13 +561,6 @@ export default function ClientDetailPage() {
     setData(await res.json())
     setLoading(false)
   }
-
-  useEffect(() => {
-    const requestedTab = searchParams.get('tab')
-    if (requestedTab === 'overzicht' || requestedTab === 'offertes' || requestedTab === 'training' || requestedTab === 'facturen') {
-      setTab(requestedTab)
-    }
-  }, [searchParams])
 
   useEffect(() => {
     if (id) loadClientDetail()
@@ -625,7 +625,7 @@ export default function ClientDetailPage() {
           {TABS.map(t => (
             <button
               key={t.id}
-              onClick={() => setTab(t.id)}
+              onClick={() => handleTabChange(t.id)}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex-1 justify-center ${
                 tab === t.id
                   ? 'bg-brand-orange text-white shadow'
