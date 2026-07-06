@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, FileText, BarChart3, MessageSquare, LogOut, ShieldCheck, Users, ClipboardList, Receipt, Building2, Menu, X } from 'lucide-react'
+import { LayoutDashboard, FileText, BarChart3, MessageSquare, LogOut, ShieldCheck, Users, ClipboardList, Receipt, Building2, Menu, X, Sparkles } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function Sidebar() {
@@ -59,6 +59,7 @@ export default function Sidebar() {
     { name: 'Training Intake', href: '/dashboard/onboarding', icon: ClipboardList, badge: openOnboardingCount },
     { name: 'Bedrijfsgegevens', href: '/dashboard/bedrijfsgegevens', icon: Building2 },
     { name: 'Facturen', href: '/dashboard/facturen', icon: Receipt, badge: openFacturenCount, badgeClass: 'bg-red-500/20 text-red-300' },
+    { name: 'Funda-teksten', href: '/dashboard/funda-tekst', icon: Sparkles },
     { name: 'Feedback', href: '/dashboard/feedback', icon: MessageSquare },
     { name: 'Team', href: '/dashboard/team', icon: Users },
     { name: 'Wachtwoord', href: '/dashboard/wachtwoord-wijzigen', icon: ShieldCheck },
