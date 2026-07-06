@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Users, Plus, Loader2, Pencil, Save, X, RefreshCw, CheckCircle2, Clock, ExternalLink, Trash2 } from 'lucide-react'
+import { Users, Plus, Loader2, Pencil, Save, X, RefreshCw, CheckCircle2, Clock, ExternalLink, Trash2, Link as LinkIcon } from 'lucide-react'
 import type { Client } from '@/lib/types'
 import {
   type ProfileFieldErrors,
@@ -84,6 +84,8 @@ export default function AdminClientsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Client | null>(null)
   const [deletingClientId, setDeletingClientId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState('')
+  const [intakeLinkLoadingId, setIntakeLinkLoadingId] = useState<string | null>(null)
+  const [intakeLinkCopiedId, setIntakeLinkCopiedId] = useState<string | null>(null)
 
   useEffect(() => {
     void loadClients()
@@ -294,6 +296,33 @@ export default function AdminClientsPage() {
     setClients((prev) => prev.filter((client) => client.id !== deleteTarget.id))
     setDeleteTarget(null)
     setDeletingClientId(null)
+  }
+
+  async function handleCopyIntakeLink(clientId: string) {
+    setIntakeLinkLoadingId(clientId)
+    setActionError('')
+
+    const res = await fetch(`/api/admin/clients/${clientId}/intake-token`, {
+      method: 'POST',
+    })
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      setActionError(err.error || 'Intake link aanmaken is mislukt')
+      setIntakeLinkLoadingId(null)
+      return
+    }
+
+    const { url } = await res.json()
+    try {
+      await navigator.clipboard.writeText(url)
+      setIntakeLinkCopiedId(clientId)
+      setTimeout(() => setIntakeLinkCopiedId(null), 2000)
+    } catch {
+      setActionError('Kopiëren mislukt. URL: ' + url)
+    }
+
+    setIntakeLinkLoadingId(null)
   }
 
   return (
@@ -531,6 +560,23 @@ export default function AdminClientsPage() {
                         ? <CheckCircle2 className="w-3.5 h-3.5" />
                         : <RefreshCw className="w-3.5 h-3.5" />}
                     <span className="hidden sm:inline">{triggerSuccess === client.id ? 'Getriggerd!' : 'Onboarding'}</span>
+                  </button>
+                  <button
+                    onClick={() => void handleCopyIntakeLink(client.id)}
+                    disabled={intakeLinkLoadingId === client.id}
+                    title="Intake link kopiëren"
+                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-all ${
+                      intakeLinkCopiedId === client.id
+                        ? 'bg-green-500/20 text-green-400'
+                        : 'bg-white/5 hover:bg-white/10 text-white/60 hover:text-white'
+                    }`}
+                  >
+                    {intakeLinkLoadingId === client.id
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : intakeLinkCopiedId === client.id
+                        ? <CheckCircle2 className="w-3.5 h-3.5" />
+                        : <LinkIcon className="w-3.5 h-3.5" />}
+                    <span className="hidden sm:inline">{intakeLinkCopiedId === client.id ? 'Link gekopieerd!' : 'Intake link'}</span>
                   </button>
                   <Link
                     href={`/admin/clients/${client.id}?tab=${detailTab}`}

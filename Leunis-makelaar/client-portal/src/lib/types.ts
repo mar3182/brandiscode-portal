@@ -6,6 +6,8 @@ export type TrainingIntakeStatus = 'draft' | 'submitted' | 'reviewed' | 'planned
 export type TrainingSessionStatus = 'proposed' | 'confirmed' | 'completed' | 'cancelled' | 'rescheduled'
 export type CommunicationChannel = 'portal' | 'email' | 'whatsapp'
 
+export type MicrosoftSubscription = 'none' | 'basic' | 'business' | 'enterprise'
+
 export interface Client {
   id: string
   email: string
@@ -23,7 +25,41 @@ export interface Client {
   billing_city: string | null
   billing_country: string | null
   onboarding_completed_at: string | null
+  microsoft_subscription: MicrosoftSubscription | null
+  software_inventory: string[] | null
+  ai_goals: string | null
   created_at: string
+}
+
+export interface IntakeToken {
+  id: string
+  client_id: string
+  token: string
+  expires_at: string
+  used_at: string | null
+  created_at: string
+}
+
+export interface IntakeTeamMember {
+  name: string
+  email: string
+  role: 'owner' | 'member'
+  function_title?: string
+}
+
+export interface IntakeSubmitBody {
+  contact_person?: string
+  kvk_number?: string
+  btw_number?: string
+  iban?: string
+  billing_email?: string
+  billing_address_line1?: string
+  billing_postal_code?: string
+  billing_city?: string
+  microsoft_subscription?: MicrosoftSubscription
+  software_inventory?: string[]
+  ai_goals?: string
+  team_members: IntakeTeamMember[]
 }
 
 export interface Offerte {
