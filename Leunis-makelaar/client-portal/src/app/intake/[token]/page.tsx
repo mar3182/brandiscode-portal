@@ -18,7 +18,7 @@ import {
   formatBtwInput,
   formatIbanInput,
 } from '@/lib/companyProfileValidation'
-import type { IntakeSubmitBody, IntakeTeamMember, MicrosoftSubscription } from '@/lib/types'
+import type { IntakeSubmitBody, IntakeTeamMember, IntakeTeamMemberProfile, MicrosoftSubscription } from '@/lib/types'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -42,6 +42,59 @@ const MICROSOFT_OPTIONS: { value: MicrosoftSubscription; label: string }[] = [
   { value: 'enterprise', label: 'Microsoft 365 Enterprise' },
 ]
 
+const DIGITAL_SKILL_OPTIONS: { value: NonNullable<IntakeTeamMemberProfile['digital_skill']>; label: string }[] = [
+  { value: 'basis', label: 'Basis (e-mail en internet)' },
+  { value: 'gemiddeld', label: 'Gemiddeld (meerdere programma\'s)' },
+  { value: 'gevorderd', label: 'Gevorderd (leer snel nieuwe software)' },
+  { value: 'expert', label: 'Expert' },
+]
+
+const AI_EXPERIENCE_OPTIONS: { value: NonNullable<IntakeTeamMemberProfile['ai_experience']>; label: string }[] = [
+  { value: 'nooit', label: 'Nooit gebruikt' },
+  { value: 'geprobeerd', label: 'Wel eens geprobeerd' },
+  { value: 'soms', label: 'Gebruik het soms' },
+  { value: 'regelmatig', label: 'Gebruik het regelmatig' },
+  { value: 'dagelijks', label: 'Gebruik het dagelijks' },
+]
+
+const AI_TOOLS_OPTIONS = ['ChatGPT', 'Microsoft Copilot', 'Google Gemini', 'Siri / Alexa', 'Geen', 'Anders']
+
+const AI_ATTITUDE_OPTIONS: { value: NonNullable<IntakeTeamMemberProfile['ai_attitude']>; label: string }[] = [
+  { value: 'enthousiast', label: 'Enthousiast 🚀' },
+  { value: 'nieuwsgierig', label: 'Nieuwsgierig' },
+  { value: 'neutraal', label: 'Neutraal' },
+  { value: 'sceptisch', label: 'Sceptisch' },
+  { value: 'bezorgd', label: 'Bezorgd' },
+]
+
+const DAILY_TASKS_OPTIONS = [
+  'E-mails beantwoorden',
+  'Woningbeschrijvingen schrijven',
+  'Klantcontact',
+  'Documenten opstellen',
+  'Data invoeren',
+  'Afspraken plannen',
+  'Rapporten maken',
+  'Anders',
+]
+
+const WEEKLY_REPETITIVE_OPTIONS: { value: NonNullable<IntakeTeamMemberProfile['weekly_repetitive_hours']>; label: string }[] = [
+  { value: 'minder-dan-2', label: 'Minder dan 2 uur' },
+  { value: '2-tot-5', label: '2 tot 5 uur' },
+  { value: '5-tot-10', label: '5 tot 10 uur' },
+  { value: 'meer-dan-10', label: 'Meer dan 10 uur' },
+]
+
+const TRAINING_PREFERENCE_OPTIONS: { value: NonNullable<IntakeTeamMemberProfile['training_preference']>; label: string }[] = [
+  { value: 'zelf-uitproberen', label: 'Zelf uitproberen' },
+  { value: 'stap-voor-stap', label: 'Stap-voor-stap begeleiding' },
+  { value: 'video', label: 'Video tutorials' },
+  { value: 'handleiding', label: 'Schriftelijke handleiding' },
+]
+
+const TRAINING_DAYS_OPTIONS = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag']
+const TRAINING_TIME_OPTIONS = ['Ochtend', 'Middag']
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Step1Form {
@@ -64,6 +117,7 @@ interface TeamMemberForm {
   email: string
   function_title: string
   role: 'owner' | 'member'
+  profile: IntakeTeamMemberProfile
 }
 
 const emptyTeamMember = (): TeamMemberForm => ({
@@ -71,6 +125,7 @@ const emptyTeamMember = (): TeamMemberForm => ({
   email: '',
   function_title: '',
   role: 'member',
+  profile: {},
 })
 
 const emptyStep1: Step1Form = {
@@ -242,6 +297,10 @@ export default function IntakePage() {
 
   function handleRemoveMember(index: number) {
     setTeamMembers((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  function handleMemberProfileChange(updates: Partial<IntakeTeamMemberProfile>) {
+    setMemberForm((prev) => ({ ...prev, profile: { ...prev.profile, ...updates } }))
   }
 
   // ── Submit ────────────────────────────────────────────────────────────────
@@ -425,8 +484,9 @@ export default function IntakePage() {
             onSetAddingMember={setAddingMember}
             onMemberFormChange={(field, value) => {
               setMemberForm((prev) => ({ ...prev, [field]: value }))
-              if (memberErrors[field]) setMemberErrors((prev) => ({ ...prev, [field]: undefined }))
+              if (memberErrors[field as keyof typeof memberErrors]) setMemberErrors((prev) => ({ ...prev, [field]: undefined }))
             }}
+            onMemberProfileChange={handleMemberProfileChange}
             onAddMember={handleAddMember}
             onRemoveMember={handleRemoveMember}
             onBack={() => {
@@ -690,12 +750,13 @@ interface Step2Props {
   teamMembers: IntakeTeamMember[]
   addingMember: boolean
   memberForm: TeamMemberForm
-  memberErrors: Partial<Record<keyof TeamMemberForm, string>>
+  memberErrors: Partial<Record<'name' | 'email' | 'function_title' | 'role', string>>
   teamError: string
   submitting: boolean
   submitError: string
   onSetAddingMember: (val: boolean) => void
-  onMemberFormChange: (field: keyof TeamMemberForm, value: string) => void
+  onMemberFormChange: (field: 'name' | 'email' | 'function_title' | 'role', value: string) => void
+  onMemberProfileChange: (updates: Partial<IntakeTeamMemberProfile>) => void
   onAddMember: () => void
   onRemoveMember: (index: number) => void
   onBack: () => void
@@ -712,6 +773,7 @@ function Step2({
   submitError,
   onSetAddingMember,
   onMemberFormChange,
+  onMemberProfileChange,
   onAddMember,
   onRemoveMember,
   onBack,
@@ -741,6 +803,15 @@ function Step2({
                   <p className="text-white/50 text-xs truncate">{member.email}</p>
                   {member.function_title && (
                     <p className="text-white/40 text-xs truncate">{member.function_title}</p>
+                  )}
+                  {member.profile && (member.profile.digital_skill || member.profile.ai_experience || member.profile.ai_attitude) && (
+                    <p className="text-white/30 text-xs mt-0.5 truncate">
+                      {[
+                        member.profile.digital_skill ? { basis: 'Basis', gemiddeld: 'Gemiddeld', gevorderd: 'Gevorderd', expert: 'Expert' }[member.profile.digital_skill] : null,
+                        member.profile.ai_experience ? { nooit: 'Geen AI', geprobeerd: 'AI geprobeerd', soms: 'Soms AI', regelmatig: 'Regelmatig AI', dagelijks: 'Dagelijks AI' }[member.profile.ai_experience] : null,
+                        member.profile.ai_attitude ? { enthousiast: 'Enthousiast 🚀', nieuwsgierig: 'Nieuwsgierig', neutraal: 'Neutraal', sceptisch: 'Sceptisch', bezorgd: 'Bezorgd' }[member.profile.ai_attitude] : null,
+                      ].filter(Boolean).join(' · ')}
+                    </p>
                   )}
                 </div>
                 <span
@@ -853,6 +924,261 @@ function Step2({
                   </label>
                 ))}
               </div>
+            </div>
+
+            {/* Profile section — expandable */}
+            <div className="border-t border-white/10 pt-4">
+              <details>
+                <summary className="cursor-pointer text-sm text-white/50 hover:text-white/70 transition-colors flex items-center gap-2 list-none select-none">
+                  <span className="text-brand-gold/60 text-xs">▸</span>
+                  Meer informatie (optioneel)
+                </summary>
+                <div className="space-y-5 mt-5">
+
+                  {/* Digitale vaardigheid */}
+                  <p className="text-xs font-semibold text-white/40 uppercase tracking-widest">Digitale vaardigheid</p>
+                  <div>
+                    <label className="block text-sm text-white/60 mb-2">Computer vaardigheid</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {DIGITAL_SKILL_OPTIONS.map((opt) => (
+                        <label
+                          key={opt.value}
+                          className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                            memberForm.profile.digital_skill === opt.value
+                              ? 'bg-brand-gold/10 border-brand-gold/40'
+                              : 'bg-white/5 border-white/10 hover:border-white/20'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="member-digital-skill"
+                            value={opt.value}
+                            checked={memberForm.profile.digital_skill === opt.value}
+                            onChange={() => onMemberProfileChange({ digital_skill: opt.value })}
+                            className="accent-brand-gold flex-shrink-0"
+                          />
+                          <span className="text-white text-sm">{opt.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* AI & Automatisering */}
+                  <p className="text-xs font-semibold text-white/40 uppercase tracking-widest mt-4">AI &amp; Automatisering</p>
+                  <div>
+                    <label className="block text-sm text-white/60 mb-2">Ervaring met AI tools</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {AI_EXPERIENCE_OPTIONS.map((opt) => (
+                        <label
+                          key={opt.value}
+                          className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                            memberForm.profile.ai_experience === opt.value
+                              ? 'bg-brand-gold/10 border-brand-gold/40'
+                              : 'bg-white/5 border-white/10 hover:border-white/20'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="member-ai-experience"
+                            value={opt.value}
+                            checked={memberForm.profile.ai_experience === opt.value}
+                            onChange={() => onMemberProfileChange({ ai_experience: opt.value })}
+                            className="accent-brand-gold flex-shrink-0"
+                          />
+                          <span className="text-white text-sm">{opt.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-white/60 mb-2">Welke AI tools ken/gebruik je?</label>
+                    <div className="flex flex-wrap gap-2">
+                      {AI_TOOLS_OPTIONS.map((tool) => {
+                        const selected = (memberForm.profile.ai_tools_known ?? []).includes(tool)
+                        return (
+                          <button
+                            key={tool}
+                            type="button"
+                            onClick={() => {
+                              const current = memberForm.profile.ai_tools_known ?? []
+                              onMemberProfileChange({ ai_tools_known: selected ? current.filter((t) => t !== tool) : [...current, tool] })
+                            }}
+                            className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                              selected ? 'bg-brand-gold/20 border-brand-gold/60 text-brand-gold' : 'bg-white/5 border-white/10 text-white/60 hover:border-white/30'
+                            }`}
+                          >
+                            {tool}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-white/60 mb-2">Houding tegenover AI</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {AI_ATTITUDE_OPTIONS.map((opt) => (
+                        <label
+                          key={opt.value}
+                          className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                            memberForm.profile.ai_attitude === opt.value
+                              ? 'bg-brand-gold/10 border-brand-gold/40'
+                              : 'bg-white/5 border-white/10 hover:border-white/20'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="member-ai-attitude"
+                            value={opt.value}
+                            checked={memberForm.profile.ai_attitude === opt.value}
+                            onChange={() => onMemberProfileChange({ ai_attitude: opt.value })}
+                            className="accent-brand-gold flex-shrink-0"
+                          />
+                          <span className="text-white text-sm">{opt.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Werkpatronen */}
+                  <p className="text-xs font-semibold text-white/40 uppercase tracking-widest mt-4">Werkpatronen</p>
+                  <div>
+                    <label className="block text-sm text-white/60 mb-2">Dagelijkse taken</label>
+                    <div className="flex flex-wrap gap-2">
+                      {DAILY_TASKS_OPTIONS.map((task) => {
+                        const selected = (memberForm.profile.daily_tasks ?? []).includes(task)
+                        return (
+                          <button
+                            key={task}
+                            type="button"
+                            onClick={() => {
+                              const current = memberForm.profile.daily_tasks ?? []
+                              onMemberProfileChange({ daily_tasks: selected ? current.filter((t) => t !== task) : [...current, task] })
+                            }}
+                            className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                              selected ? 'bg-brand-gold/20 border-brand-gold/60 text-brand-gold' : 'bg-white/5 border-white/10 text-white/60 hover:border-white/30'
+                            }`}
+                          >
+                            {task}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-white/60 mb-2">Hoeveel uur per week ben je kwijt aan herhalend werk?</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {WEEKLY_REPETITIVE_OPTIONS.map((opt) => (
+                        <label
+                          key={opt.value}
+                          className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                            memberForm.profile.weekly_repetitive_hours === opt.value
+                              ? 'bg-brand-gold/10 border-brand-gold/40'
+                              : 'bg-white/5 border-white/10 hover:border-white/20'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="member-weekly-hours"
+                            value={opt.value}
+                            checked={memberForm.profile.weekly_repetitive_hours === opt.value}
+                            onChange={() => onMemberProfileChange({ weekly_repetitive_hours: opt.value })}
+                            className="accent-brand-gold flex-shrink-0"
+                          />
+                          <span className="text-white text-sm">{opt.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <FormField label="Wat zou je het liefst nooit meer zelf doen?">
+                    <textarea
+                      className={`${INPUT_CLASS} resize-none`}
+                      rows={3}
+                      placeholder="bijv. altijd dezelfde e-mails typen..."
+                      value={memberForm.profile.automation_wish ?? ''}
+                      onChange={(e) => onMemberProfileChange({ automation_wish: e.target.value })}
+                    />
+                  </FormField>
+
+                  {/* Training voorkeur */}
+                  <p className="text-xs font-semibold text-white/40 uppercase tracking-widest mt-4">Training voorkeur</p>
+                  <div>
+                    <label className="block text-sm text-white/60 mb-2">Hoe leer jij het liefst?</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {TRAINING_PREFERENCE_OPTIONS.map((opt) => (
+                        <label
+                          key={opt.value}
+                          className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                            memberForm.profile.training_preference === opt.value
+                              ? 'bg-brand-gold/10 border-brand-gold/40'
+                              : 'bg-white/5 border-white/10 hover:border-white/20'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="member-training-pref"
+                            value={opt.value}
+                            checked={memberForm.profile.training_preference === opt.value}
+                            onChange={() => onMemberProfileChange({ training_preference: opt.value })}
+                            className="accent-brand-gold flex-shrink-0"
+                          />
+                          <span className="text-white text-sm">{opt.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-white/60 mb-2">Beschikbaarheid voor training</label>
+                    <p className="text-xs text-white/40 mb-2">Dagen</p>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {TRAINING_DAYS_OPTIONS.map((day) => {
+                        const selected = (memberForm.profile.training_availability_days ?? []).includes(day)
+                        return (
+                          <button
+                            key={day}
+                            type="button"
+                            onClick={() => {
+                              const current = memberForm.profile.training_availability_days ?? []
+                              onMemberProfileChange({ training_availability_days: selected ? current.filter((d) => d !== day) : [...current, day] })
+                            }}
+                            className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                              selected ? 'bg-brand-gold/20 border-brand-gold/60 text-brand-gold' : 'bg-white/5 border-white/10 text-white/60 hover:border-white/30'
+                            }`}
+                          >
+                            {day}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <p className="text-xs text-white/40 mb-2">Dagdeel</p>
+                    <div className="flex flex-wrap gap-2">
+                      {TRAINING_TIME_OPTIONS.map((time) => {
+                        const selected = (memberForm.profile.training_availability_time ?? []).includes(time)
+                        return (
+                          <button
+                            key={time}
+                            type="button"
+                            onClick={() => {
+                              const current = memberForm.profile.training_availability_time ?? []
+                              onMemberProfileChange({ training_availability_time: selected ? current.filter((t) => t !== time) : [...current, time] })
+                            }}
+                            className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                              selected ? 'bg-brand-gold/20 border-brand-gold/60 text-brand-gold' : 'bg-white/5 border-white/10 text-white/60 hover:border-white/30'
+                            }`}
+                          >
+                            {time}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                </div>
+              </details>
             </div>
 
             <div className="flex gap-3 pt-1">
