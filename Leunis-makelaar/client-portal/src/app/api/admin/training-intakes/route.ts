@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { sendTrainingProposalEmail } from '@/lib/email'
 import { NextRequest, NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 type IntakeStatus = 'draft' | 'submitted' | 'reviewed' | 'planned'
 
 function noStore(payload: unknown, status = 200) {

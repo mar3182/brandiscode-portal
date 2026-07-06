@@ -11,6 +11,8 @@ import {
 } from '@/lib/trainingIntake'
 import { NextRequest, NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 function noStore(payload: unknown, status = 200) {
   return NextResponse.json(payload, {
     status,

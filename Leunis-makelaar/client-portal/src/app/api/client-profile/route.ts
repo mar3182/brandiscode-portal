@@ -3,6 +3,8 @@ import { validateCompanyProfileFields } from '@/lib/companyProfileValidation'
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 function mapSchemaCacheError(message: string) {
   if (message.includes('schema cache') || message.includes('Could not find the')) {
     return 'Database mist nieuwe klantprofiel-kolommen. Voer eerst supabase/migration-client-profile.sql uit in Supabase SQL Editor en herlaad daarna de app.'

@@ -2,6 +2,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 function csvEscape(value: unknown) {
   const input = value == null ? '' : String(value)
   const escaped = input.replaceAll('"', '""')

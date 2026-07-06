@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import type { IntakeSubmitBody, IntakeTeamMember } from '@/lib/types'
 
+export const dynamic = 'force-dynamic'
+
 const NO_STORE = { 'Cache-Control': 'no-store' } as const
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://portal.brandiscode.com'
 const FROM = process.env.EMAIL_FROM ?? 'Brand is Code <noreply@brandiscode.com>'

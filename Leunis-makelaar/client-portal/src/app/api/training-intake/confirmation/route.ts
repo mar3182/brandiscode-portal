@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { sendTrainingConfirmedEmail, sendRescheduledNotificationEmail } from '@/lib/email'
 import { NextRequest, NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 function noStore(payload: unknown, status = 200) {
   return NextResponse.json(payload, { status, headers: { 'Cache-Control': 'no-store' } })
 }

@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 async function getCallerClientId() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
