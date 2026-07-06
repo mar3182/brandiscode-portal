@@ -199,6 +199,28 @@ export interface Factuur {
   sprint?: Sprint | null
 }
 
+// --- AI: Funda-teksten ---
+
+export type FundaTekstRequest = {
+  woningtype: string           // 'Vrijstaande woning' | 'Tussenwoning' | 'Hoekwoning' | 'Appartement' | 'Boerderij' | anders
+  adres: string                // bijv. "Hoogstraat 5, Tholen"
+  bouwjaar?: string
+  woonoppervlakte?: string     // m²
+  perceeloppervlakte?: string  // m²
+  kamers?: string
+  slaapkamers?: string
+  ligging: string              // bijv. "centrum Tholen, aan park, rustige weg"
+  kenmerken: string[]          // ["Monument", "Balkenplafond", "Tuin op het zuiden", "Garage", ...]
+  staat: string                // "Instapklaar" | "Opknapper" | "Goed onderhouden" | "Gerenoveerd"
+  bijzonderheden?: string      // vrije tekst extra info
+  lengte: 'kort' | 'normaal' | 'uitgebreid'  // kort ~200w, normaal ~400w, uitgebreid ~600w
+}
+
+export type FundaTekstResponse = {
+  tekst: string
+  woorden: number
+}
+
 export interface TrainingIntake {
   id: string
   client_id: string
