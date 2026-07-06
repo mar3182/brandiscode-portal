@@ -226,6 +226,7 @@ export async function POST(
           name: member.name.trim(),
           role: member.role,
           function_title: member.function_title?.trim() ?? null,
+          intake_profile: member.profile ?? {},
           ...(authUserId ? { user_id: authUserId } : {}),
         },
         { onConflict: 'client_id,email' }

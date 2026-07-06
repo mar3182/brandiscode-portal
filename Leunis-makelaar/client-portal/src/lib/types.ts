@@ -40,11 +40,38 @@ export interface IntakeToken {
   created_at: string
 }
 
+export type DigitalSkillLevel = 'basis' | 'gemiddeld' | 'gevorderd' | 'expert'
+export type AiExperienceLevel = 'nooit' | 'geprobeerd' | 'soms' | 'regelmatig' | 'dagelijks'
+export type AiAttitude = 'enthousiast' | 'nieuwsgierig' | 'neutraal' | 'sceptisch' | 'bezorgd'
+export type TrainingPreference = 'zelf-uitproberen' | 'stap-voor-stap' | 'video' | 'handleiding'
+export type WeeklyRepetitiveHours = 'minder-dan-2' | '2-tot-5' | '5-tot-10' | 'meer-dan-10'
+
+export type IntakeTeamMemberProfile = {
+  // Digitale vaardigheid
+  digital_skill?: DigitalSkillLevel
+
+  // AI & Automatisering
+  ai_experience?: AiExperienceLevel
+  ai_tools_known?: string[]          // ['ChatGPT', 'Copilot', 'Gemini', 'Siri', 'Geen', 'Anders']
+  ai_attitude?: AiAttitude
+
+  // Werkpatronen
+  daily_tasks?: string[]             // ['E-mails beantwoorden', 'Woningbeschrijvingen', 'Klantcontact', 'Documenten opstellen', 'Data invoeren', 'Afspraken plannen', 'Rapporten maken', 'Anders']
+  weekly_repetitive_hours?: WeeklyRepetitiveHours
+  automation_wish?: string           // open tekstveld: "Wat zou je het liefst nooit meer zelf doen?"
+
+  // Training
+  training_preference?: TrainingPreference
+  training_availability_days?: string[]   // ['Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag']
+  training_availability_time?: string[]   // ['Ochtend','Middag']
+}
+
 export interface IntakeTeamMember {
   name: string
   email: string
   role: 'owner' | 'member'
   function_title?: string
+  profile?: IntakeTeamMemberProfile
 }
 
 export interface IntakeSubmitBody {
