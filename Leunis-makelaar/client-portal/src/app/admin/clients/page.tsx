@@ -352,6 +352,15 @@ export default function AdminClientsPage() {
                   placeholder="klant@email.nl"
                 />
               </Field>
+              <Field label="Contactpersoon">
+                <input
+                  type="text"
+                  value={form.contact_person}
+                  onChange={e => setForm(f => ({ ...f, contact_person: e.target.value }))}
+                  className={INPUT_CLASS}
+                  placeholder="Naam contactpersoon"
+                />
+              </Field>
               <Field label="Bedrijf">
                 <input
                   type="text"
@@ -592,6 +601,9 @@ export default function AdminClientsPage() {
                       setEditEmailErrors(validateEditEmails({ email, billing_email: editForm.billing_email }))
                     }}
                   />
+                </Field>
+                <Field label="Contactpersoon">
+                  <input className={INPUT_CLASS} value={editForm.contact_person} onChange={(e) => setEditForm((prev) => prev ? ({ ...prev, contact_person: e.target.value }) : prev)} placeholder="Naam contactpersoon" />
                 </Field>
                 <Field label="Bedrijfsnaam">
                   <input className={INPUT_CLASS} value={editForm.company} onChange={(e) => setEditForm((prev) => prev ? ({ ...prev, company: e.target.value }) : prev)} />
