@@ -5,16 +5,16 @@ import type { FundaTekstRequest, FundaTekstResponse } from '@/lib/types'
 export const dynamic = 'force-dynamic'
 
 function getOpenAI(): OpenAI {
-  if (process.env.OPENAI_API_KEY) {
-    return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  }
   if (process.env.GITHUB_TOKEN) {
     return new OpenAI({
       apiKey: process.env.GITHUB_TOKEN,
       baseURL: 'https://models.inference.ai.azure.com',
     })
   }
-  throw new Error('Geen OPENAI_API_KEY of GITHUB_TOKEN geconfigureerd')
+  if (process.env.OPENAI_API_KEY) {
+    return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  }
+  throw new Error('Geen GITHUB_TOKEN of OPENAI_API_KEY geconfigureerd')
 }
 
 const SYSTEM_PROMPT = `Je bent een professionele vastgoedtekstschrijver voor Leunis Makelaars op het eiland Tholen, Zeeland. Je schrijft wervende Funda-advertentieteksten in de herkenbare stijl van Leunis Makelaars.
