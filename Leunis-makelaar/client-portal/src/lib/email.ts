@@ -1,6 +1,8 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY)
+}
 
 const FROM = process.env.EMAIL_FROM ?? 'Brand is Code <noreply@brandiscode.com>'
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://portal.brandiscode.com'
@@ -137,7 +139,7 @@ function trainingProposalHtml(data: TrainingProposalEmailData): string {
 // ── exported send functions ───────────────────────────────────────────────────
 
 export async function sendTrainingProposalEmail(data: TrainingProposalEmailData) {
-  const { error } = await resend.emails.send({
+  const { error } = await getResend().emails.send({
     from: FROM,
     to: [data.to],
     subject: `Trainingsvoorstel ${fmtDateTime(data.sessionStart)} — Brand is Code`,
@@ -148,7 +150,7 @@ export async function sendTrainingProposalEmail(data: TrainingProposalEmailData)
 }
 
 export async function sendTrainingConfirmedEmail(to: string, contactName: string, sessionStart: string | null) {
-  const { error } = await resend.emails.send({
+  const { error } = await getResend().emails.send({
     from: FROM,
     to: [to],
     subject: 'Training bevestigd — Brand is Code',
@@ -165,7 +167,7 @@ export async function sendRescheduledNotificationEmail(
   clientName: string,
   proposedDatetime: string
 ) {
-  const { error } = await resend.emails.send({
+  const { error } = await getResend().emails.send({
     from: FROM,
     to: [adminEmail],
     subject: `Tegenvoorstel training — ${clientName}`,
