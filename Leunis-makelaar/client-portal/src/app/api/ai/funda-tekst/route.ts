@@ -7,6 +7,11 @@ export const dynamic = 'force-dynamic'
 let openai: OpenAI | null = null
 if (process.env.OPENAI_API_KEY) {
   openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+} else if (process.env.GITHUB_TOKEN) {
+  openai = new OpenAI({
+    apiKey: process.env.GITHUB_TOKEN,
+    baseURL: 'https://models.inference.ai.azure.com',
+  })
 }
 
 const SYSTEM_PROMPT = `Je bent een professionele vastgoedtekstschrijver voor Leunis Makelaars op het eiland Tholen, Zeeland. Je schrijft wervende Funda-advertentieteksten in de herkenbare stijl van Leunis Makelaars.
@@ -40,9 +45,9 @@ WOORDAANTALLEN:
 
 export async function POST(req: NextRequest) {
   if (!openai) {
-    console.error('Funda-tekst: OPENAI_API_KEY is niet geconfigureerd op de server.')
+    console.error('Funda-tekst: geen OPENAI_API_KEY of GITHUB_TOKEN geconfigureerd.')
     return NextResponse.json(
-      { error: 'OpenAI API key niet geconfigureerd' },
+      { error: 'AI service niet geconfigureerd' },
       { status: 500, headers: { 'Cache-Control': 'no-store' } }
     )
   }
