@@ -4,14 +4,17 @@ import type { FundaTekstRequest, FundaTekstResponse } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 
-let openai: OpenAI | null = null
-if (process.env.GITHUB_TOKEN) {
-  openai = new OpenAI({
-    apiKey: process.env.GITHUB_TOKEN,
-    baseURL: 'https://models.inference.ai.azure.com',
-  })
-} else if (process.env.OPENAI_API_KEY) {
-  openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+function getOpenAI(): OpenAI {
+  if (process.env.GITHUB_TOKEN) {
+    return new OpenAI({
+      apiKey: process.env.GITHUB_TOKEN,
+      baseURL: 'https://models.inference.ai.azure.com',
+    })
+  }
+  if (process.env.OPENAI_API_KEY) {
+    return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  }
+  throw new Error('Geen GITHUB_TOKEN of OPENAI_API_KEY geconfigureerd')
 }
 
 const SYSTEM_PROMPT = `Je bent een professionele vastgoedtekstschrijver voor Leunis Makelaars op het eiland Tholen, Zeeland. Je schrijft wervende Funda-advertentieteksten in de herkenbare stijl van Leunis Makelaars.
@@ -44,15 +47,8 @@ WOORDAANTALLEN:
 - uitgebreid: ~600 woorden`
 
 export async function POST(req: NextRequest) {
-  if (!openai) {
-    console.error('Funda-tekst: geen OPENAI_API_KEY of GITHUB_TOKEN geconfigureerd.')
-    return NextResponse.json(
-      { error: 'AI service niet geconfigureerd' },
-      { status: 500, headers: { 'Cache-Control': 'no-store' } }
-    )
-  }
-
   try {
+    const openai = getOpenAI()
     const body: FundaTekstRequest = await req.json()
 
     const lengteInstructie = {
@@ -93,9 +89,10 @@ ${lengteInstructie}`
     const response: FundaTekstResponse = { tekst, woorden }
     return NextResponse.json(response, { headers: { 'Cache-Control': 'no-store' } })
   } catch (err) {
-    console.error('Funda-tekst fout:', err)
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('Funda-tekst fout:', message)
     return NextResponse.json(
-      { error: 'Er is een fout opgetreden bij het genereren van de tekst.' },
+      { error: `Fout bij genereren: ${message}` },
       { status: 500, headers: { 'Cache-Control': 'no-store' } }
     )
   }
