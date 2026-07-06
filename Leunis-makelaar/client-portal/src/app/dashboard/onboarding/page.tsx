@@ -150,6 +150,12 @@ export default function OnboardingPage() {
         }
       }
 
+      if (intakeRes.status === 401 || billingRes.status === 401) {
+        setError('Je account is nog niet gekoppeld aan een bedrijf. Neem contact op met Brand is Code.')
+        setLoading(false)
+        return
+      }
+
       if (intakeRes.ok) {
         const intakeData = await intakeRes.json()
         if (intakeData.intake) {

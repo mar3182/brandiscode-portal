@@ -96,12 +96,37 @@ async function getIntakeForClient(clientId: string) {
   if (intakeError) throw intakeError
 
   if (!intake) {
+    const { data: clientProfile } = await admin
+      .from('clients')
+      .select('name, email, contact_person, billing_email')
+      .eq('id', clientId)
+      .maybeSingle()
+
+    const { data: teamMembers } = await admin
+      .from('client_users')
+      .select('name, role')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: true })
+
+    const prefilledMembers: TrainingIntakeMemberInput[] = (teamMembers || []).map((member, index) => ({
+      full_name: member.name || '',
+      role: member.role || '',
+      top_tasks: [],
+      bottleneck: '',
+      kpi_goal: '',
+      digital_skill: null,
+      ai_experience: '',
+      prompt_data_boundary: '',
+      training_day_availability: '',
+      sort_order: index,
+    }))
+
     const emptyInput: TrainingIntakeInput = {
       training_duration: '',
       preferred_datetime: '',
       preferred_time_note: '',
-      contact_person: '',
-      contact_email: '',
+      contact_person: clientProfile?.contact_person || clientProfile?.name || '',
+      contact_email: clientProfile?.email || clientProfile?.billing_email || '',
       focus_area: DEFAULT_FOCUS_AREA,
       privacy_constraints: '',
       data_usage_consent: false,
@@ -112,12 +137,29 @@ async function getIntakeForClient(clientId: string) {
       communication_notes: '',
       portal_notifications_enabled: false,
       trainer_notes: '',
-      members: [],
+      members: prefilledMembers,
     }
 
     return {
-      intake: null,
-      members: [],
+      intake: {
+        status: 'draft',
+        training_duration: emptyInput.training_duration,
+        preferred_datetime: emptyInput.preferred_datetime,
+        preferred_time_note: emptyInput.preferred_time_note,
+        contact_person: emptyInput.contact_person,
+        contact_email: emptyInput.contact_email,
+        focus_area: emptyInput.focus_area,
+        privacy_constraints: emptyInput.privacy_constraints,
+        data_usage_consent: emptyInput.data_usage_consent,
+        communication_channel: emptyInput.communication_channel,
+        communication_email: emptyInput.communication_email,
+        communication_whatsapp: emptyInput.communication_whatsapp,
+        communication_consent: emptyInput.communication_consent,
+        communication_notes: emptyInput.communication_notes,
+        portal_notifications_enabled: emptyInput.portal_notifications_enabled,
+        trainer_notes: emptyInput.trainer_notes,
+      },
+      members: prefilledMembers,
       sessions: [],
       completeness: computeTrainingCompleteness(emptyInput),
     }

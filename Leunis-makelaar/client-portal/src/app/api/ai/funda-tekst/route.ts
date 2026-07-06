@@ -4,7 +4,10 @@ import type { FundaTekstRequest, FundaTekstResponse } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+let openai: OpenAI | null = null
+if (process.env.OPENAI_API_KEY) {
+  openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+}
 
 const SYSTEM_PROMPT = `Je bent een professionele vastgoedtekstschrijver voor Leunis Makelaars op het eiland Tholen, Zeeland. Je schrijft wervende Funda-advertentieteksten in de herkenbare stijl van Leunis Makelaars.
 
@@ -36,6 +39,14 @@ WOORDAANTALLEN:
 - uitgebreid: ~600 woorden`
 
 export async function POST(req: NextRequest) {
+  if (!openai) {
+    console.error('Funda-tekst: OPENAI_API_KEY is niet geconfigureerd op de server.')
+    return NextResponse.json(
+      { error: 'OpenAI API key niet geconfigureerd' },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } }
+    )
+  }
+
   try {
     const body: FundaTekstRequest = await req.json()
 

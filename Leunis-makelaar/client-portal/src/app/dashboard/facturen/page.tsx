@@ -19,6 +19,7 @@ export default function FacturenPage() {
   const [facturen, setFacturen] = useState<Factuur[]>([])
   const [clientInfo, setClientInfo] = useState<FactuurClientInfo | null>(null)
   const [loading, setLoading] = useState(true)
+  const [notLinked, setNotLinked] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -26,6 +27,13 @@ export default function FacturenPage() {
         fetch('/api/facturen'),
         fetch('/api/client-profile'),
       ])
+
+      if (facturenRes.status === 401) {
+        setNotLinked(true)
+        setLoading(false)
+        return
+      }
+
       const [facturenData, profileData] = await Promise.all([
         facturenRes.json(),
         profileRes.json(),
@@ -77,6 +85,20 @@ export default function FacturenPage() {
       <div className="max-w-6xl">
         <div className="glass-card p-12 text-center">
           <Loader2 className="w-8 h-8 text-brand-gold animate-spin mx-auto" />
+        </div>
+      </div>
+    )
+  }
+
+  if (notLinked) {
+    return (
+      <div className="max-w-6xl">
+        <div className="mb-6 md:mb-8">
+          <h1 className="text-2xl font-bold text-white">Facturen</h1>
+        </div>
+        <div className="glass-card p-8 text-center">
+          <Receipt className="w-12 h-12 text-white/20 mx-auto mb-4" />
+          <p className="text-white/70">Je account is nog niet gekoppeld aan een bedrijf. Neem contact op met Brand is Code.</p>
         </div>
       </div>
     )

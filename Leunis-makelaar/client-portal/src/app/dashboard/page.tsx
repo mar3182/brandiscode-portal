@@ -34,7 +34,7 @@ export default function DashboardPage() {
         .from('client_users')
         .select('name')
         .eq('email', user.email)
-        .single()
+        .maybeSingle()
 
       if (clientUser) setClientName(clientUser.name)
 

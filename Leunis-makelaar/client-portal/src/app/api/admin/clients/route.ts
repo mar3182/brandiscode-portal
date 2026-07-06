@@ -140,6 +140,7 @@ export async function PATCH(req: NextRequest) {
 
   const update = {
     name: normalizeOptionalString(body.name),
+    email: normalizeOptionalString(body.email),
     company: normalizeOptionalString(body.company),
     phone: normalizeOptionalString(body.phone),
     contact_person: normalizeOptionalString(body.contact_person),
@@ -162,7 +163,12 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Naam is verplicht' }, { status: 400 })
   }
 
+  if (!update.email) {
+    return NextResponse.json({ error: 'E-mail is verplicht' }, { status: 400 })
+  }
+
   const patchValidation = validateCompanyProfileFields({
+    email: update.email,
     billing_email: update.billing_email,
     kvk_number: update.kvk_number,
     btw_number: update.btw_number,
@@ -176,6 +182,7 @@ export async function PATCH(req: NextRequest) {
     )
   }
 
+  update.email = patchValidation.normalized.email
   update.billing_email = patchValidation.normalized.billing_email ?? null
   update.kvk_number = patchValidation.normalized.kvk_number ?? null
   update.btw_number = patchValidation.normalized.btw_number ?? null
