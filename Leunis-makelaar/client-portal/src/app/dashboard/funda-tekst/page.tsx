@@ -100,6 +100,7 @@ export default function FundaTekstPage() {
   const [verfijnInput, setVerfijnInput] = useState('')
   const [verfijnLoading, setVerfijnLoading] = useState(false)
   const [copiedTab, setCopiedTab] = useState<MediaFormat | null>(null)
+  const [verfijnSuccess, setVerfijnSuccess] = useState(false)
   const lastRequestRef = useRef<FundaTekstRequest | null>(null)
 
   function updateForm(field: keyof FormState, value: string) {
@@ -290,6 +291,8 @@ export default function FundaTekstPage() {
         )
       }
       setVerfijnInput('')
+      setVerfijnSuccess(true)
+      setTimeout(() => setVerfijnSuccess(false), 3000)
     } catch (err) {
       setApiError(err instanceof Error ? err.message : 'Verfijn mislukt')
     } finally {
@@ -743,6 +746,11 @@ export default function FundaTekstPage() {
               </div>
               {/* Verfijn */}
               <div className="mt-4 pt-4 border-t border-white/10">
+                {verfijnSuccess && (
+                  <div className="mb-3 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-xs flex items-center gap-2">
+                    <Check className="w-3 h-3" /> Tekst bijgewerkt!
+                  </div>
+                )}
                 <p className="text-xs font-medium text-white/40 mb-2 flex items-center gap-1.5">
                   <Pen className="w-3 h-3" /> Verfijn met AI
                 </p>
@@ -769,7 +777,7 @@ export default function FundaTekstPage() {
             </div>
           )}
 
-          {/* Multi-format result — tabs */}
+          {/* Multi-format result — tabs */}}
           {multiResult && !loading && (
             <div className="glass-card p-6 rounded-2xl">
               {/* Tab bar */}
@@ -792,7 +800,7 @@ export default function FundaTekstPage() {
               </div>
 
               {/* Actieve tab tekst */}
-              <div className="prose prose-sm prose-invert max-w-none min-h-[180px]">
+              <div className={`prose prose-sm prose-invert max-w-none min-h-[180px] transition-opacity ${verfijnLoading ? 'opacity-40' : 'opacity-100'}`}>
                 {multiResult[activeTab].split('\n\n').map((paragraph, i) => (
                   <p key={i} className="text-white/85 leading-relaxed text-sm mb-4 last:mb-0">
                     {paragraph}
@@ -824,6 +832,11 @@ export default function FundaTekstPage() {
 
               {/* Verfijn */}
               <div className="mt-4 pt-4 border-t border-white/10">
+                {verfijnSuccess && (
+                  <div className="mb-3 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-xs flex items-center gap-2">
+                    <Check className="w-3 h-3" /> Tekst bijgewerkt!
+                  </div>
+                )}
                 <p className="text-xs font-medium text-white/40 mb-2 flex items-center gap-1.5">
                   <Pen className="w-3 h-3" /> Verfijn de {MEDIA_TABS.find(t => t.id === activeTab)?.label} tekst met AI
                 </p>
