@@ -214,6 +214,7 @@ export type FundaTekstRequest = {
   staat: string                // "Instapklaar" | "Opknapper" | "Goed onderhouden" | "Gerenoveerd"
   bijzonderheden?: string      // vrije tekst extra info
   lengte: 'kort' | 'normaal' | 'uitgebreid'  // kort ~200w, normaal ~400w, uitgebreid ~600w
+  images?: string[]            // base64 data URLs van foto's / plattegrond (max 4)
 }
 
 export type FundaTekstResponse = {

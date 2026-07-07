@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Sparkles, Loader2, Copy, Check, RotateCcw } from 'lucide-react'
+import { Sparkles, Loader2, Copy, Check, RotateCcw, Upload, X } from 'lucide-react'
 import type { FundaTekstRequest, FundaTekstResponse } from '@/lib/types'
 
 const INPUT_CLASS =
@@ -85,6 +85,9 @@ export default function FundaTekstPage() {
   const [result, setResult] = useState<FundaTekstResponse | null>(null)
   const [apiError, setApiError] = useState('')
   const [copied, setCopied] = useState(false)
+  const [images, setImages] = useState<string[]>([])
+  const [imageNames, setImageNames] = useState<string[]>([])
+  const [imageError, setImageError] = useState('')
   const lastRequestRef = useRef<FundaTekstRequest | null>(null)
 
   function updateForm(field: keyof FormState, value: string) {
@@ -132,6 +135,7 @@ export default function FundaTekstPage() {
         staat: form.staat,
         bijzonderheden: form.bijzonderheden || undefined,
         lengte: form.lengte,
+        images: images.length > 0 ? images : undefined,
       }
     }
 
@@ -172,6 +176,34 @@ export default function FundaTekstPage() {
     if (lastRequestRef.current) {
       handleGenerate(lastRequestRef.current)
     }
+  }
+
+  function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    setImageError('')
+    const files = Array.from(e.target.files || [])
+    const remaining = 4 - images.length
+    const toProcess = files.slice(0, remaining)
+    const tooLarge = files.some((f) => f.size > 4 * 1024 * 1024)
+    if (tooLarge) setImageError('Sommige afbeeldingen zijn groter dan 4MB en zijn overgeslagen.')
+    const validFiles = toProcess.filter((f) => f.size <= 4 * 1024 * 1024)
+    const base64s = await Promise.all(validFiles.map(fileToBase64))
+    setImages((prev) => [...prev, ...base64s])
+    setImageNames((prev) => [...prev, ...validFiles.map((f) => f.name)])
+    e.target.value = ''
+  }
+
+  function removeImage(index: number) {
+    setImages((prev) => prev.filter((_, i) => i !== index))
+    setImageNames((prev) => prev.filter((_, i) => i !== index))
   }
 
   return (
@@ -437,7 +469,59 @@ export default function FundaTekstPage() {
             </div>
           </div>
 
-          {/* Sectie 4: Lengte */}
+          {/* Sectie 4: Foto's & Plattegrond */}
+          <div className="glass-card p-6 rounded-2xl">
+            <h2 className="text-sm font-semibold text-white/80 uppercase tracking-wider mb-1">
+              Foto&apos;s &amp; Plattegrond
+              <span className="ml-2 text-xs font-normal text-white/40 normal-case">optioneel</span>
+            </h2>
+            <p className="text-xs text-white/40 mb-4">
+              Upload foto&apos;s of een plattegrond. De AI analyseert deze voor een nauwkeurige kamer-voor-kamer beschrijving. Zonder foto&apos;s schrijft de AI een algemene sfeervolle tekst.
+            </p>
+
+            {images.length < 4 && (
+              <label className="block w-full cursor-pointer">
+                <div className="flex flex-col items-center justify-center gap-2 p-5 border-2 border-dashed border-white/10 rounded-xl hover:border-brand-blue/40 hover:bg-white/5 transition-all">
+                  <Upload className="w-5 h-5 text-white/30" />
+                  <span className="text-sm text-white/40">Klik om foto&apos;s te uploaden</span>
+                  <span className="text-xs text-white/25">JPG, PNG — max 4MB per afbeelding, max 4 stuks</span>
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={handleImageUpload}
+                />
+              </label>
+            )}
+
+            {imageError && (
+              <p className="mt-2 text-xs text-red-400">{imageError}</p>
+            )}
+
+            {images.length > 0 && (
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                {images.map((src, i) => (
+                  <div key={i} className="relative group rounded-xl overflow-hidden aspect-video bg-white/5">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={src} alt={imageNames[i]} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all" />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(i)}
+                      className="absolute top-1.5 right-1.5 p-1 rounded-full bg-red-500/80 text-white opacity-0 group-hover:opacity-100 transition-all"
+                      aria-label="Verwijder afbeelding"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Sectie 5: Lengte */}
           <div className="glass-card p-6 rounded-2xl">
             <h2 className="text-sm font-semibold text-white/80 uppercase tracking-wider mb-4">
               Tekstlengte

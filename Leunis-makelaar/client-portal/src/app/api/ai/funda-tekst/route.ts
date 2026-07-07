@@ -28,7 +28,7 @@ SCHRIJFSTIJL:
 VASTE STRUCTUUR:
 1. Openingszin: sfeervolle inleiding met locatie en karakter van de woning (GEEN prijs noemen)
 2. Beknopte introductie van het totaalplaatje
-3. Kamer-voor-kamer beschrijving: Begane grond → 1e verdieping → eventueel 2e verdieping → Tuin/buitenruimte
+3. Ruimtebeschrijving: ALLEEN als je foto's of plattegrond hebt ontvangen maak je een kamer-voor-kamer beschrijving. Zonder beelden: schrijf sfeervolle algemene beschrijving. Verzin NOOIT specifieke kamers, ruimtes of details die niet zijn opgegeven of zichtbaar zijn.
 4. Plaatsbeschrijving: "Tholen staat bekend om..." of de betreffende kern op het eiland
 5. Reisafstanden: Bergen op Zoom ±20 min, Breda/Rotterdam/Antwerpen ±40 min
 6. Vaste afsluiting: "Wij kunnen ons goed voorstellen dat u deze woning wilt bezichtigen. Neem contact op met Leunis Makelaars voor een afspraak!"
@@ -57,7 +57,13 @@ export async function POST(req: NextRequest) {
       uitgebreid: 'Schrijf een uitgebreide tekst van circa 600 woorden met gedetailleerde kamer-voor-kamer beschrijving.',
     }[body.lengte]
 
-    const userPrompt = `Schrijf een Funda-advertentietekst voor de volgende woning:
+    const hasImages = Array.isArray(body.images) && body.images.length > 0
+
+    const imageNote = hasImages
+      ? `\n\nJe hebt ${body.images!.length} afbeelding(en) ontvangen (foto's en/of plattegrond). Analyseer deze nauwkeurig. Baseer de ruimtebeschrijving uitsluitend op wat je daadwerkelijk ziet.`
+      : '\n\nBELANGRIJK: Je hebt géén foto\'s of plattegrond ontvangen. Schrijf GEEN kamer-voor-kamer beschrijving en verzin GEEN specifieke ruimtes of details. Houd de beschrijving sfeervolle en algemeen, gebaseerd op de opgegeven gegevens.'
+
+    const userPromptText = `Schrijf een Funda-advertentietekst voor de volgende woning:
 
 Woningtype: ${body.woningtype}
 Adres: ${body.adres}
@@ -71,14 +77,30 @@ Kenmerken: ${body.kenmerken.join(', ')}
 Staat: ${body.staat}
 ${body.bijzonderheden ? `Bijzonderheden: ${body.bijzonderheden}` : ''}
 
-${lengteInstructie}`
+${lengteInstructie}${imageNote}`
+
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = hasImages
+      ? [
+          { role: 'system', content: SYSTEM_PROMPT },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: userPromptText },
+              ...body.images!.map((img) => ({
+                type: 'image_url' as const,
+                image_url: { url: img, detail: 'low' as const },
+              })),
+            ],
+          },
+        ]
+      : [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: userPromptText },
+        ]
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userPrompt },
-      ],
+      messages,
       temperature: 0.7,
       max_tokens: 1200,
     })
