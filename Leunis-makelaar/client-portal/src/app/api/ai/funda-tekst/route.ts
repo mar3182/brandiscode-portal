@@ -37,6 +37,7 @@ NOOIT:
 - Prijs noemen
 - "Uniek" of "droomwoning" gebruiken (te cliché)
 - Meer dan 2 uitroeptekens in de hele tekst
+- Specifieke kenmerken noemen (balkon, garage, inloopdouche, vloerverwarming, zonnepanelen, airco, laadpaal, dakkapel, zwembad, sauna, etc.) die NIET zijn opgegeven in de kenmerken of bijzonderheden — ook niet als aanname of suggestie
 
 VOORBEELDSTIJL (Hoogstraat 5, Tholen):
 "Aan één van de oudste en meest karaktervolle straten van de historische binnenstad van Tholen staat dit schitterende Rijksmonument uit 1849. Een woning waar sfeer, historie en warmte op een unieke manier samenkomen. Authentieke details zoals hoge balkenplafonds, glas-in-loodramen, fraaie vloeren en karaktervolle raampartijen geven het huis een bijzondere uitstraling, terwijl de praktische indeling en het wooncomfort perfect aansluiten op het leven van nu."
