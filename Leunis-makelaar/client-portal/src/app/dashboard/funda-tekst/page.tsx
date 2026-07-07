@@ -777,7 +777,7 @@ export default function FundaTekstPage() {
             </div>
           )}
 
-          {/* Multi-format result — tabs */}}
+          {/* Multi-format result — tabs */}
           {multiResult && !loading && (
             <div className="glass-card p-6 rounded-2xl">
               {/* Tab bar */}
