@@ -222,6 +222,25 @@ export type FundaTekstResponse = {
   woorden: number
 }
 
+export type MediaFormat = 'funda' | 'instagram' | 'facebook' | 'brochure'
+
+export type FundaMultiResponse = {
+  funda: string
+  instagram: string
+  facebook: string
+  brochure: string
+}
+
+export type VerfijnRequest = {
+  tekst: string
+  instructie: string
+  format: MediaFormat
+}
+
+export type VerfijnResponse = {
+  tekst: string
+}
+
 export interface TrainingIntake {
   id: string
   client_id: string

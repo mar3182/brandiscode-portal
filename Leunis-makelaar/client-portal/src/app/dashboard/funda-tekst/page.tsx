@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Sparkles, Loader2, Copy, Check, RotateCcw, Upload, X } from 'lucide-react'
-import type { FundaTekstRequest, FundaTekstResponse } from '@/lib/types'
+import { Sparkles, Loader2, Copy, Check, RotateCcw, Upload, X, Pen } from 'lucide-react'
+import type { FundaTekstRequest, FundaTekstResponse, FundaMultiResponse, MediaFormat } from '@/lib/types'
 
 const INPUT_CLASS =
   'w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-brand-blue/50 transition-all'
@@ -48,6 +48,13 @@ const LENGTE_OPTIONS: { value: Lengte; label: string; desc: string }[] = [
   { value: 'uitgebreid', label: 'Uitgebreid', desc: '~600 woorden' },
 ]
 
+const MEDIA_TABS: Array<{ id: MediaFormat; label: string; hint: string }> = [
+  { id: 'funda', label: 'Funda', hint: '~400w' },
+  { id: 'instagram', label: 'Instagram', hint: '~120w + #' },
+  { id: 'facebook', label: 'Facebook', hint: '~180w' },
+  { id: 'brochure', label: 'Brochure', hint: 'Print' },
+]
+
 interface FormState {
   woningtype: string
   adres: string
@@ -88,6 +95,11 @@ export default function FundaTekstPage() {
   const [images, setImages] = useState<string[]>([])
   const [imageNames, setImageNames] = useState<string[]>([])
   const [imageError, setImageError] = useState('')
+  const [multiResult, setMultiResult] = useState<FundaMultiResponse | null>(null)
+  const [activeTab, setActiveTab] = useState<MediaFormat>('funda')
+  const [verfijnInput, setVerfijnInput] = useState('')
+  const [verfijnLoading, setVerfijnLoading] = useState(false)
+  const [copiedTab, setCopiedTab] = useState<MediaFormat | null>(null)
   const lastRequestRef = useRef<FundaTekstRequest | null>(null)
 
   function updateForm(field: keyof FormState, value: string) {
@@ -143,6 +155,7 @@ export default function FundaTekstPage() {
     setLoading(true)
     setApiError('')
     setResult(null)
+    setMultiResult(null)
 
     try {
       const res = await fetch('/api/ai/funda-tekst', {
@@ -204,6 +217,90 @@ export default function FundaTekstPage() {
   function removeImage(index: number) {
     setImages((prev) => prev.filter((_, i) => i !== index))
     setImageNames((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  async function handleGenerateAll() {
+    if (!validate()) return
+    const request: FundaTekstRequest = {
+      woningtype: form.woningtype,
+      adres: form.adres.trim(),
+      bouwjaar: form.bouwjaar || undefined,
+      woonoppervlakte: form.woonoppervlakte || undefined,
+      perceeloppervlakte: form.perceeloppervlakte || undefined,
+      kamers: form.kamers || undefined,
+      slaapkamers: form.slaapkamers || undefined,
+      ligging: form.ligging.trim(),
+      kenmerken,
+      staat: form.staat,
+      bijzonderheden: form.bijzonderheden || undefined,
+      lengte: form.lengte,
+      images: images.length > 0 ? images : undefined,
+    }
+    lastRequestRef.current = request
+    setLoading(true)
+    setApiError('')
+    setResult(null)
+    setMultiResult(null)
+    setActiveTab('funda')
+    setVerfijnInput('')
+    try {
+      const res = await fetch('/api/ai/funda-multi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error((data as { error?: string }).error || 'Er is een fout opgetreden')
+      }
+      const data: FundaMultiResponse = await res.json()
+      setMultiResult(data)
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : 'Er is een fout opgetreden')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleVerfijn() {
+    const currentTekst = multiResult ? multiResult[activeTab] : result?.tekst
+    if (!currentTekst || !verfijnInput.trim()) return
+    setVerfijnLoading(true)
+    setApiError('')
+    try {
+      const res = await fetch('/api/ai/verfijn-tekst', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tekst: currentTekst,
+          instructie: verfijnInput.trim(),
+          format: multiResult ? activeTab : 'funda',
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error((data as { error?: string }).error || 'Verfijn mislukt')
+      }
+      const data = await res.json() as { tekst: string }
+      if (multiResult) {
+        setMultiResult((prev) => (prev ? { ...prev, [activeTab]: data.tekst } : null))
+      } else {
+        setResult((prev) =>
+          prev ? { ...prev, tekst: data.tekst, woorden: data.tekst.split(/\s+/).filter(Boolean).length } : null
+        )
+      }
+      setVerfijnInput('')
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : 'Verfijn mislukt')
+    } finally {
+      setVerfijnLoading(false)
+    }
+  }
+
+  async function handleCopyTab(format: MediaFormat, text: string) {
+    await navigator.clipboard.writeText(text)
+    setCopiedTab(format)
+    setTimeout(() => setCopiedTab(null), 2000)
   }
 
   return (
@@ -545,38 +642,40 @@ export default function FundaTekstPage() {
             </div>
           </div>
 
-          {/* Genereer knop */}
-          <button
-            type="button"
-            onClick={() => handleGenerate()}
-            disabled={loading}
-            className="w-full py-4 px-6 rounded-2xl bg-brand-blue text-white font-semibold text-base flex items-center justify-center gap-3 hover:bg-brand-blue/90 disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-lg shadow-brand-blue/20"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Bezig met schrijven...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-5 h-5" />
-                Genereer tekst
-              </>
-            )}
-          </button>
+          {/* Genereer knoppen */}
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => handleGenerate()}
+              disabled={loading}
+              className="py-4 px-4 rounded-2xl bg-brand-blue text-white font-semibold text-sm flex items-center justify-center gap-2 hover:bg-brand-blue/90 disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-lg shadow-brand-blue/20"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              Funda tekst
+            </button>
+            <button
+              type="button"
+              onClick={handleGenerateAll}
+              disabled={loading}
+              className="py-4 px-4 rounded-2xl bg-brand-gold/20 border border-brand-gold/40 text-brand-gold font-semibold text-sm flex items-center justify-center gap-2 hover:bg-brand-gold/30 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              Alle formats
+            </button>
+          </div>
         </div>
 
         {/* RIGHT — Output */}
-        <div className="lg:sticky lg:top-8 lg:self-start">
+        <div className="lg:sticky lg:top-8 lg:self-start space-y-4">
           {/* API Error */}
           {apiError && (
-            <div className="mb-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
+            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
               {apiError}
             </div>
           )}
 
           {/* Loading shimmer */}
-          {loading && !result && (
+          {loading && (
             <div className="glass-card p-6 rounded-2xl">
               <div className="flex items-center justify-between mb-6">
                 <div className="h-4 w-32 bg-white/10 rounded animate-pulse" />
@@ -584,52 +683,39 @@ export default function FundaTekstPage() {
               </div>
               <div className="space-y-3">
                 {[100, 90, 95, 80, 85, 70, 90, 60].map((w, i) => (
-                  <div
-                    key={i}
-                    className="h-3 bg-white/10 rounded animate-pulse"
-                    style={{ width: `${w}%` }}
-                  />
+                  <div key={i} className="h-3 bg-white/10 rounded animate-pulse" style={{ width: `${w}%` }} />
                 ))}
               </div>
               <div className="mt-6 space-y-3">
                 {[88, 75, 92, 65].map((w, i) => (
-                  <div
-                    key={i}
-                    className="h-3 bg-white/10 rounded animate-pulse"
-                    style={{ width: `${w}%` }}
-                  />
+                  <div key={i} className="h-3 bg-white/10 rounded animate-pulse" style={{ width: `${w}%` }} />
                 ))}
               </div>
             </div>
           )}
 
           {/* Empty state */}
-          {!loading && !result && !apiError && (
+          {!loading && !result && !multiResult && !apiError && (
             <div className="glass-card p-8 rounded-2xl flex flex-col items-center justify-center text-center min-h-[300px]">
               <div className="p-4 rounded-2xl bg-white/5 border border-white/10 mb-4">
                 <Sparkles className="w-8 h-8 text-white/20" />
               </div>
-              <p className="text-white/30 text-sm">
-                Jouw gegenereerde tekst verschijnt hier...
-              </p>
+              <p className="text-white/30 text-sm">Jouw gegenereerde tekst verschijnt hier...</p>
               <p className="text-white/20 text-xs mt-2">
-                Vul het formulier in en klik op &ldquo;Genereer tekst&rdquo;
+                Klik op &ldquo;Funda tekst&rdquo; of &ldquo;Alle formats&rdquo;
               </p>
             </div>
           )}
 
-          {/* Result */}
-          {result && !loading && (
+          {/* Single Funda result */}
+          {result && !loading && !multiResult && (
             <div className="glass-card p-6 rounded-2xl">
-              {/* Header */}
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-white/70">Gegenereerde tekst</h3>
+                <h3 className="text-sm font-semibold text-white/70">Funda tekst</h3>
                 <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-white/40">
                   ~{result.woorden} woorden
                 </span>
               </div>
-
-              {/* Tekst */}
               <div className="prose prose-sm prose-invert max-w-none">
                 {result.tekst.split('\n\n').map((paragraph, i) => (
                   <p key={i} className="text-white/85 leading-relaxed text-sm mb-4 last:mb-0">
@@ -637,36 +723,129 @@ export default function FundaTekstPage() {
                   </p>
                 ))}
               </div>
-
-              {/* Actions */}
               <div className="flex items-center gap-3 mt-6 pt-4 border-t border-white/10">
                 <button
                   type="button"
                   onClick={handleCopy}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-blue/20 border border-brand-blue/30 text-brand-blue text-sm font-medium hover:bg-brand-blue/30 transition-all flex-1 justify-center"
                 >
-                  {copied ? (
-                    <>
-                      <Check className="w-4 h-4" />
-                      Gekopieerd! ✓
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-4 h-4" />
-                      Kopieer tekst
-                    </>
-                  )}
+                  {copied ? <><Check className="w-4 h-4" /> Gekopieerd! ✓</> : <><Copy className="w-4 h-4" /> Kopieer</>}
                 </button>
                 <button
                   type="button"
                   onClick={handleOpnieuw}
                   disabled={loading}
-                  aria-label="Opnieuw genereren"
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white/50 text-sm hover:text-white hover:bg-white/10 transition-all"
                 >
                   <RotateCcw className="w-4 h-4" />
                   <span className="hidden sm:inline">Opnieuw</span>
                 </button>
+              </div>
+              {/* Verfijn */}
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <p className="text-xs font-medium text-white/40 mb-2 flex items-center gap-1.5">
+                  <Pen className="w-3 h-3" /> Verfijn met AI
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={verfijnInput}
+                    onChange={(e) => setVerfijnInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !verfijnLoading) void handleVerfijn() }}
+                    placeholder="bijv. maak de opening sfeervoller..."
+                    className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-xs placeholder-white/20 focus:outline-none focus:border-brand-blue/40 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleVerfijn()}
+                    disabled={verfijnLoading || !verfijnInput.trim()}
+                    className="px-4 py-2 bg-brand-gold/20 border border-brand-gold/30 text-brand-gold text-xs font-medium rounded-xl hover:bg-brand-gold/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap flex items-center gap-1.5"
+                  >
+                    {verfijnLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Pen className="w-3 h-3" />}
+                    Verfijn
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Multi-format result — tabs */}
+          {multiResult && !loading && (
+            <div className="glass-card p-6 rounded-2xl">
+              {/* Tab bar */}
+              <div className="flex gap-1 p-1 bg-white/5 rounded-xl border border-white/10 mb-5">
+                {MEDIA_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => { setActiveTab(tab.id); setVerfijnInput('') }}
+                    className={`flex-1 py-2 px-1 rounded-lg transition-all text-center ${
+                      activeTab === tab.id
+                        ? 'bg-brand-blue/30 text-brand-blue border border-brand-blue/40'
+                        : 'text-white/40 hover:text-white/70'
+                    }`}
+                  >
+                    <div className="text-xs font-medium">{tab.label}</div>
+                    <div className="text-[10px] opacity-60 hidden sm:block">{tab.hint}</div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Actieve tab tekst */}
+              <div className="prose prose-sm prose-invert max-w-none min-h-[180px]">
+                {multiResult[activeTab].split('\n\n').map((paragraph, i) => (
+                  <p key={i} className="text-white/85 leading-relaxed text-sm mb-4 last:mb-0">
+                    {paragraph}
+                  </p>
+                ))}
+              </div>
+
+              {/* Acties */}
+              <div className="flex items-center gap-3 mt-6 pt-4 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => void handleCopyTab(activeTab, multiResult[activeTab])}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-blue/20 border border-brand-blue/30 text-brand-blue text-sm font-medium hover:bg-brand-blue/30 transition-all flex-1 justify-center"
+                >
+                  {copiedTab === activeTab
+                    ? <><Check className="w-4 h-4" /> Gekopieerd! ✓</>
+                    : <><Copy className="w-4 h-4" /> Kopieer {MEDIA_TABS.find(t => t.id === activeTab)?.label}</>}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpnieuw}
+                  disabled={loading}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white/50 text-sm hover:text-white hover:bg-white/10 transition-all"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span className="hidden sm:inline">Opnieuw</span>
+                </button>
+              </div>
+
+              {/* Verfijn */}
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <p className="text-xs font-medium text-white/40 mb-2 flex items-center gap-1.5">
+                  <Pen className="w-3 h-3" /> Verfijn de {MEDIA_TABS.find(t => t.id === activeTab)?.label} tekst met AI
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={verfijnInput}
+                    onChange={(e) => setVerfijnInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !verfijnLoading) void handleVerfijn() }}
+                    placeholder="bijv. voeg meer nadruk op de ligging toe..."
+                    className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-xs placeholder-white/20 focus:outline-none focus:border-brand-blue/40 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleVerfijn()}
+                    disabled={verfijnLoading || !verfijnInput.trim()}
+                    className="px-4 py-2 bg-brand-gold/20 border border-brand-gold/30 text-brand-gold text-xs font-medium rounded-xl hover:bg-brand-gold/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap flex items-center gap-1.5"
+                  >
+                    {verfijnLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Pen className="w-3 h-3" />}
+                    Verfijn
+                  </button>
+                </div>
               </div>
             </div>
           )}
