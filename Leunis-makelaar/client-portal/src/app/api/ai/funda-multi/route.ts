@@ -37,17 +37,24 @@ FACEBOOK — minimaal 150 woorden:
 - Eindig met: "Interesse? Neem contact op of bezoek onze website voor meer informatie."
 - Geen prijs
 
-BROCHURE — minimaal 220 woorden, bij voorkeur 250-300:
+BROCHURE — minimaal 320 woorden, bij voorkeur 350-500:
 - Formeel en professioneel — geschikt voor print
 - Neutrale, beschrijvende stijl — geen marketingkreten
-- Objectief overzicht: locatie, woningtype, kenmerken, ligging, omgeving
+- Objectief overzicht in vaste volgorde:
+  1) Intro: adres, woningtype, bouwjaar, perceel/woonoppervlakte
+  2) Indeling begane grond
+  3) Indeling verdieping(en)
+  4) Buitenruimte / berging / parkeren
+  5) Omgeving en bereikbaarheid
+  6) Samenvatting + uitnodiging bezichtiging
 - Geen uitroeptekens
 
 VOOR ALLE FORMATEN — NOOIT:
 - Prijs noemen
 - "Uniek" of "droomwoning" gebruiken
 - Specifieke kenmerken noemen (balkon, garage, inloopdouche, vloerverwarming, zonnepanelen, airco, laadpaal, dakkapel, etc.) die NIET zijn opgegeven in kenmerken of bijzonderheden
-- Teksten te vroeg afkappen — schrijf altijd het gevraagde minimum vol`
+- Teksten te vroeg afkappen — schrijf altijd het gevraagde minimum vol
+- Voor brochure: nooit onder de minimale lengte blijven`
 
 export async function POST(req: NextRequest) {
   try {
