@@ -11,7 +11,6 @@ export default function WachtwoordWijzigenPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const supabase = createClient()
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -29,6 +28,8 @@ export default function WachtwoordWijzigenPage() {
     }
 
     setLoading(true)
+
+    const supabase = createClient()
 
     const { error: updateError } = await supabase.auth.updateUser({
       password,

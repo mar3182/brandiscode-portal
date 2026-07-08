@@ -11,7 +11,6 @@ export default function ForgotPasswordPage() {
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null)
-  const supabase = createClient()
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -46,6 +45,8 @@ export default function ForgotPasswordPage() {
     }
 
     setLoading(true)
+
+    const supabase = createClient()
 
     const redirectTo = `${window.location.origin}/auth/callback?next=/dashboard/wachtwoord-wijzigen`
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
