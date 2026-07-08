@@ -115,3 +115,39 @@ Vragen voor het gesprek:
 1. Welke 3 processen kosten nu het meeste tijd per week?
 2. Welke Realworks-data moet als eerste in het portal zichtbaar zijn?
 3. Welke onderdelen zouden jullie op termijn liever in een eigen CRM-oplossing zien?
+
+## 8) E-mail Template — Kickoff naar assistent (Jorinda) met CC Arno
+Onderwerp: Start Sprint 1 (beta portal) — intake invullen + vervolgstappen
+
+Aan: {{email_jorinda}}
+CC: {{email_arno}}
+
+Hallo Jorinda,
+
+Zoals afgestemd starten we met Sprint 1 via het nieuwe Brand is Code portal (beta).
+
+Belangrijk:
+
+1. De portal is nieuw en we gebruiken deze nu als beta-omgeving met jullie als eerste klant.
+2. Om alles goed klaar te zetten, wil ik je vragen de intake in te vullen via onderstaande link.
+
+Intake-link:
+{{intake_link}}
+
+Waarom dit nodig is:
+
+- We zetten hiermee jullie teamgegevens, Microsoft-context en softwaregebruik goed in het systeem.
+- Daarna staan de Sprint 1 onderdelen direct klaar in jullie klantaccount (incl. sprint-overzicht en vervolgstappen).
+- Ook trainingsvoorstellen en vervolgafspraken lopen via het portal, zodat alles op één plek staat.
+
+Na jullie intake doe ik het volgende:
+
+1. Ik controleer of alle teamaccounts goed klaarstaan.
+2. Ik zet het trainingsvoorstel voor Sprint 1 in jullie portal-account.
+3. Ik plan een apart kort scopegesprek over de Realworks CRM-koppeling als vervolgstap.
+
+Als er iets niet duidelijk is, stuur me gerust een bericht.
+
+Met vriendelijke groet,
+{{trainer_naam}}
+Brand is Code

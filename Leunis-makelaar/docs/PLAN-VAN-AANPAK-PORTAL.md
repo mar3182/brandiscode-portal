@@ -73,19 +73,20 @@ ALTER TABLE clients ADD COLUMN ai_goals jsonb;             -- goals van klant
 
 | Onderdeel                      | Afgesproken voor Sprint 1                               | Huidige status (8 juli)                                                | Impact op planning                |
 | ------------------------------ | ------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------- |
-| Team intake + bedrijfsgegevens | Intake-link, teamrollen, software-inventaris, AI-doelen | ✅ Opgeleverd en live                                                   | Geen vertraging                   |
-| Funda AI tool                  | Woningtekst generatie als kern deliverable              | ✅ Opgeleverd en live (single + multi-format + verfijnen)               | Geen vertraging                   |
+| Team intake + bedrijfsgegevens | Intake-link, teamrollen, software-inventaris, AI-doelen | ✅ Opgeleverd, beta klaar (nog niet gedeeld met klant)                  | Delen na account + intake-link    |
+| Funda AI tool                  | Woningtekst generatie als kern deliverable              | ✅ Opgeleverd, beta klaar (single + multi-format + verfijnen)           | Live voor klant na intake         |
 | Training voorbereiding         | Intake per teamrol + trainingsmoment plannen            | 🟡 In voorbereiding (afhankelijk van klantbevestiging datum/deelnemers) | Datum afstemmen met klant         |
 | Training uitvoering            | On-site workshop Sprint 1                               | ⬜ Nog niet uitgevoerd                                                  | Planningsafspraak nodig           |
 | Realworks CRM koppeling        | Niet in oorspronkelijke Sprint 1 scope                  | 🟡 Nieuw ontdekt tijdens uitvoering                                     | Scopegesprek nodig voor Sprint 2+ |
 
 ### Wijziging in termijnen (communicatiepunt)
 
-De functionaliteit voor de AI tool is opgeleverd binnen Sprint 1. De planning voor training en eventuele Realworks-koppeling wordt apart bevestigd na afstemming met de klant over:
+De functionaliteit voor de AI tool is opgeleverd binnen Sprint 1 en staat in beta gereed. De planning voor training en eventuele Realworks-koppeling wordt apart bevestigd na afstemming met de klant over:
 
-1. Beschikbaarheid team voor training
-2. Toegang en API-afspraken rond Realworks
-3. Prioriteit: eerst training afronden of direct starten met CRM-integratie
+1. Intake afronden via portal (teamgegevens + Microsoft context)
+2. Beschikbaarheid team voor training
+3. Toegang en API-afspraken rond Realworks
+4. Prioriteit: eerst training afronden of direct starten met CRM-integratie
 
 ---
 
