@@ -151,3 +151,15 @@ Als er iets niet duidelijk is, stuur me gerust een bericht.
 Met vriendelijke groet,
 {{trainer_naam}}
 Brand is Code
+
+## 9) WhatsApp Warme Intro — vooraf aan beslismail naar Arno
+Hi Arno, korte heads-up 👋
+
+Ik stuur je zo een korte mail met 3 duidelijke vervolgroutes na Sprint 1.
+Doel: samen snel kiezen wat voor Leunis nu het meeste waarde oplevert:
+
+1) eerst Sprint 1 strak afronden,
+2) lichte Realworks-koppeling als volgende stap,
+3) of samen richting eigen AI-native CRM roadmap.
+
+Als je wilt plannen we direct een kort gesprek van 25 min om knopen door te hakken.
