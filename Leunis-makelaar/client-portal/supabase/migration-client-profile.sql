@@ -11,7 +11,10 @@ ALTER TABLE clients ADD COLUMN IF NOT EXISTS billing_address_line2 TEXT;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS billing_postal_code TEXT;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS billing_city TEXT;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS billing_country TEXT DEFAULT 'Nederland';
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS sector_raw TEXT;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS sector TEXT DEFAULT 'generic';
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS sector_confidence NUMERIC(4,3);
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS intake_profile JSONB;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS onboarding_completed_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_clients_kvk_number ON clients(kvk_number);

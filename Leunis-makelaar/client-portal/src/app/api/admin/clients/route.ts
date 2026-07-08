@@ -1,11 +1,28 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { validateCompanyProfileFields } from '@/lib/companyProfileValidation'
+import OpenAI from 'openai'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-const VALID_SECTORS = new Set(['generic', 'real_estate', 'professional_services'])
+const VALID_SECTORS = ['generic', 'real_estate', 'professional_services'] as const
+type SupportedSector = (typeof VALID_SECTORS)[number]
+
+const SECTOR_PROFILES: Record<SupportedSector, { software_options: string[]; daily_tasks_options: string[] }> = {
+  generic: {
+    software_options: ['Outlook', 'Word', 'Excel', 'WhatsApp Business', 'Google Workspace', 'Andere'],
+    daily_tasks_options: ['E-mails beantwoorden', 'Klantcontact', 'Documenten opstellen', 'Data invoeren', 'Afspraken plannen', 'Rapporten maken', 'Anders'],
+  },
+  real_estate: {
+    software_options: ['Realworks', 'Outlook', 'Word', 'Excel', 'WhatsApp Business', 'Google Workspace', 'Andere'],
+    daily_tasks_options: ['E-mails beantwoorden', 'Klantcontact', 'Documenten opstellen', 'Data invoeren', 'Afspraken plannen', 'Rapporten maken', 'Woningbeschrijvingen schrijven', 'Anders'],
+  },
+  professional_services: {
+    software_options: ['Microsoft Teams', 'SharePoint', 'Notion', 'Outlook', 'Word', 'Excel', 'WhatsApp Business', 'Google Workspace', 'Andere'],
+    daily_tasks_options: ['E-mails beantwoorden', 'Klantcontact', 'Documenten opstellen', 'Data invoeren', 'Afspraken plannen', 'Rapporten maken', 'Adviesvoorstellen maken', 'Klantdossiers bijwerken', 'Anders'],
+  },
+}
 
 function mapSchemaCacheError(message: string) {
   if (message.includes('schema cache') || message.includes('Could not find the')) {
@@ -20,10 +37,78 @@ function normalizeOptionalString(value: unknown) {
   return trimmed.length ? trimmed : null
 }
 
-function normalizeSector(value: unknown) {
+function normalizeSector(value: unknown): SupportedSector {
   if (typeof value !== 'string') return 'generic'
   const normalized = value.trim().toLowerCase()
-  return VALID_SECTORS.has(normalized) ? normalized : 'generic'
+  return (VALID_SECTORS as readonly string[]).includes(normalized) ? (normalized as SupportedSector) : 'generic'
+}
+
+function classifySectorByHeuristic(raw: string): { sector: SupportedSector; confidence: number } {
+  const text = raw.toLowerCase()
+
+  const realEstateKeywords = ['makelaar', 'makelaardij', 'woning', 'huizen', 'funda', 'vastgoed', 'verhuur', 'koopwoning']
+  if (realEstateKeywords.some((k) => text.includes(k))) {
+    return { sector: 'real_estate', confidence: 0.86 }
+  }
+
+  const servicesKeywords = ['advies', 'consult', 'account', 'jurid', 'administratie', 'dienstverlening', 'kantoor', 'mkb']
+  if (servicesKeywords.some((k) => text.includes(k))) {
+    return { sector: 'professional_services', confidence: 0.8 }
+  }
+
+  return { sector: 'generic', confidence: 0.62 }
+}
+
+function getOpenAI(): OpenAI | null {
+  if (process.env.GITHUB_TOKEN) {
+    return new OpenAI({
+      apiKey: process.env.GITHUB_TOKEN,
+      baseURL: 'https://models.inference.ai.azure.com',
+    })
+  }
+  if (process.env.OPENAI_API_KEY) {
+    return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  }
+  return null
+}
+
+async function classifySector(raw: string | null): Promise<{ sector: SupportedSector; confidence: number; intakeProfile: Record<string, string[]> }> {
+  if (!raw) {
+    return { sector: 'generic', confidence: 0.5, intakeProfile: SECTOR_PROFILES.generic }
+  }
+
+  const heuristic = classifySectorByHeuristic(raw)
+  const openai = getOpenAI()
+  if (!openai) {
+    return { sector: heuristic.sector, confidence: heuristic.confidence, intakeProfile: SECTOR_PROFILES[heuristic.sector] }
+  }
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      response_format: { type: 'json_object' },
+      temperature: 0,
+      max_tokens: 120,
+      messages: [
+        {
+          role: 'system',
+          content: 'Classificeer een bedrijfssector naar exact een van: generic, real_estate, professional_services. Antwoord alleen JSON met keys: sector en confidence (0-1).',
+        },
+        {
+          role: 'user',
+          content: `Branche/sector omschrijving: ${raw}`,
+        },
+      ],
+    })
+
+    const parsed = JSON.parse(completion.choices[0]?.message?.content ?? '{}') as { sector?: string; confidence?: number }
+    const sector = normalizeSector(parsed.sector)
+    const confidence = typeof parsed.confidence === 'number' ? Math.max(0, Math.min(1, parsed.confidence)) : heuristic.confidence
+
+    return { sector, confidence, intakeProfile: SECTOR_PROFILES[sector] }
+  } catch {
+    return { sector: heuristic.sector, confidence: heuristic.confidence, intakeProfile: SECTOR_PROFILES[heuristic.sector] }
+  }
 }
 
 async function checkAdmin() {
@@ -54,6 +139,8 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const { name, email } = body
+  const sectorRaw = normalizeOptionalString(body.sector_raw)
+  const sectorClassification = await classifySector(sectorRaw)
 
   const payload = {
     name: normalizeOptionalString(name),
@@ -70,7 +157,10 @@ export async function POST(req: NextRequest) {
     billing_postal_code: normalizeOptionalString(body.billing_postal_code),
     billing_city: normalizeOptionalString(body.billing_city),
     billing_country: normalizeOptionalString(body.billing_country),
-    sector: normalizeSector(body.sector),
+    sector_raw: sectorRaw,
+    sector: sectorClassification.sector,
+    sector_confidence: sectorClassification.confidence,
+    intake_profile: sectorClassification.intakeProfile,
   }
 
   if (!payload.name || !payload.email) {
@@ -144,6 +234,8 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json()
   const id = normalizeOptionalString(body.id)
+  const sectorRaw = normalizeOptionalString(body.sector_raw)
+  const sectorClassification = await classifySector(sectorRaw)
 
   if (!id) {
     return NextResponse.json({ error: 'id is verplicht' }, { status: 400 })
@@ -164,7 +256,10 @@ export async function PATCH(req: NextRequest) {
     billing_postal_code: normalizeOptionalString(body.billing_postal_code),
     billing_city: normalizeOptionalString(body.billing_city),
     billing_country: normalizeOptionalString(body.billing_country),
-    sector: normalizeSector(body.sector),
+    sector_raw: sectorRaw,
+    sector: sectorClassification.sector,
+    sector_confidence: sectorClassification.confidence,
+    intake_profile: sectorClassification.intakeProfile,
     onboarding_completed_at:
       typeof body.mark_completed === 'boolean'
         ? (body.mark_completed ? new Date().toISOString() : null)

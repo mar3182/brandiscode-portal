@@ -149,6 +149,11 @@ interface TeamMemberForm {
   profile: IntakeTeamMemberProfile
 }
 
+interface IntakeProfileOverrides {
+  software_options?: string[]
+  daily_tasks_options?: string[]
+}
+
 type MemberErrorKey = keyof TeamMemberForm | 'digital_skill' | 'ai_experience'
 
 const emptyTeamMember = (): TeamMemberForm => ({
@@ -187,6 +192,7 @@ export default function IntakePage() {
   const [tokenError, setTokenError] = useState('')
   const [companyName, setCompanyName] = useState('')
   const [sector, setSector] = useState<IntakeSector>('generic')
+  const [profileOverrides, setProfileOverrides] = useState<IntakeProfileOverrides | null>(null)
 
   // Wizard state
   const [step, setStep] = useState(1)
@@ -204,18 +210,26 @@ export default function IntakePage() {
   const [memberErrors, setMemberErrors] = useState<Partial<Record<MemberErrorKey, string>>>({})
   const [teamError, setTeamError] = useState('')
 
-  const softwareOptions =
+  const sectorSoftwareOptions =
     sector === 'real_estate'
       ? REAL_ESTATE_SOFTWARE_OPTIONS
       : sector === 'professional_services'
         ? PROFESSIONAL_SERVICES_SOFTWARE_OPTIONS
         : GENERIC_SOFTWARE_OPTIONS
-  const dailyTasksOptions =
+  const sectorDailyTasksOptions =
     sector === 'real_estate'
       ? REAL_ESTATE_DAILY_TASKS_OPTIONS
       : sector === 'professional_services'
         ? PROFESSIONAL_SERVICES_DAILY_TASKS_OPTIONS
         : GENERIC_DAILY_TASKS_OPTIONS
+
+  const softwareOptions = Array.isArray(profileOverrides?.software_options) && profileOverrides.software_options.length > 0
+    ? profileOverrides.software_options
+    : sectorSoftwareOptions
+
+  const dailyTasksOptions = Array.isArray(profileOverrides?.daily_tasks_options) && profileOverrides.daily_tasks_options.length > 0
+    ? profileOverrides.daily_tasks_options
+    : sectorDailyTasksOptions
 
   // ── Token validation ──────────────────────────────────────────────────────
 
@@ -241,9 +255,18 @@ export default function IntakePage() {
           setPageState('error')
           return
         }
-        const data = await res.json() as { client: { id: string; company: string; sector?: string | null }; valid: boolean }
+        const data = await res.json() as {
+          client: {
+            id: string
+            company: string
+            sector?: string | null
+            intake_profile?: IntakeProfileOverrides | null
+          }
+          valid: boolean
+        }
         setCompanyName(data.client.company ?? '')
         setSector(resolveSector(data.client.sector))
+        setProfileOverrides(data.client.intake_profile ?? null)
         setPageState('wizard')
       } catch {
         setTokenError('Er is een fout opgetreden bij het laden van de pagina. Probeer het opnieuw.')

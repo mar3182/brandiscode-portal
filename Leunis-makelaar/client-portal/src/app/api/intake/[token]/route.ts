@@ -153,7 +153,7 @@ export async function GET(
 
   const { data: client, error: clientError } = await admin
     .from('clients')
-    .select('id, company, name, sector')
+    .select('id, company, name, sector, sector_confidence, intake_profile')
     .eq('id', tokenRow.client_id)
     .single()
 
@@ -173,6 +173,8 @@ export async function GET(
             : client.sector === 'professional_services'
               ? 'professional_services'
               : 'generic',
+        sector_confidence: typeof client.sector_confidence === 'number' ? client.sector_confidence : null,
+        intake_profile: client.intake_profile ?? null,
       },
     },
     { headers: NO_STORE }

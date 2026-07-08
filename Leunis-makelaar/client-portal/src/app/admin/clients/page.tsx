@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Users, Plus, Loader2, Pencil, Save, X, RefreshCw, CheckCircle2, Clock, ExternalLink, Trash2, Link as LinkIcon } from 'lucide-react'
-import type { Client, ClientSector } from '@/lib/types'
+import type { Client } from '@/lib/types'
 import {
   type ProfileFieldErrors,
   formatBtwInput,
@@ -30,7 +30,7 @@ type ClientForm = {
   billing_postal_code: string
   billing_city: string
   billing_country: string
-  sector: ClientSector
+  sector_raw: string
   mark_completed: boolean
 }
 
@@ -50,17 +50,11 @@ const initialForm: ClientForm = {
   billing_postal_code: '',
   billing_city: '',
   billing_country: 'Nederland',
-  sector: 'generic',
+  sector_raw: '',
   mark_completed: false,
 }
 
-const SECTOR_OPTIONS: { value: ClientSector; label: string }[] = [
-  { value: 'generic', label: 'Algemeen' },
-  { value: 'real_estate', label: 'Makelaardij' },
-  { value: 'professional_services', label: 'Zakelijke dienstverlening' },
-]
-
-function getSectorLabel(sector: ClientSector | null) {
+function getSectorLabel(sector: string | null) {
   if (sector === 'real_estate') return 'Makelaardij'
   if (sector === 'professional_services') return 'Zakelijke dienstverlening'
   return 'Algemeen'
@@ -129,7 +123,7 @@ export default function AdminClientsPage() {
     billing_postal_code: source.billing_postal_code,
     billing_city: source.billing_city,
     billing_country: source.billing_country,
-    sector: source.sector,
+    sector_raw: source.sector_raw,
     mark_completed: source.mark_completed,
   })
 
@@ -150,7 +144,7 @@ export default function AdminClientsPage() {
     billing_postal_code: client.billing_postal_code || '',
     billing_city: client.billing_city || '',
     billing_country: client.billing_country || 'Nederland',
-    sector: client.sector || 'generic',
+    sector_raw: client.sector_raw || client.sector || '',
     mark_completed: Boolean(client.onboarding_completed_at),
   })
 
@@ -415,18 +409,14 @@ export default function AdminClientsPage() {
                   placeholder="Bedrijfsnaam"
                 />
               </Field>
-              <Field label="Sector">
-                <select
-                  value={form.sector}
-                  onChange={e => setForm(f => ({ ...f, sector: e.target.value as ClientSector }))}
+              <Field label="Branche / sector (vrije tekst)">
+                <input
+                  type="text"
+                  value={form.sector_raw}
+                  onChange={e => setForm(f => ({ ...f, sector_raw: e.target.value }))}
                   className={INPUT_CLASS}
-                >
-                  {SECTOR_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value} className="bg-[#1B2A4A] text-white">
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Bijv. makelaardij, accountancy, juridisch, retail..."
+                />
               </Field>
               <Field label="Telefoon">
                 <input
@@ -568,7 +558,8 @@ export default function AdminClientsPage() {
                       </span>
                     )}
                     <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-white/10 text-white/70 border border-white/15 ml-2">
-                      Sector: {getSectorLabel(client.sector)}
+                      Sector (AI): {getSectorLabel(client.sector)}
+                      {typeof client.sector_confidence === 'number' ? ` (${Math.round(client.sector_confidence * 100)}%)` : ''}
                     </span>
                   </div>
                 </div>
@@ -686,18 +677,13 @@ export default function AdminClientsPage() {
                 <Field label="Bedrijfsnaam">
                   <input className={INPUT_CLASS} value={editForm.company} onChange={(e) => setEditForm((prev) => prev ? ({ ...prev, company: e.target.value }) : prev)} />
                 </Field>
-                <Field label="Sector">
-                  <select
+                <Field label="Branche / sector (vrije tekst)">
+                  <input
                     className={INPUT_CLASS}
-                    value={editForm.sector}
-                    onChange={(e) => setEditForm((prev) => prev ? ({ ...prev, sector: e.target.value as ClientSector }) : prev)}
-                  >
-                    {SECTOR_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value} className="bg-[#1B2A4A] text-white">
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                    value={editForm.sector_raw}
+                    onChange={(e) => setEditForm((prev) => prev ? ({ ...prev, sector_raw: e.target.value }) : prev)}
+                    placeholder="Bijv. makelaardij, accountancy, juridisch, retail..."
+                  />
                 </Field>
                 <Field label="Telefoon">
                   <input className={INPUT_CLASS} value={editForm.phone} onChange={(e) => setEditForm((prev) => prev ? ({ ...prev, phone: e.target.value }) : prev)} />

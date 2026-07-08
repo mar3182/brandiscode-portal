@@ -8,7 +8,10 @@ CREATE TABLE clients (
   name TEXT NOT NULL,
   company TEXT,
   phone TEXT,
+  sector_raw TEXT,
   sector TEXT DEFAULT 'generic',
+  sector_confidence NUMERIC(4,3),
+  intake_profile JSONB,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 

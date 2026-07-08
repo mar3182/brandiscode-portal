@@ -79,7 +79,10 @@ export interface Client {
   billing_postal_code: string | null
   billing_city: string | null
   billing_country: string | null
+  sector_raw: string | null
   sector: ClientSector | null
+  sector_confidence: number | null
+  intake_profile: Record<string, unknown> | null
   onboarding_completed_at: string | null
   microsoft_subscription: MicrosoftSubscription | null
   software_inventory: string[] | null

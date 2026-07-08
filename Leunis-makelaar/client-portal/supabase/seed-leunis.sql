@@ -10,15 +10,16 @@ DECLARE
 BEGIN
 
 -- 1. Client aanmaken
-INSERT INTO clients (name, company, email, phone, sector)
+INSERT INTO clients (name, company, email, phone, sector_raw, sector)
 VALUES (
   'Arno Leunis & Henk Sturris',
   'Leunis Makelaars',
   'arno@leunismakelaars.nl',
   '+31 166 604 490',
+  'makelaardij',
   'real_estate'
 )
-ON CONFLICT (email) DO UPDATE SET company = EXCLUDED.company, sector = EXCLUDED.sector
+ON CONFLICT (email) DO UPDATE SET company = EXCLUDED.company, sector_raw = EXCLUDED.sector_raw, sector = EXCLUDED.sector
 RETURNING id INTO v_client_id;
 
 -- 2. Offerte aanmaken
