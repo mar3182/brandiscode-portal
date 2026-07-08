@@ -77,6 +77,30 @@ Je werkt als ontwikkelaar aan het **Brand is Code client portal** — een Next.j
 
 7. **Responsive-first** — elke pagina werkt op mobiel (320px+), tablet en desktop. Gebruik Tailwind responsive prefixes (`sm:`, `md:`, `lg:`). Test altijd op kleine schermen. De portal wordt in de toekomst een native app (Android + macOS) — mobile-first is de standaard.
 
+8. **Data Safety First (niet onderhandelbaar)** — elke agent volgt bij elke wijziging verplicht de stappen in `docs/DATA-SAFETY-PROTOCOL.md`.
+
+## Verplichte Data Safety Gates (voor ALLE agents)
+
+Iedere agent (frontend, backend, PM, sub-agent) moet dit uitvoeren:
+
+1. **Voor wijziging**
+  - Bevestig impact op data (schema, deletes, updates, migraties).
+  - Gebruik geen destructieve SQL in productie zonder expliciete PM-goedkeuring.
+
+2. **Tijdens wijziging**
+  - Gebruik idempotente migraties (`IF NOT EXISTS`, veilige checks).
+  - Voorkom hardcoded IDs in SQL seeds; gebruik dynamische lookups.
+  - Respecteer tenant-isolatie (`client_id` filters + RLS).
+
+3. **Voor oplevering**
+  - Voeg verificatiequeries en rollback-notities toe bij datawijzigingen.
+  - Meld expliciet resterende risico's en handmatige stappen.
+
+4. **Nooit doen zonder expliciete opdracht**
+  - Bulk delete op productiedata.
+  - Historische data overschrijven zonder back-up/restoreplan.
+  - Geheimen of keys loggen/opslaan in plaintext buiten beveiligde context.
+
 ---
 
 - **Productie branch:** `main` (deployt automatisch naar Vercel)
@@ -92,6 +116,7 @@ Na elke werksessie:
 1. Update de statustabel in `docs/PROJECT-BRIEF-ONBOARDING.md` (sectie 7)
 2. Commit met: `docs: update project brief na [agent naam] sessie`
 3. Meld aan de PM wat af is en wat de volgende stap is
+4. Noteer bij datawijzigingen expliciet dat de Data Safety Gates zijn doorlopen
 
 ---
 

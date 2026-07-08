@@ -10,11 +10,13 @@ Dit document blijft de bron voor de onboarding-basis. Voor actuele Sprint 1 Leun
 
 1. `docs/PLAN-VAN-AANPAK-PORTAL.md` — actuele scope, status en termijnen
 2. `docs/TRAINING-COMMUNICATIE-TEMPLATES.md` — klantcommunicatie templates (incl. planningswijzigingen)
+3. `docs/DATA-SAFETY-PROTOCOL.md` — verplichte data safety aanpak voor alle agents
 
 Werkwijze voor alle agents:
 
 - Lees altijd sectie 0 van dit document + bovengenoemde documenten bij start.
 - Bij statuswijzigingen: update eerst `docs/PLAN-VAN-AANPAK-PORTAL.md`, daarna dit document als onboarding-impact wijzigt.
+- Datawijzigingen (SQL/API/seed) mogen alleen door met expliciete Data Safety Gate check uit `docs/DATA-SAFETY-PROTOCOL.md`.
 
 ---
 

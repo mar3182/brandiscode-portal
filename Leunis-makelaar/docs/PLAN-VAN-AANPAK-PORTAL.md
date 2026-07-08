@@ -14,6 +14,20 @@ Het Brand is Code client portal is een professioneel SaaS-platform waar:
 
 ---
 
+## Niet-onderhandelbare randvoorwaarde — Data Safety First
+
+Vanaf nu geldt voor alle agents en alle projectstappen:
+
+1. Elke datawijziging volgt het protocol in `docs/DATA-SAFETY-PROTOCOL.md`.
+2. Geen destructieve productie-SQL zonder expliciete PM-goedkeuring.
+3. Elke migratie moet idempotent en controleerbaar zijn.
+4. Elke datawijziging bevat verificatiestappen en rollback-notitie.
+5. Tenant-isolatie (`client_id` + RLS) mag nooit worden omzeild.
+
+Doel: dataverliesrisico minimaliseren en herstelbaarheid borgen bij elke release.
+
+---
+
 ## Fase 0 — Direct te doen (deze week)
 
 | #   | Taak                                                              | Wie            | Status   |
