@@ -162,6 +162,7 @@ export default function IntakePage() {
   const [step, setStep] = useState(1)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [submitWarnings, setSubmitWarnings] = useState<string[]>([])
   const [teamCount, setTeamCount] = useState(0)
 
   // Forms
@@ -345,6 +346,7 @@ export default function IntakePage() {
 
     setSubmitting(true)
     setSubmitError('')
+    setSubmitWarnings([])
 
     const software = [
       ...form.software_inventory.filter((s) => s !== 'Andere'),
@@ -381,8 +383,11 @@ export default function IntakePage() {
         return
       }
 
-      const data = await res.json() as { success: boolean; team_count: number }
+      const data = await res.json() as { success: boolean; team_count: number; warnings?: string[] }
       setTeamCount(data.team_count)
+      if (Array.isArray(data.warnings) && data.warnings.length > 0) {
+        setSubmitWarnings(data.warnings)
+      }
       setPageState('success')
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch {
@@ -438,8 +443,18 @@ export default function IntakePage() {
           </p>
           {teamCount > 0 && (
             <p className="text-white/60 text-sm mt-3 leading-relaxed">
-              Je {teamCount === 1 ? 'teamlid ontvangt' : `${teamCount} teamleden ontvangen`} een welkomstmail met inloggegevens voor het portal.
+              Je {teamCount === 1 ? 'teamlid ontvangt' : `${teamCount} teamleden ontvangen`} een loginmail voor het portal.
             </p>
+          )}
+          {submitWarnings.length > 0 && (
+            <div className="mt-5 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-left">
+              <p className="text-amber-300 text-xs font-semibold uppercase tracking-wider mb-2">Let op</p>
+              <ul className="text-amber-200/90 text-xs space-y-1">
+                {submitWarnings.map((warning, idx) => (
+                  <li key={`${warning}-${idx}`}>- {warning}</li>
+                ))}
+              </ul>
+            </div>
           )}
           <div className="mt-8 p-4 rounded-xl bg-brand-gold/10 border border-brand-gold/20">
             <p className="text-brand-gold/90 text-xs">

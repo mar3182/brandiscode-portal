@@ -72,6 +72,53 @@ function welcomeEmailHtml(params: {
 </html>`
 }
 
+function existingUserEmailHtml(params: {
+  name: string
+  company: string
+  email: string
+}): string {
+  return `<!DOCTYPE html>
+<html lang="nl">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Arial,sans-serif;color:#e2e8f0">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:40px 16px">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#1e293b;border-radius:16px;overflow:hidden;border:1px solid #334155">
+        <tr><td style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);padding:32px 40px;border-bottom:1px solid #334155">
+          <p style="margin:0;font-size:13px;color:#f97316;font-weight:600;letter-spacing:1px;text-transform:uppercase">Brand is Code</p>
+          <h1 style="margin:8px 0 0;font-size:22px;font-weight:700;color:#fff">Je portal-account staat klaar</h1>
+        </td></tr>
+        <tr><td style="padding:32px 40px">
+          <p style="margin:0 0 16px;color:#cbd5e1">Hallo ${params.name},</p>
+          <p style="margin:0 0 24px;color:#94a3b8;line-height:1.6">
+            Je bent toegevoegd aan het Brand is Code klanten portal van
+            <strong style="color:#e2e8f0">${params.company}</strong>.
+          </p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;border:1px solid #334155;border-radius:12px;margin-bottom:24px">
+            <tr><td style="padding:20px 24px">
+              <p style="margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#64748b">Inloggen</p>
+              <p style="margin:0 0 4px;color:#e2e8f0"><strong>Portaal:</strong> <a href="${BASE_URL}/login" style="color:#f97316;text-decoration:none">${BASE_URL}/login</a></p>
+              <p style="margin:0 0 4px;color:#e2e8f0"><strong>E-mail:</strong> ${params.email}</p>
+              <p style="margin:0;color:#94a3b8;font-size:14px">Wachtwoord vergeten? Vraag een nieuwe aan via onderstaande knop.</p>
+            </td></tr>
+          </table>
+          <a href="${BASE_URL}/login/wachtwoord-vergeten" style="display:inline-block;background:#f97316;color:#fff;font-weight:600;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:15px">
+            Wachtwoord opnieuw instellen
+          </a>
+        </td></tr>
+        <tr><td style="padding:20px 40px;border-top:1px solid #334155">
+          <p style="margin:0;font-size:12px;color:#475569;text-align:center">
+            Met vriendelijke groet, Brand is Code &mdash;
+            <a href="https://brandiscode.com" style="color:#f97316;text-decoration:none">brandiscode.com</a>
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`
+}
+
 // ── shared token validation ────────────────────────────────────────────────────
 
 async function validateToken(token: string) {
@@ -219,9 +266,13 @@ export async function POST(
   }
 
   // ── 2. Create auth users + client_users records ───────────────────────────
-  const resend = new Resend(process.env.RESEND_API_KEY)
+  const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
   const companyName = client.company ?? client.name
   const errors: string[] = []
+
+  if (!resend) {
+    errors.push('E-mailprovider is niet geconfigureerd (RESEND_API_KEY ontbreekt). Inlogmails zijn niet verstuurd.')
+  }
 
   for (const member of body.team_members as IntakeTeamMember[]) {
     const email = member.email.trim().toLowerCase()
@@ -234,7 +285,9 @@ export async function POST(
       email_confirm: true,
     })
 
-    if (authError && !authError.message.includes('already been registered')) {
+    const alreadyRegistered = Boolean(authError?.message.includes('already been registered'))
+
+    if (authError && !alreadyRegistered) {
       errors.push(`Auth aanmaken mislukt voor ${email}: ${authError.message}`)
       continue
     }
@@ -261,19 +314,27 @@ export async function POST(
       errors.push(`Gebruikersrecord opslaan mislukt voor ${email}: ${cuError.message}`)
     }
 
-    // Only send welcome email for newly created users (not existing ones)
-    if (!authError) {
+    if (resend) {
       try {
+        const isExistingUser = alreadyRegistered
         await resend.emails.send({
           from: FROM,
           to: email,
-          subject: `Welkom bij het Brand is Code portal — ${companyName}`,
-          html: welcomeEmailHtml({
-            name: member.name.trim(),
-            company: companyName,
-            email,
-            password: temporaryPassword,
-          }),
+          subject: isExistingUser
+            ? `Je portal-account staat klaar — ${companyName}`
+            : `Welkom bij het Brand is Code portal — ${companyName}`,
+          html: isExistingUser
+            ? existingUserEmailHtml({
+              name: member.name.trim(),
+              company: companyName,
+              email,
+            })
+            : welcomeEmailHtml({
+              name: member.name.trim(),
+              company: companyName,
+              email,
+              password: temporaryPassword,
+            }),
         })
       } catch (emailErr) {
         // Non-fatal: log but don't block the response
