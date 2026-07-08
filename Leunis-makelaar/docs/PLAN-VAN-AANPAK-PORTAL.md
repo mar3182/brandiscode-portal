@@ -113,6 +113,27 @@ De functionaliteit voor de AI tool is opgeleverd binnen Sprint 1 en staat in bet
 
 ---
 
+## Fase 2A — AI Instellingen & Billing Modellen (BYOK / Managed / Hybrid)
+**Doel:** Klant kan kiezen hoe AI wordt afgerekend en welke modellen/providers gebruikt worden.
+
+**Waarom nu:** Leunis heeft (vooralsnog) geen Copilot-licentiepad gekozen en wil flexibiliteit richting CRM-koppeling.
+
+### Wat er gebouwd wordt
+
+1. AI instellingen tab op klantniveau (admin)
+2. Moduskeuze: BYOK / Managed / Hybrid
+3. Provider- en modelselectie per use-case
+4. Veilige key-opslag + key test endpoint
+5. Usage en kostenindicatie in dashboard
+
+### Functionele bron
+
+Uitwerking staat in:
+
+- `docs/AI-INSTELLINGEN-EN-BILLING-SPEC.md`
+
+---
+
 ## Fase 3 — Portal Messaging (E-mail via Portal)
 **Doel:** Alle klantcommunicatie loopt via het portal — geen losse e-mails meer
 
