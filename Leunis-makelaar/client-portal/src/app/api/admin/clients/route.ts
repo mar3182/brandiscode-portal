@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-const VALID_SECTORS = new Set(['generic', 'real_estate'])
+const VALID_SECTORS = new Set(['generic', 'real_estate', 'professional_services'])
 
 function mapSchemaCacheError(message: string) {
   if (message.includes('schema cache') || message.includes('Could not find the')) {

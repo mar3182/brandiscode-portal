@@ -167,7 +167,12 @@ export async function GET(
       client: {
         id: client.id,
         company: client.company ?? client.name,
-        sector: client.sector === 'real_estate' ? 'real_estate' : 'generic',
+        sector:
+          client.sector === 'real_estate'
+            ? 'real_estate'
+            : client.sector === 'professional_services'
+              ? 'professional_services'
+              : 'generic',
       },
     },
     { headers: NO_STORE }

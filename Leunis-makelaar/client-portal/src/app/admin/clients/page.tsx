@@ -57,7 +57,14 @@ const initialForm: ClientForm = {
 const SECTOR_OPTIONS: { value: ClientSector; label: string }[] = [
   { value: 'generic', label: 'Algemeen' },
   { value: 'real_estate', label: 'Makelaardij' },
+  { value: 'professional_services', label: 'Zakelijke dienstverlening' },
 ]
+
+function getSectorLabel(sector: ClientSector | null) {
+  if (sector === 'real_estate') return 'Makelaardij'
+  if (sector === 'professional_services') return 'Zakelijke dienstverlening'
+  return 'Algemeen'
+}
 
 const INPUT_CLASS = 'w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-brand-blue/50 transition-all'
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -561,7 +568,7 @@ export default function AdminClientsPage() {
                       </span>
                     )}
                     <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-white/10 text-white/70 border border-white/15 ml-2">
-                      Sector: {client.sector === 'real_estate' ? 'Makelaardij' : 'Algemeen'}
+                      Sector: {getSectorLabel(client.sector)}
                     </span>
                   </div>
                 </div>

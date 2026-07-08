@@ -7,7 +7,7 @@ export type TrainingSessionStatus = 'proposed' | 'confirmed' | 'completed' | 'ca
 export type CommunicationChannel = 'portal' | 'email' | 'whatsapp'
 
 export type MicrosoftSubscription = 'none' | 'basic' | 'business' | 'enterprise'
-export type ClientSector = 'generic' | 'real_estate'
+export type ClientSector = 'generic' | 'real_estate' | 'professional_services'
 
 export type AiMode = 'byok' | 'managed' | 'hybrid'
 export type AiProvider = 'openai' | 'azure-openai' | 'anthropic' | 'github-models'

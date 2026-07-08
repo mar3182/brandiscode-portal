@@ -25,7 +25,7 @@ import type { IntakeSubmitBody, IntakeTeamMember, IntakeTeamMemberProfile, Micro
 const INPUT_CLASS =
   'w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-brand-gold/50 transition-all'
 
-type IntakeSector = 'generic' | 'real_estate'
+type IntakeSector = 'generic' | 'real_estate' | 'professional_services'
 
 const GENERIC_SOFTWARE_OPTIONS = [
   'Outlook',
@@ -38,6 +38,13 @@ const GENERIC_SOFTWARE_OPTIONS = [
 
 const REAL_ESTATE_SOFTWARE_OPTIONS = [
   'Realworks',
+  ...GENERIC_SOFTWARE_OPTIONS,
+]
+
+const PROFESSIONAL_SERVICES_SOFTWARE_OPTIONS = [
+  'Microsoft Teams',
+  'SharePoint',
+  'Notion',
   ...GENERIC_SOFTWARE_OPTIONS,
 ]
 
@@ -88,6 +95,12 @@ const REAL_ESTATE_DAILY_TASKS_OPTIONS = [
   'Woningbeschrijvingen schrijven',
 ]
 
+const PROFESSIONAL_SERVICES_DAILY_TASKS_OPTIONS = [
+  ...GENERIC_DAILY_TASKS_OPTIONS,
+  'Adviesvoorstellen maken',
+  'Klantdossiers bijwerken',
+]
+
 const WEEKLY_REPETITIVE_OPTIONS: { value: NonNullable<IntakeTeamMemberProfile['weekly_repetitive_hours']>; label: string }[] = [
   { value: 'minder-dan-2', label: 'Minder dan 2 uur' },
   { value: '2-tot-5', label: '2 tot 5 uur' },
@@ -106,7 +119,9 @@ const TRAINING_DAYS_OPTIONS = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'V
 const TRAINING_TIME_OPTIONS = ['Ochtend', 'Middag']
 
 function resolveSector(raw?: string | null): IntakeSector {
-  return raw === 'real_estate' ? 'real_estate' : 'generic'
+  if (raw === 'real_estate') return 'real_estate'
+  if (raw === 'professional_services') return 'professional_services'
+  return 'generic'
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -189,8 +204,18 @@ export default function IntakePage() {
   const [memberErrors, setMemberErrors] = useState<Partial<Record<MemberErrorKey, string>>>({})
   const [teamError, setTeamError] = useState('')
 
-  const softwareOptions = sector === 'real_estate' ? REAL_ESTATE_SOFTWARE_OPTIONS : GENERIC_SOFTWARE_OPTIONS
-  const dailyTasksOptions = sector === 'real_estate' ? REAL_ESTATE_DAILY_TASKS_OPTIONS : GENERIC_DAILY_TASKS_OPTIONS
+  const softwareOptions =
+    sector === 'real_estate'
+      ? REAL_ESTATE_SOFTWARE_OPTIONS
+      : sector === 'professional_services'
+        ? PROFESSIONAL_SERVICES_SOFTWARE_OPTIONS
+        : GENERIC_SOFTWARE_OPTIONS
+  const dailyTasksOptions =
+    sector === 'real_estate'
+      ? REAL_ESTATE_DAILY_TASKS_OPTIONS
+      : sector === 'professional_services'
+        ? PROFESSIONAL_SERVICES_DAILY_TASKS_OPTIONS
+        : GENERIC_DAILY_TASKS_OPTIONS
 
   // ── Token validation ──────────────────────────────────────────────────────
 
