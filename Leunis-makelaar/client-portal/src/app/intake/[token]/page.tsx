@@ -120,6 +120,8 @@ interface TeamMemberForm {
   profile: IntakeTeamMemberProfile
 }
 
+type MemberErrorKey = keyof TeamMemberForm | 'digital_skill' | 'ai_experience'
+
 const emptyTeamMember = (): TeamMemberForm => ({
   name: '',
   email: '',
@@ -168,7 +170,7 @@ export default function IntakePage() {
   const [teamMembers, setTeamMembers] = useState<IntakeTeamMember[]>([])
   const [addingMember, setAddingMember] = useState(false)
   const [memberForm, setMemberForm] = useState<TeamMemberForm>(emptyTeamMember())
-  const [memberErrors, setMemberErrors] = useState<Partial<Record<keyof TeamMemberForm, string>>>({})
+  const [memberErrors, setMemberErrors] = useState<Partial<Record<MemberErrorKey, string>>>({})
   const [teamError, setTeamError] = useState('')
 
   // ── Token validation ──────────────────────────────────────────────────────
@@ -265,13 +267,19 @@ export default function IntakePage() {
   // ── Team member logic ────────────────────────────────────────────────────
 
   function validateMember(): boolean {
-    const errors: Partial<Record<keyof TeamMemberForm, string>> = {}
+    const errors: Partial<Record<MemberErrorKey, string>> = {}
 
     if (!memberForm.name.trim()) errors.name = 'Naam is verplicht.'
     if (!memberForm.email.trim()) {
       errors.email = 'E-mailadres is verplicht.'
     } else if (!EMAIL_REGEX.test(memberForm.email)) {
       errors.email = 'Voer een geldig e-mailadres in.'
+    }
+    if (!memberForm.profile.digital_skill) {
+      errors.digital_skill = 'Kies het niveau van computer/tech vaardigheid.'
+    }
+    if (!memberForm.profile.ai_experience) {
+      errors.ai_experience = 'Kies de ervaring met AI.'
     }
 
     setMemberErrors(errors)
@@ -281,11 +289,29 @@ export default function IntakePage() {
   function handleAddMember() {
     if (!validateMember()) return
 
+    const profile: IntakeTeamMemberProfile = {
+      digital_skill: memberForm.profile.digital_skill,
+      ai_experience: memberForm.profile.ai_experience,
+      ...(memberForm.profile.ai_tools_known?.length ? { ai_tools_known: memberForm.profile.ai_tools_known } : {}),
+      ...(memberForm.profile.ai_attitude ? { ai_attitude: memberForm.profile.ai_attitude } : {}),
+      ...(memberForm.profile.daily_tasks?.length ? { daily_tasks: memberForm.profile.daily_tasks } : {}),
+      ...(memberForm.profile.weekly_repetitive_hours ? { weekly_repetitive_hours: memberForm.profile.weekly_repetitive_hours } : {}),
+      ...(memberForm.profile.automation_wish?.trim() ? { automation_wish: memberForm.profile.automation_wish.trim() } : {}),
+      ...(memberForm.profile.training_preference ? { training_preference: memberForm.profile.training_preference } : {}),
+      ...(memberForm.profile.training_availability_days?.length
+        ? { training_availability_days: memberForm.profile.training_availability_days }
+        : {}),
+      ...(memberForm.profile.training_availability_time?.length
+        ? { training_availability_time: memberForm.profile.training_availability_time }
+        : {}),
+    }
+
     const member: IntakeTeamMember = {
       name: memberForm.name.trim(),
       email: memberForm.email.trim().toLowerCase(),
       role: memberForm.role,
       ...(memberForm.function_title.trim() ? { function_title: memberForm.function_title.trim() } : {}),
+      profile,
     }
 
     setTeamMembers((prev) => [...prev, member])
@@ -301,6 +327,12 @@ export default function IntakePage() {
 
   function handleMemberProfileChange(updates: Partial<IntakeTeamMemberProfile>) {
     setMemberForm((prev) => ({ ...prev, profile: { ...prev.profile, ...updates } }))
+    if (updates.digital_skill && memberErrors.digital_skill) {
+      setMemberErrors((prev) => ({ ...prev, digital_skill: undefined }))
+    }
+    if (updates.ai_experience && memberErrors.ai_experience) {
+      setMemberErrors((prev) => ({ ...prev, ai_experience: undefined }))
+    }
   }
 
   // ── Submit ────────────────────────────────────────────────────────────────
@@ -750,7 +782,7 @@ interface Step2Props {
   teamMembers: IntakeTeamMember[]
   addingMember: boolean
   memberForm: TeamMemberForm
-  memberErrors: Partial<Record<'name' | 'email' | 'function_title' | 'role', string>>
+  memberErrors: Partial<Record<MemberErrorKey, string>>
   teamError: string
   submitting: boolean
   submitError: string
@@ -784,7 +816,7 @@ function Step2({
       <div className="glass-card p-6 md:p-8">
         <h2 className="text-xl font-semibold text-white mb-1">Teamleden</h2>
         <p className="text-white/50 text-sm mb-6">
-          Voeg de teamleden toe die toegang krijgen tot het portal. Minimaal 1 vereist.
+          Voeg de teamleden toe die toegang krijgen tot het portal. Minimaal 1 vereist. Computer/tech vaardigheid en AI-ervaring zijn verplicht per teamlid.
         </p>
 
         {/* Member list */}
@@ -926,70 +958,83 @@ function Step2({
               </div>
             </div>
 
-            {/* Profile section — expandable */}
+            {/* Profile section */}
             <div className="border-t border-white/10 pt-4">
-              <details>
-                <summary className="cursor-pointer text-sm text-white/50 hover:text-white/70 transition-colors flex items-center gap-2 list-none select-none">
-                  <span className="text-brand-gold/60 text-xs">▸</span>
-                  Meer informatie (optioneel)
-                </summary>
-                <div className="space-y-5 mt-5">
+              <div className="space-y-5 mt-2">
 
-                  {/* Digitale vaardigheid */}
-                  <p className="text-xs font-semibold text-white/40 uppercase tracking-widest">Digitale vaardigheid</p>
-                  <div>
-                    <label className="block text-sm text-white/60 mb-2">Computer vaardigheid</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {DIGITAL_SKILL_OPTIONS.map((opt) => (
-                        <label
-                          key={opt.value}
-                          className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
-                            memberForm.profile.digital_skill === opt.value
-                              ? 'bg-brand-gold/10 border-brand-gold/40'
-                              : 'bg-white/5 border-white/10 hover:border-white/20'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="member-digital-skill"
-                            value={opt.value}
-                            checked={memberForm.profile.digital_skill === opt.value}
-                            onChange={() => onMemberProfileChange({ digital_skill: opt.value })}
-                            className="accent-brand-gold flex-shrink-0"
-                          />
-                          <span className="text-white text-sm">{opt.label}</span>
-                        </label>
-                      ))}
-                    </div>
+                {/* Digitale vaardigheid */}
+                <p className="text-xs font-semibold text-white/40 uppercase tracking-widest">Digitale vaardigheid</p>
+                <div>
+                  <label className="block text-sm text-white/60 mb-2">
+                    Computer/tech vaardigheid
+                    <span className="text-brand-gold ml-1">*</span>
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {DIGITAL_SKILL_OPTIONS.map((opt) => (
+                      <label
+                        key={opt.value}
+                        className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                          memberForm.profile.digital_skill === opt.value
+                            ? 'bg-brand-gold/10 border-brand-gold/40'
+                            : 'bg-white/5 border-white/10 hover:border-white/20'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="member-digital-skill"
+                          value={opt.value}
+                          checked={memberForm.profile.digital_skill === opt.value}
+                          onChange={() => onMemberProfileChange({ digital_skill: opt.value })}
+                          className="accent-brand-gold flex-shrink-0"
+                        />
+                        <span className="text-white text-sm">{opt.label}</span>
+                      </label>
+                    ))}
                   </div>
+                  {memberErrors.digital_skill && (
+                    <p className="text-red-400 text-xs mt-1.5 flex items-center gap-1.5">
+                      <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                      {memberErrors.digital_skill}
+                    </p>
+                  )}
+                </div>
 
-                  {/* AI & Automatisering */}
-                  <p className="text-xs font-semibold text-white/40 uppercase tracking-widest mt-4">AI &amp; Automatisering</p>
-                  <div>
-                    <label className="block text-sm text-white/60 mb-2">Ervaring met AI tools</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {AI_EXPERIENCE_OPTIONS.map((opt) => (
-                        <label
-                          key={opt.value}
-                          className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
-                            memberForm.profile.ai_experience === opt.value
-                              ? 'bg-brand-gold/10 border-brand-gold/40'
-                              : 'bg-white/5 border-white/10 hover:border-white/20'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="member-ai-experience"
-                            value={opt.value}
-                            checked={memberForm.profile.ai_experience === opt.value}
-                            onChange={() => onMemberProfileChange({ ai_experience: opt.value })}
-                            className="accent-brand-gold flex-shrink-0"
-                          />
-                          <span className="text-white text-sm">{opt.label}</span>
-                        </label>
-                      ))}
-                    </div>
+                {/* AI & Automatisering */}
+                <p className="text-xs font-semibold text-white/40 uppercase tracking-widest mt-4">AI &amp; Automatisering</p>
+                <div>
+                  <label className="block text-sm text-white/60 mb-2">
+                    Ervaring met AI tools
+                    <span className="text-brand-gold ml-1">*</span>
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {AI_EXPERIENCE_OPTIONS.map((opt) => (
+                      <label
+                        key={opt.value}
+                        className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                          memberForm.profile.ai_experience === opt.value
+                            ? 'bg-brand-gold/10 border-brand-gold/40'
+                            : 'bg-white/5 border-white/10 hover:border-white/20'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="member-ai-experience"
+                          value={opt.value}
+                          checked={memberForm.profile.ai_experience === opt.value}
+                          onChange={() => onMemberProfileChange({ ai_experience: opt.value })}
+                          className="accent-brand-gold flex-shrink-0"
+                        />
+                        <span className="text-white text-sm">{opt.label}</span>
+                      </label>
+                    ))}
                   </div>
+                  {memberErrors.ai_experience && (
+                    <p className="text-red-400 text-xs mt-1.5 flex items-center gap-1.5">
+                      <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                      {memberErrors.ai_experience}
+                    </p>
+                  )}
+                </div>
 
                   <div>
                     <label className="block text-sm text-white/60 mb-2">Welke AI tools ken/gebruik je?</label>
@@ -1177,8 +1222,7 @@ function Step2({
                     </div>
                   </div>
 
-                </div>
-              </details>
+              </div>
             </div>
 
             <div className="flex gap-3 pt-1">

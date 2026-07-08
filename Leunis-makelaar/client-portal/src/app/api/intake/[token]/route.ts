@@ -8,6 +8,8 @@ export const dynamic = 'force-dynamic'
 const NO_STORE = { 'Cache-Control': 'no-store' } as const
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://portal.brandiscode.com'
 const FROM = process.env.EMAIL_FROM ?? 'Brand is Code <noreply@brandiscode.com>'
+const DIGITAL_SKILL_VALUES = ['basis', 'gemiddeld', 'gevorderd', 'expert'] as const
+const AI_EXPERIENCE_VALUES = ['nooit', 'geprobeerd', 'soms', 'regelmatig', 'dagelijks'] as const
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -164,6 +166,27 @@ export async function POST(
     }
     if (member.role !== 'owner' && member.role !== 'member') {
       return NextResponse.json({ error: `Ongeldig rol: ${member.role}` }, { status: 400, headers: NO_STORE })
+    }
+
+    if (!member.profile || typeof member.profile !== 'object') {
+      return NextResponse.json(
+        { error: `Profielinformatie ontbreekt voor teamlid: ${member.name}` },
+        { status: 400, headers: NO_STORE }
+      )
+    }
+
+    if (!member.profile.digital_skill || !DIGITAL_SKILL_VALUES.includes(member.profile.digital_skill)) {
+      return NextResponse.json(
+        { error: `Computer/tech vaardigheid ontbreekt of is ongeldig voor teamlid: ${member.name}` },
+        { status: 400, headers: NO_STORE }
+      )
+    }
+
+    if (!member.profile.ai_experience || !AI_EXPERIENCE_VALUES.includes(member.profile.ai_experience)) {
+      return NextResponse.json(
+        { error: `AI-ervaring ontbreekt of is ongeldig voor teamlid: ${member.name}` },
+        { status: 400, headers: NO_STORE }
+      )
     }
   }
 
