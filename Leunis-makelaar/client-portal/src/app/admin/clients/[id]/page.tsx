@@ -18,9 +18,23 @@ import {
   Loader2,
   Mail,
   Phone,
+  Sparkles,
   User,
 } from 'lucide-react'
-import type { Client, Factuur, FactuurStatus, Offerte, OfferteStatus, Sprint, TrainingIntake, TrainingIntakeStatus } from '@/lib/types'
+import type {
+  AiKeyStatus,
+  AiMode,
+  AiProvider,
+  Client,
+  ClientAiSettings,
+  Factuur,
+  FactuurStatus,
+  Offerte,
+  OfferteStatus,
+  Sprint,
+  TrainingIntake,
+  TrainingIntakeStatus,
+} from '@/lib/types'
 
 // ── local sub-types ───────────────────────────────────────────────────────────
 interface TrainingRow extends TrainingIntake {
@@ -47,6 +61,40 @@ interface ClientDetail {
   offertes: OfferteRow[]
   trainingen: TrainingRow[]
   facturen: Factuur[]
+}
+
+type SanitizedClientAiSettings = Pick<
+  ClientAiSettings,
+  | 'client_id'
+  | 'ai_mode'
+  | 'provider'
+  | 'listing_generation_model'
+  | 'listing_refinement_model'
+  | 'social_generation_model'
+  | 'brochure_generation_model'
+  | 'managed_bundle'
+  | 'fair_use_limit'
+  | 'warning_threshold'
+  | 'api_key_last4'
+  | 'key_status'
+  | 'updated_by'
+> & {
+  id: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+type AiSettingsFormState = {
+  ai_mode: AiMode
+  provider: AiProvider
+  listing_generation_model: string
+  listing_refinement_model: string
+  social_generation_model: string
+  brochure_generation_model: string
+  managed_bundle: string
+  fair_use_limit: string
+  warning_threshold: string
+  api_key: string
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -148,6 +196,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'offertes', label: 'Offertes', icon: <FileText size={15} /> },
   { id: 'training', label: 'Training', icon: <GraduationCap size={15} /> },
   { id: 'facturen', label: 'Facturen', icon: <CreditCard size={15} /> },
+  { id: 'ai', label: 'AI Instellingen', icon: <Sparkles size={15} /> },
 ]
 
 // ── sub-sections ──────────────────────────────────────────────────────────────
@@ -531,6 +580,344 @@ function FacturenTab({ facturen, clientId }: { facturen: Factuur[]; clientId: st
   )
 }
 
+const AI_MODE_OPTIONS: Array<{ value: AiMode; label: string }> = [
+  { value: 'managed', label: 'Managed' },
+  { value: 'byok', label: 'BYOK' },
+  { value: 'hybrid', label: 'Hybrid' },
+]
+
+const AI_PROVIDER_OPTIONS: Array<{ value: AiProvider; label: string }> = [
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'azure-openai', label: 'Azure OpenAI' },
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'github-models', label: 'GitHub Models' },
+]
+
+const KEY_STATUS_META: Record<AiKeyStatus, { label: string; className: string }> = {
+  unknown: { label: 'Onbekend', className: 'bg-yellow-500/20 text-yellow-300' },
+  valid: { label: 'Geldig', className: 'bg-green-500/20 text-green-300' },
+  invalid: { label: 'Ongeldig', className: 'bg-red-500/20 text-red-300' },
+}
+
+function toFormState(settings: SanitizedClientAiSettings): AiSettingsFormState {
+  return {
+    ai_mode: settings.ai_mode,
+    provider: settings.provider,
+    listing_generation_model: settings.listing_generation_model ?? '',
+    listing_refinement_model: settings.listing_refinement_model ?? '',
+    social_generation_model: settings.social_generation_model ?? '',
+    brochure_generation_model: settings.brochure_generation_model ?? '',
+    managed_bundle: settings.managed_bundle ?? '',
+    fair_use_limit: settings.fair_use_limit ? String(settings.fair_use_limit) : '',
+    warning_threshold: String(settings.warning_threshold),
+    api_key: '',
+  }
+}
+
+function AiSettingsTab({ clientId }: { clientId: string }) {
+  const [form, setForm] = useState<AiSettingsFormState | null>(null)
+  const [settings, setSettings] = useState<SanitizedClientAiSettings | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  async function loadSettings() {
+    setLoading(true)
+    setError('')
+    const res = await fetch(`/api/admin/clients/${clientId}/ai-settings`, { cache: 'no-store' })
+    const body = await res.json().catch(() => ({} as { error?: string; settings?: SanitizedClientAiSettings }))
+
+    if (!res.ok || !body.settings) {
+      setError(body.error || 'Kon AI instellingen niet laden.')
+      setLoading(false)
+      return
+    }
+
+    setSettings(body.settings)
+    setForm(toFormState(body.settings))
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    loadSettings()
+  }, [clientId])
+
+  function updateField<K extends keyof AiSettingsFormState>(key: K, value: AiSettingsFormState[K]) {
+    setForm((prev) => {
+      if (!prev) return prev
+      return { ...prev, [key]: value }
+    })
+  }
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (!form || !settings) return
+
+    setError('')
+    setSuccess('')
+
+    const warningValue = Number(form.warning_threshold)
+    if (!Number.isInteger(warningValue) || warningValue < 50 || warningValue > 99) {
+      setError('Waarschuwingsdrempel moet tussen 50 en 99 liggen.')
+      return
+    }
+
+    let fairUseLimit: number | null = null
+    if (form.fair_use_limit.trim() !== '') {
+      const parsedLimit = Number(form.fair_use_limit)
+      if (!Number.isInteger(parsedLimit) || parsedLimit <= 0) {
+        setError('Fair use limiet moet een positief geheel getal zijn of leeg blijven.')
+        return
+      }
+      fairUseLimit = parsedLimit
+    }
+
+    const apiKeyRequired =
+      form.ai_mode === 'byok' &&
+      (settings.key_status === 'unknown' || settings.key_status === 'invalid' || !settings.api_key_last4)
+
+    if (apiKeyRequired && !form.api_key.trim()) {
+      setError('Voor BYOK is een API key verplicht zolang de huidige key nog niet geldig is opgeslagen.')
+      return
+    }
+
+    setSaving(true)
+
+    const payload = {
+      ai_mode: form.ai_mode,
+      provider: form.provider,
+      listing_generation_model: form.listing_generation_model,
+      listing_refinement_model: form.listing_refinement_model,
+      social_generation_model: form.social_generation_model,
+      brochure_generation_model: form.brochure_generation_model,
+      managed_bundle: form.managed_bundle,
+      fair_use_limit: fairUseLimit,
+      warning_threshold: warningValue,
+      ...(form.api_key.trim() ? { api_key: form.api_key.trim() } : {}),
+    }
+
+    const res = await fetch(`/api/admin/clients/${clientId}/ai-settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+
+    const body = await res.json().catch(() => ({} as { error?: string; settings?: SanitizedClientAiSettings }))
+
+    if (!res.ok || !body.settings) {
+      setError(body.error || 'Opslaan van AI instellingen is mislukt.')
+      setSaving(false)
+      return
+    }
+
+    setSettings(body.settings)
+    setForm(toFormState(body.settings))
+    setSuccess('AI instellingen zijn succesvol opgeslagen.')
+    setSaving(false)
+  }
+
+  if (loading || !form || !settings) {
+    return (
+      <div className="glass-card p-8 flex items-center justify-center gap-3 text-white/70">
+        <Loader2 className="w-5 h-5 animate-spin text-brand-orange" /> AI instellingen laden...
+      </div>
+    )
+  }
+
+  const apiKeyRequired =
+    form.ai_mode === 'byok' &&
+    (settings.key_status === 'unknown' || settings.key_status === 'invalid' || !settings.api_key_last4)
+
+  return (
+    <form onSubmit={onSubmit} className="glass-card p-4 md:p-6 space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base md:text-lg font-semibold text-white">AI Instellingen</h2>
+          <p className="text-xs text-white/50">Configuratie voor modellen, provider en fair use limieten.</p>
+        </div>
+        <div className="text-xs text-white/70 flex flex-wrap gap-2">
+          <span className={`px-2 py-1 rounded-full ${KEY_STATUS_META[settings.key_status].className}`}>
+            Key status: {KEY_STATUS_META[settings.key_status].label}
+          </span>
+          {settings.api_key_last4 ? (
+            <span className="px-2 py-1 rounded-full bg-white/10 text-white/80">
+              Key opgeslagen (eindigt op {settings.api_key_last4})
+            </span>
+          ) : (
+            <span className="px-2 py-1 rounded-full bg-white/10 text-white/60">Geen API key opgeslagen</span>
+          )}
+        </div>
+      </div>
+
+      {error ? (
+        <div className="glass-card p-3 border border-red-500/40 bg-red-500/10 text-red-200 text-sm" role="alert" aria-live="assertive">
+          {error}
+        </div>
+      ) : null}
+      {success ? (
+        <div className="glass-card p-3 border border-emerald-500/40 bg-emerald-500/10 text-emerald-200 text-sm" role="status" aria-live="polite">
+          {success}
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="ai_mode" className="block text-xs text-white/50 mb-1">AI modus</label>
+          <select
+            id="ai_mode"
+            value={form.ai_mode}
+            onChange={(e) => updateField('ai_mode', e.target.value as AiMode)}
+            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-brand-orange/50"
+          >
+            {AI_MODE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label htmlFor="provider" className="block text-xs text-white/50 mb-1">Provider</label>
+          <select
+            id="provider"
+            value={form.provider}
+            onChange={(e) => updateField('provider', e.target.value as AiProvider)}
+            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-brand-orange/50"
+          >
+            {AI_PROVIDER_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label htmlFor="listing_generation_model" className="block text-xs text-white/50 mb-1">Listing generation model</label>
+          <input
+            id="listing_generation_model"
+            type="text"
+            value={form.listing_generation_model}
+            onChange={(e) => updateField('listing_generation_model', e.target.value)}
+            placeholder="bijv. gpt-4.1-mini"
+            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-brand-orange/50"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="listing_refinement_model" className="block text-xs text-white/50 mb-1">Listing refinement model</label>
+          <input
+            id="listing_refinement_model"
+            type="text"
+            value={form.listing_refinement_model}
+            onChange={(e) => updateField('listing_refinement_model', e.target.value)}
+            placeholder="bijv. gpt-4.1-mini"
+            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-brand-orange/50"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="social_generation_model" className="block text-xs text-white/50 mb-1">Social generation model</label>
+          <input
+            id="social_generation_model"
+            type="text"
+            value={form.social_generation_model}
+            onChange={(e) => updateField('social_generation_model', e.target.value)}
+            placeholder="bijv. claude-3-5-sonnet"
+            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-brand-orange/50"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="brochure_generation_model" className="block text-xs text-white/50 mb-1">Brochure generation model</label>
+          <input
+            id="brochure_generation_model"
+            type="text"
+            value={form.brochure_generation_model}
+            onChange={(e) => updateField('brochure_generation_model', e.target.value)}
+            placeholder="bijv. gpt-4.1"
+            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-brand-orange/50"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="managed_bundle" className="block text-xs text-white/50 mb-1">Managed bundle</label>
+          <input
+            id="managed_bundle"
+            type="text"
+            value={form.managed_bundle}
+            onChange={(e) => updateField('managed_bundle', e.target.value)}
+            placeholder="bijv. premium-makelaars"
+            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-brand-orange/50"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="fair_use_limit" className="block text-xs text-white/50 mb-1">Fair use limiet</label>
+          <input
+            id="fair_use_limit"
+            type="number"
+            min={1}
+            step={1}
+            value={form.fair_use_limit}
+            onChange={(e) => updateField('fair_use_limit', e.target.value)}
+            placeholder="Leeg = geen limiet"
+            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-brand-orange/50"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="warning_threshold" className="block text-xs text-white/50 mb-1">Waarschuwingsdrempel (50-99)</label>
+          <input
+            id="warning_threshold"
+            type="number"
+            min={50}
+            max={99}
+            step={1}
+            value={form.warning_threshold}
+            onChange={(e) => updateField('warning_threshold', e.target.value)}
+            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-brand-orange/50"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label htmlFor="api_key" className={`block text-xs mb-1 ${apiKeyRequired ? 'text-red-300' : 'text-white/50'}`}>
+          API key {apiKeyRequired ? '(verplicht voor BYOK)' : '(optioneel, alleen bij wijzigen)'}
+        </label>
+        <input
+          id="api_key"
+          type="password"
+          autoComplete="new-password"
+          value={form.api_key}
+          onChange={(e) => updateField('api_key', e.target.value)}
+          placeholder="Voer alleen in als je de key wilt opslaan of wijzigen"
+          className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-white text-sm focus:outline-none focus:border-brand-orange/50 ${
+            apiKeyRequired ? 'border-red-400/60' : 'border-white/10'
+          }`}
+        />
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-2">
+        <button
+          type="submit"
+          disabled={saving}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-brand-orange text-white text-sm font-medium disabled:opacity-60"
+        >
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+          Opslaan
+        </button>
+        <button
+          type="button"
+          onClick={loadSettings}
+          disabled={saving}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-white/10 text-white/80 text-sm font-medium disabled:opacity-60"
+        >
+          Opnieuw laden
+        </button>
+      </div>
+    </form>
+  )
+}
+
 // ── main page ─────────────────────────────────────────────────────────────────
 
 export default function ClientDetailPage() {
@@ -543,7 +930,7 @@ export default function ClientDetailPage() {
 
   // Derive active tab directly from URL — avoids state-reset race with searchParams effect
   const rawTab = searchParams.get('tab')
-  const tab: Tab = (rawTab === 'overzicht' || rawTab === 'offertes' || rawTab === 'training' || rawTab === 'facturen') ? rawTab : 'overzicht'
+  const tab: Tab = (rawTab === 'overzicht' || rawTab === 'offertes' || rawTab === 'training' || rawTab === 'facturen' || rawTab === 'ai') ? rawTab : 'overzicht'
 
   function handleTabChange(tabId: Tab) {
     router.replace(`/admin/clients/${id}?tab=${tabId}`)
@@ -591,6 +978,7 @@ export default function ClientDetailPage() {
     offertes: offertes.length,
     training: trainingen.length,
     facturen: facturen.length,
+    ai: 0,
   }
 
   return (
@@ -651,6 +1039,7 @@ export default function ClientDetailPage() {
           {tab === 'offertes' && <OffertesTab offertes={offertes} clientId={client.id} />}
           {tab === 'training' && <TrainingTab trainingen={trainingen} clientId={client.id} onSessionPlanned={loadClientDetail} />}
           {tab === 'facturen' && <FacturenTab facturen={facturen} clientId={client.id} />}
+          {tab === 'ai' && <AiSettingsTab clientId={client.id} />}
         </div>
       </div>
     </div>
