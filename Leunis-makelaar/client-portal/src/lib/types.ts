@@ -8,6 +8,60 @@ export type CommunicationChannel = 'portal' | 'email' | 'whatsapp'
 
 export type MicrosoftSubscription = 'none' | 'basic' | 'business' | 'enterprise'
 
+export type AiMode = 'byok' | 'managed' | 'hybrid'
+export type AiProvider = 'openai' | 'azure-openai' | 'anthropic' | 'github-models'
+export type AiKeyStatus = 'unknown' | 'valid' | 'invalid'
+
+export interface ClientAiSettings {
+  id: string
+  client_id: string
+  ai_mode: AiMode
+  provider: AiProvider
+  listing_generation_model: string | null
+  listing_refinement_model: string | null
+  social_generation_model: string | null
+  brochure_generation_model: string | null
+  managed_bundle: string | null
+  fair_use_limit: number | null
+  warning_threshold: number
+  api_key_encrypted: string | null
+  api_key_last4: string | null
+  key_status: AiKeyStatus
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AiUsageEvent {
+  id: string
+  client_id: string
+  tool_name: string
+  provider: string
+  model: string
+  mode: string
+  input_tokens: number | null
+  output_tokens: number | null
+  estimated_cost: number | null
+  request_status: 'success' | 'error'
+  created_at: string
+}
+
+export type ClientAiSettingsUpsert = {
+  client_id: string
+  ai_mode: AiMode
+  provider: AiProvider
+  listing_generation_model?: string | null
+  listing_refinement_model?: string | null
+  social_generation_model?: string | null
+  brochure_generation_model?: string | null
+  managed_bundle?: string | null
+  fair_use_limit?: number | null
+  warning_threshold: number
+  api_key?: string
+  key_status?: AiKeyStatus
+  updated_by: string
+}
+
 export interface Client {
   id: string
   email: string
