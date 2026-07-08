@@ -189,7 +189,7 @@ function fmtDateTime(iso: string | null) {
 }
 
 // ── tabs ──────────────────────────────────────────────────────────────────────
-type Tab = 'overzicht' | 'offertes' | 'training' | 'facturen'
+type Tab = 'overzicht' | 'offertes' | 'training' | 'facturen' | 'ai'
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'overzicht', label: 'Overzicht', icon: <User size={15} /> },
