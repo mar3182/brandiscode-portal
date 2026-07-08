@@ -4,6 +4,18 @@
 **Projectmanager:** GitHub Copilot (algemeen manager / coördinator)  
 **Eigenaar:** Brand is Code  
 
+## 0. ACTUELE BRONNEN VOOR ALLE AGENTS
+
+Dit document blijft de bron voor de onboarding-basis. Voor actuele Sprint 1 Leunis planning en klantafspraken gelden aanvullend:
+
+1. `docs/PLAN-VAN-AANPAK-PORTAL.md` — actuele scope, status en termijnen
+2. `docs/TRAINING-COMMUNICATIE-TEMPLATES.md` — klantcommunicatie templates (incl. planningswijzigingen)
+
+Werkwijze voor alle agents:
+
+- Lees altijd sectie 0 van dit document + bovengenoemde documenten bij start.
+- Bij statuswijzigingen: update eerst `docs/PLAN-VAN-AANPAK-PORTAL.md`, daarna dit document als onboarding-impact wijzigt.
+
 ---
 
 ## 1. PROJECTMANAGER — ROL & VERANTWOORDELIJKHEDEN
@@ -206,4 +218,4 @@ De onboarding is af wanneer:
 
 ---
 
-*Laatste update: 2026-06-28 door PM (GitHub Copilot)*
+*Laatste update: 2026-07-08 door PM (GitHub Copilot)*
