@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
+import OpenAI from 'openai'
 import type { IntakeSubmitBody, IntakeTeamMember } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
@@ -10,12 +11,109 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://portal.brandiscode
 const FROM = process.env.EMAIL_FROM ?? 'Brand is Code <noreply@brandiscode.com>'
 const DIGITAL_SKILL_VALUES = ['basis', 'gemiddeld', 'gevorderd', 'expert'] as const
 const AI_EXPERIENCE_VALUES = ['nooit', 'geprobeerd', 'soms', 'regelmatig', 'dagelijks'] as const
+const VALID_SECTORS = ['generic', 'real_estate', 'professional_services'] as const
+type SupportedSector = (typeof VALID_SECTORS)[number]
+
+const SECTOR_PROFILES: Record<SupportedSector, { software_options: string[]; daily_tasks_options: string[] }> = {
+  generic: {
+    software_options: ['Outlook', 'Word', 'Excel', 'WhatsApp Business', 'Google Workspace', 'Andere'],
+    daily_tasks_options: ['E-mails beantwoorden', 'Klantcontact', 'Documenten opstellen', 'Data invoeren', 'Afspraken plannen', 'Rapporten maken', 'Anders'],
+  },
+  real_estate: {
+    software_options: ['Realworks', 'Outlook', 'Word', 'Excel', 'WhatsApp Business', 'Google Workspace', 'Andere'],
+    daily_tasks_options: ['E-mails beantwoorden', 'Klantcontact', 'Documenten opstellen', 'Data invoeren', 'Afspraken plannen', 'Rapporten maken', 'Woningbeschrijvingen schrijven', 'Anders'],
+  },
+  professional_services: {
+    software_options: ['Microsoft Teams', 'SharePoint', 'Notion', 'Outlook', 'Word', 'Excel', 'WhatsApp Business', 'Google Workspace', 'Andere'],
+    daily_tasks_options: ['E-mails beantwoorden', 'Klantcontact', 'Documenten opstellen', 'Data invoeren', 'Afspraken plannen', 'Rapporten maken', 'Adviesvoorstellen maken', 'Klantdossiers bijwerken', 'Anders'],
+  },
+}
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function generateTemporaryPassword(): string {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
   return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+}
+
+function normalizeOptionalString(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed.length ? trimmed : null
+}
+
+function normalizeSector(value: unknown): SupportedSector {
+  if (typeof value !== 'string') return 'generic'
+  const normalized = value.trim().toLowerCase()
+  return (VALID_SECTORS as readonly string[]).includes(normalized) ? (normalized as SupportedSector) : 'generic'
+}
+
+function classifySectorByHeuristic(raw: string): { sector: SupportedSector; confidence: number } {
+  const text = raw.toLowerCase()
+
+  const realEstateKeywords = ['makelaar', 'makelaardij', 'woning', 'huizen', 'funda', 'vastgoed', 'verhuur', 'koopwoning']
+  if (realEstateKeywords.some((keyword) => text.includes(keyword))) {
+    return { sector: 'real_estate', confidence: 0.86 }
+  }
+
+  const servicesKeywords = ['advies', 'consult', 'account', 'jurid', 'administratie', 'dienstverlening', 'kantoor', 'mkb']
+  if (servicesKeywords.some((keyword) => text.includes(keyword))) {
+    return { sector: 'professional_services', confidence: 0.8 }
+  }
+
+  return { sector: 'generic', confidence: 0.62 }
+}
+
+function getOpenAI(): OpenAI | null {
+  if (process.env.GITHUB_TOKEN) {
+    return new OpenAI({
+      apiKey: process.env.GITHUB_TOKEN,
+      baseURL: 'https://models.inference.ai.azure.com',
+    })
+  }
+  if (process.env.OPENAI_API_KEY) {
+    return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  }
+  return null
+}
+
+async function classifySector(raw: string | null): Promise<{ sector: SupportedSector; confidence: number; intakeProfile: Record<string, string[]> }> {
+  if (!raw) {
+    return { sector: 'generic', confidence: 0.5, intakeProfile: SECTOR_PROFILES.generic }
+  }
+
+  const heuristic = classifySectorByHeuristic(raw)
+  const openai = getOpenAI()
+  if (!openai) {
+    return { sector: heuristic.sector, confidence: heuristic.confidence, intakeProfile: SECTOR_PROFILES[heuristic.sector] }
+  }
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      response_format: { type: 'json_object' },
+      temperature: 0,
+      max_tokens: 120,
+      messages: [
+        {
+          role: 'system',
+          content: 'Classificeer een bedrijfssector naar exact een van: generic, real_estate, professional_services. Antwoord alleen JSON met keys: sector en confidence (0-1).',
+        },
+        {
+          role: 'user',
+          content: `Branche/sector omschrijving: ${raw}`,
+        },
+      ],
+    })
+
+    const parsed = JSON.parse(completion.choices[0]?.message?.content ?? '{}') as { sector?: string; confidence?: number }
+    const sector = normalizeSector(parsed.sector)
+    const confidence = typeof parsed.confidence === 'number' ? Math.max(0, Math.min(1, parsed.confidence)) : heuristic.confidence
+
+    return { sector, confidence, intakeProfile: SECTOR_PROFILES[sector] }
+  } catch {
+    return { sector: heuristic.sector, confidence: heuristic.confidence, intakeProfile: SECTOR_PROFILES[heuristic.sector] }
+  }
 }
 
 function welcomeEmailHtml(params: {
@@ -252,7 +350,7 @@ export async function POST(
   }
 
   // ── 1. Update client with company info ────────────────────────────────────
-  const companyPatch: Record<string, string | string[] | null> = {}
+  const companyPatch: Record<string, unknown> = {}
   if (body.contact_person !== undefined) companyPatch.contact_person = body.contact_person.trim() || null
   if (body.kvk_number !== undefined) companyPatch.kvk_number = body.kvk_number.trim() || null
   if (body.btw_number !== undefined) companyPatch.btw_number = body.btw_number.trim() || null
@@ -264,6 +362,15 @@ export async function POST(
   if (body.microsoft_subscription !== undefined) companyPatch.microsoft_subscription = body.microsoft_subscription
   if (Array.isArray(body.software_inventory)) companyPatch.software_inventory = body.software_inventory
   if (body.ai_goals !== undefined) companyPatch.ai_goals = body.ai_goals.trim() || null
+
+  if (body.sector_raw !== undefined) {
+    const sectorRaw = normalizeOptionalString(body.sector_raw)
+    const sectorClassification = await classifySector(sectorRaw)
+    companyPatch.sector_raw = sectorRaw
+    companyPatch.sector = sectorClassification.sector
+    companyPatch.sector_confidence = sectorClassification.confidence
+    companyPatch.intake_profile = sectorClassification.intakeProfile
+  }
 
   if (Object.keys(companyPatch).length > 0) {
     const { error: patchError } = await admin

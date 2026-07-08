@@ -124,9 +124,25 @@ function resolveSector(raw?: string | null): IntakeSector {
   return 'generic'
 }
 
+function inferSectorFromRaw(raw?: string): IntakeSector {
+  if (!raw) return 'generic'
+  const text = raw.toLowerCase()
+
+  if (['makelaar', 'makelaardij', 'vastgoed', 'funda', 'woning', 'verhuur'].some((keyword) => text.includes(keyword))) {
+    return 'real_estate'
+  }
+
+  if (['advies', 'consult', 'juridisch', 'accountancy', 'administratie', 'dienstverlening', 'kantoor'].some((keyword) => text.includes(keyword))) {
+    return 'professional_services'
+  }
+
+  return 'generic'
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Step1Form {
+  sector_raw: string
   contact_person: string
   kvk_number: string
   btw_number: string
@@ -165,6 +181,7 @@ const emptyTeamMember = (): TeamMemberForm => ({
 })
 
 const emptyStep1: Step1Form = {
+  sector_raw: '',
   contact_person: '',
   kvk_number: '',
   btw_number: '',
@@ -210,16 +227,18 @@ export default function IntakePage() {
   const [memberErrors, setMemberErrors] = useState<Partial<Record<MemberErrorKey, string>>>({})
   const [teamError, setTeamError] = useState('')
 
+  const effectiveSector = form.sector_raw.trim() ? inferSectorFromRaw(form.sector_raw) : sector
+
   const sectorSoftwareOptions =
-    sector === 'real_estate'
+    effectiveSector === 'real_estate'
       ? REAL_ESTATE_SOFTWARE_OPTIONS
-      : sector === 'professional_services'
+      : effectiveSector === 'professional_services'
         ? PROFESSIONAL_SERVICES_SOFTWARE_OPTIONS
         : GENERIC_SOFTWARE_OPTIONS
   const sectorDailyTasksOptions =
-    sector === 'real_estate'
+    effectiveSector === 'real_estate'
       ? REAL_ESTATE_DAILY_TASKS_OPTIONS
-      : sector === 'professional_services'
+      : effectiveSector === 'professional_services'
         ? PROFESSIONAL_SERVICES_DAILY_TASKS_OPTIONS
         : GENERIC_DAILY_TASKS_OPTIONS
 
@@ -312,6 +331,10 @@ export default function IntakePage() {
 
   function validateStep1(): boolean {
     const errors: Partial<Record<keyof Step1Form, string>> = {}
+
+    if (!form.sector_raw.trim()) {
+      errors.sector_raw = 'Branche / sector is verplicht.'
+    }
 
     if (!form.contact_person.trim()) {
       errors.contact_person = 'Contactpersoon is verplicht.'
@@ -423,6 +446,7 @@ export default function IntakePage() {
     ]
 
     const body: IntakeSubmitBody = {
+      ...(form.sector_raw.trim() ? { sector_raw: form.sector_raw.trim() } : {}),
       ...(form.contact_person.trim() ? { contact_person: form.contact_person.trim() } : {}),
       ...(form.kvk_number.trim() ? { kvk_number: form.kvk_number.trim() } : {}),
       ...(form.btw_number.trim() ? { btw_number: form.btw_number.trim() } : {}),
@@ -685,9 +709,20 @@ function Step1({
       <div>
         <h2 className="text-xl font-semibold text-white">Bedrijfsgegevens</h2>
         <p className="text-white/50 text-sm mt-1">
-          Vul je bedrijfsgegevens in. Alleen contactpersoon is verplicht.
+          Vul je bedrijfsgegevens in. Contactpersoon en branche/sector zijn verplicht.
         </p>
       </div>
+
+      <FormField label="Branche / sector" required error={errors.sector_raw}>
+        <input
+          type="text"
+          className={`${INPUT_CLASS} ${errors.sector_raw ? 'border-red-500/50' : ''}`}
+          placeholder="Bijv. makelaardij, juridisch, retail, zorg..."
+          value={form.sector_raw}
+          onChange={(e) => onFieldChange('sector_raw', e.target.value)}
+          autoComplete="organization-title"
+        />
+      </FormField>
 
       {/* Contact person */}
       <FormField label="Contactpersoon" required error={errors.contact_person}>

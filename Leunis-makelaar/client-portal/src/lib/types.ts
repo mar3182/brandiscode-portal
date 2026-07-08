@@ -134,6 +134,7 @@ export interface IntakeTeamMember {
 }
 
 export interface IntakeSubmitBody {
+  sector_raw?: string
   contact_person?: string
   kvk_number?: string
   btw_number?: string
