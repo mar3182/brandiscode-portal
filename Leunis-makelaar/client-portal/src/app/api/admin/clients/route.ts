@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
+const VALID_SECTORS = new Set(['generic', 'real_estate'])
+
 function mapSchemaCacheError(message: string) {
   if (message.includes('schema cache') || message.includes('Could not find the')) {
     return 'Database mist nieuwe klantprofiel-kolommen. Voer eerst supabase/migration-client-profile.sql uit in Supabase SQL Editor en herlaad daarna de app.'
@@ -16,6 +18,12 @@ function normalizeOptionalString(value: unknown) {
   if (typeof value !== 'string') return null
   const trimmed = value.trim()
   return trimmed.length ? trimmed : null
+}
+
+function normalizeSector(value: unknown) {
+  if (typeof value !== 'string') return 'generic'
+  const normalized = value.trim().toLowerCase()
+  return VALID_SECTORS.has(normalized) ? normalized : 'generic'
 }
 
 async function checkAdmin() {
@@ -62,6 +70,7 @@ export async function POST(req: NextRequest) {
     billing_postal_code: normalizeOptionalString(body.billing_postal_code),
     billing_city: normalizeOptionalString(body.billing_city),
     billing_country: normalizeOptionalString(body.billing_country),
+    sector: normalizeSector(body.sector),
   }
 
   if (!payload.name || !payload.email) {
@@ -155,6 +164,7 @@ export async function PATCH(req: NextRequest) {
     billing_postal_code: normalizeOptionalString(body.billing_postal_code),
     billing_city: normalizeOptionalString(body.billing_city),
     billing_country: normalizeOptionalString(body.billing_country),
+    sector: normalizeSector(body.sector),
     onboarding_completed_at:
       typeof body.mark_completed === 'boolean'
         ? (body.mark_completed ? new Date().toISOString() : null)

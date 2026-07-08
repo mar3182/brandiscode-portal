@@ -25,14 +25,20 @@ import type { IntakeSubmitBody, IntakeTeamMember, IntakeTeamMemberProfile, Micro
 const INPUT_CLASS =
   'w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-brand-gold/50 transition-all'
 
-const SOFTWARE_OPTIONS = [
-  'Realworks',
+type IntakeSector = 'generic' | 'real_estate'
+
+const GENERIC_SOFTWARE_OPTIONS = [
   'Outlook',
   'Word',
   'Excel',
   'WhatsApp Business',
   'Google Workspace',
   'Andere',
+]
+
+const REAL_ESTATE_SOFTWARE_OPTIONS = [
+  'Realworks',
+  ...GENERIC_SOFTWARE_OPTIONS,
 ]
 
 const MICROSOFT_OPTIONS: { value: MicrosoftSubscription; label: string }[] = [
@@ -67,15 +73,19 @@ const AI_ATTITUDE_OPTIONS: { value: NonNullable<IntakeTeamMemberProfile['ai_atti
   { value: 'bezorgd', label: 'Bezorgd' },
 ]
 
-const DAILY_TASKS_OPTIONS = [
+const GENERIC_DAILY_TASKS_OPTIONS = [
   'E-mails beantwoorden',
-  'Woningbeschrijvingen schrijven',
   'Klantcontact',
   'Documenten opstellen',
   'Data invoeren',
   'Afspraken plannen',
   'Rapporten maken',
   'Anders',
+]
+
+const REAL_ESTATE_DAILY_TASKS_OPTIONS = [
+  ...GENERIC_DAILY_TASKS_OPTIONS,
+  'Woningbeschrijvingen schrijven',
 ]
 
 const WEEKLY_REPETITIVE_OPTIONS: { value: NonNullable<IntakeTeamMemberProfile['weekly_repetitive_hours']>; label: string }[] = [
@@ -94,6 +104,10 @@ const TRAINING_PREFERENCE_OPTIONS: { value: NonNullable<IntakeTeamMemberProfile[
 
 const TRAINING_DAYS_OPTIONS = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag']
 const TRAINING_TIME_OPTIONS = ['Ochtend', 'Middag']
+
+function resolveSector(raw?: string | null): IntakeSector {
+  return raw === 'real_estate' ? 'real_estate' : 'generic'
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -157,6 +171,7 @@ export default function IntakePage() {
   const [pageState, setPageState] = useState<'loading' | 'error' | 'wizard' | 'success'>('loading')
   const [tokenError, setTokenError] = useState('')
   const [companyName, setCompanyName] = useState('')
+  const [sector, setSector] = useState<IntakeSector>('generic')
 
   // Wizard state
   const [step, setStep] = useState(1)
@@ -173,6 +188,9 @@ export default function IntakePage() {
   const [memberForm, setMemberForm] = useState<TeamMemberForm>(emptyTeamMember())
   const [memberErrors, setMemberErrors] = useState<Partial<Record<MemberErrorKey, string>>>({})
   const [teamError, setTeamError] = useState('')
+
+  const softwareOptions = sector === 'real_estate' ? REAL_ESTATE_SOFTWARE_OPTIONS : GENERIC_SOFTWARE_OPTIONS
+  const dailyTasksOptions = sector === 'real_estate' ? REAL_ESTATE_DAILY_TASKS_OPTIONS : GENERIC_DAILY_TASKS_OPTIONS
 
   // ── Token validation ──────────────────────────────────────────────────────
 
@@ -198,8 +216,9 @@ export default function IntakePage() {
           setPageState('error')
           return
         }
-        const data = await res.json() as { client: { id: string; company: string }; valid: boolean }
+        const data = await res.json() as { client: { id: string; company: string; sector?: string | null }; valid: boolean }
         setCompanyName(data.client.company ?? '')
+        setSector(resolveSector(data.client.sector))
         setPageState('wizard')
       } catch {
         setTokenError('Er is een fout opgetreden bij het laden van de pagina. Probeer het opnieuw.')
@@ -512,6 +531,7 @@ export default function IntakePage() {
           <Step1
             form={form}
             errors={step1Errors}
+            softwareOptions={softwareOptions}
             onFieldChange={handleFieldChange}
             onKvkChange={handleKvkChange}
             onBtwChange={handleBtwChange}
@@ -534,6 +554,7 @@ export default function IntakePage() {
               if (memberErrors[field as keyof typeof memberErrors]) setMemberErrors((prev) => ({ ...prev, [field]: undefined }))
             }}
             onMemberProfileChange={handleMemberProfileChange}
+            dailyTasksOptions={dailyTasksOptions}
             onAddMember={handleAddMember}
             onRemoveMember={handleRemoveMember}
             onBack={() => {
@@ -591,6 +612,7 @@ function PageShell({
 interface Step1Props {
   form: Step1Form
   errors: Partial<Record<keyof Step1Form, string>>
+  softwareOptions: string[]
   onFieldChange: (field: keyof Step1Form, value: string) => void
   onKvkChange: (value: string) => void
   onBtwChange: (value: string) => void
@@ -602,6 +624,7 @@ interface Step1Props {
 function Step1({
   form,
   errors,
+  softwareOptions,
   onFieldChange,
   onKvkChange,
   onBtwChange,
@@ -736,7 +759,7 @@ function Step1({
           Software die jullie gebruiken
         </label>
         <div className="flex flex-wrap gap-2">
-          {SOFTWARE_OPTIONS.map((opt) => {
+          {softwareOptions.map((opt) => {
             const selected = form.software_inventory.includes(opt)
             return (
               <button
@@ -804,6 +827,7 @@ interface Step2Props {
   onSetAddingMember: (val: boolean) => void
   onMemberFormChange: (field: 'name' | 'email' | 'function_title' | 'role', value: string) => void
   onMemberProfileChange: (updates: Partial<IntakeTeamMemberProfile>) => void
+  dailyTasksOptions: string[]
   onAddMember: () => void
   onRemoveMember: (index: number) => void
   onBack: () => void
@@ -821,6 +845,7 @@ function Step2({
   onSetAddingMember,
   onMemberFormChange,
   onMemberProfileChange,
+  dailyTasksOptions,
   onAddMember,
   onRemoveMember,
   onBack,
@@ -832,6 +857,9 @@ function Step2({
         <h2 className="text-xl font-semibold text-white mb-1">Teamleden</h2>
         <p className="text-white/50 text-sm mb-6">
           Voeg de teamleden toe die toegang krijgen tot het portal. Minimaal 1 vereist. Computer/tech vaardigheid en AI-ervaring zijn verplicht per teamlid.
+        </p>
+        <p className="text-white/35 text-xs mb-4">
+          De keuzelijsten in deze intake worden afgestemd op de sector van jullie bedrijf.
         </p>
 
         {/* Member list */}
@@ -1106,7 +1134,7 @@ function Step2({
                   <div>
                     <label className="block text-sm text-white/60 mb-2">Dagelijkse taken</label>
                     <div className="flex flex-wrap gap-2">
-                      {DAILY_TASKS_OPTIONS.map((task) => {
+                      {dailyTasksOptions.map((task) => {
                         const selected = (memberForm.profile.daily_tasks ?? []).includes(task)
                         return (
                           <button

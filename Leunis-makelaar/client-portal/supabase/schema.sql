@@ -8,6 +8,7 @@ CREATE TABLE clients (
   name TEXT NOT NULL,
   company TEXT,
   phone TEXT,
+  sector TEXT DEFAULT 'generic',
   created_at TIMESTAMPTZ DEFAULT now()
 );
 

@@ -153,7 +153,7 @@ export async function GET(
 
   const { data: client, error: clientError } = await admin
     .from('clients')
-    .select('id, company, name')
+    .select('id, company, name, sector')
     .eq('id', tokenRow.client_id)
     .single()
 
@@ -162,7 +162,14 @@ export async function GET(
   }
 
   return NextResponse.json(
-    { valid: true, client: { id: client.id, company: client.company ?? client.name } },
+    {
+      valid: true,
+      client: {
+        id: client.id,
+        company: client.company ?? client.name,
+        sector: client.sector === 'real_estate' ? 'real_estate' : 'generic',
+      },
+    },
     { headers: NO_STORE }
   )
 }

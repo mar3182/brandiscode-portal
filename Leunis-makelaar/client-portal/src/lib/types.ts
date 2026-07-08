@@ -7,6 +7,7 @@ export type TrainingSessionStatus = 'proposed' | 'confirmed' | 'completed' | 'ca
 export type CommunicationChannel = 'portal' | 'email' | 'whatsapp'
 
 export type MicrosoftSubscription = 'none' | 'basic' | 'business' | 'enterprise'
+export type ClientSector = 'generic' | 'real_estate'
 
 export type AiMode = 'byok' | 'managed' | 'hybrid'
 export type AiProvider = 'openai' | 'azure-openai' | 'anthropic' | 'github-models'
@@ -78,6 +79,7 @@ export interface Client {
   billing_postal_code: string | null
   billing_city: string | null
   billing_country: string | null
+  sector: ClientSector | null
   onboarding_completed_at: string | null
   microsoft_subscription: MicrosoftSubscription | null
   software_inventory: string[] | null
