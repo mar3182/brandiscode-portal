@@ -66,6 +66,7 @@ export async function POST(
 
   const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
   const warnings: string[] = []
+  let invitationSent = false
 
   if (!resend) {
     warnings.push('E-mailprovider is niet geconfigureerd (RESEND_API_KEY ontbreekt). Intake-uitnodiging is niet verstuurd.')
@@ -97,6 +98,7 @@ export async function POST(
           subject,
           html,
         })
+        invitationSent = true
       } catch (error) {
         warnings.push(`Intake-uitnodiging versturen naar hoofdaccount mislukt: ${String(error)}`)
       }
@@ -104,7 +106,13 @@ export async function POST(
   }
 
   return NextResponse.json(
-    { token: tokenRow.token, url, expires_at: tokenRow.expires_at, ...(warnings.length ? { warnings } : {}) },
+    {
+      token: tokenRow.token,
+      url,
+      expires_at: tokenRow.expires_at,
+      invitation_sent: invitationSent,
+      ...(warnings.length ? { warnings } : {}),
+    },
     { headers: { 'Cache-Control': 'no-store' } }
   )
 }

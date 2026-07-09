@@ -94,6 +94,7 @@ export default function AdminClientsPage() {
   const [deleteError, setDeleteError] = useState('')
   const [intakeLinkLoadingId, setIntakeLinkLoadingId] = useState<string | null>(null)
   const [intakeLinkCopiedId, setIntakeLinkCopiedId] = useState<string | null>(null)
+  const [intakeInviteNotice, setIntakeInviteNotice] = useState<{ clientId: string; message: string } | null>(null)
 
   useEffect(() => {
     void loadClients()
@@ -311,6 +312,7 @@ export default function AdminClientsPage() {
   async function handleCopyIntakeLink(clientId: string) {
     setIntakeLinkLoadingId(clientId)
     setActionError('')
+    setIntakeInviteNotice(null)
 
     const res = await fetch(`/api/admin/clients/${clientId}/intake-token`, {
       method: 'POST',
@@ -323,11 +325,20 @@ export default function AdminClientsPage() {
       return
     }
 
-    const { url } = await res.json()
+    const data = await res.json()
+    const { url, invitation_sent, warnings } = data as { url: string; invitation_sent?: boolean; warnings?: string[] }
     try {
       await navigator.clipboard.writeText(url)
       setIntakeLinkCopiedId(clientId)
       setTimeout(() => setIntakeLinkCopiedId(null), 2000)
+
+      const notice = invitation_sent
+        ? 'Uitnodiging voor het hoofdaccount is verstuurd.'
+        : 'Intake-link gekopieerd, maar hoofdaccount-uitnodiging is niet verstuurd.'
+      setIntakeInviteNotice({
+        clientId,
+        message: warnings?.length ? `${notice} ${warnings[0]}` : notice,
+      })
     } catch {
       setActionError('Kopiëren mislukt. URL: ' + url)
     }
@@ -601,6 +612,11 @@ export default function AdminClientsPage() {
                         : <LinkIcon className="w-3.5 h-3.5" />}
                     <span className="hidden sm:inline">{intakeLinkCopiedId === client.id ? 'Link gekopieerd!' : 'Intake link'}</span>
                   </button>
+                  {intakeInviteNotice?.clientId === client.id && (
+                    <span className="block w-full text-xs text-white/50 mt-1">
+                      {intakeInviteNotice.message}
+                    </span>
+                  )}
                   <Link
                     href={`/admin/clients/${client.id}?tab=${detailTab}`}
                     className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-orange/20 hover:bg-brand-orange/30 text-brand-orange text-sm"

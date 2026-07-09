@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node scripts/onboarding-scenario-tests.mjs"
+    "test": "node scripts/onboarding-scenario-tests.mjs && node scripts/intake-route-contract-tests.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.0",
