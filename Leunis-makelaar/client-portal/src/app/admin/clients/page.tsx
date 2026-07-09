@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Users, Plus, Loader2, Pencil, Save, X, RefreshCw, CheckCircle2, Clock, ExternalLink, Trash2, Link as LinkIcon } from 'lucide-react'
+import { Users, Plus, Loader2, Pencil, Save, X, RefreshCw, CheckCircle2, Clock, ExternalLink, Trash2, Link as LinkIcon, ShieldCheck, AlertTriangle } from 'lucide-react'
 import type { Client } from '@/lib/types'
 import {
   type ProfileFieldErrors,
@@ -94,7 +94,7 @@ export default function AdminClientsPage() {
   const [deleteError, setDeleteError] = useState('')
   const [intakeLinkLoadingId, setIntakeLinkLoadingId] = useState<string | null>(null)
   const [intakeLinkCopiedId, setIntakeLinkCopiedId] = useState<string | null>(null)
-  const [intakeInviteNotice, setIntakeInviteNotice] = useState<{ clientId: string; message: string } | null>(null)
+  const [intakeInviteNotice, setIntakeInviteNotice] = useState<{ clientId: string; message: string; sent: boolean } | null>(null)
 
   useEffect(() => {
     void loadClients()
@@ -338,6 +338,7 @@ export default function AdminClientsPage() {
       setIntakeInviteNotice({
         clientId,
         message: warnings?.length ? `${notice} ${warnings[0]}` : notice,
+        sent: Boolean(invitation_sent),
       })
     } catch {
       setActionError('Kopiëren mislukt. URL: ' + url)
@@ -613,9 +614,10 @@ export default function AdminClientsPage() {
                     <span className="hidden sm:inline">{intakeLinkCopiedId === client.id ? 'Link gekopieerd!' : 'Intake link'}</span>
                   </button>
                   {intakeInviteNotice?.clientId === client.id && (
-                    <span className="block w-full text-xs text-white/50 mt-1">
-                      {intakeInviteNotice.message}
-                    </span>
+                    <div className={`mt-2 w-full rounded-xl border px-3 py-2 text-xs flex items-start gap-2 ${intakeInviteNotice.sent ? 'border-green-500/20 bg-green-500/10 text-green-200' : 'border-amber-500/20 bg-amber-500/10 text-amber-100'}`}>
+                      {intakeInviteNotice.sent ? <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0" /> : <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />}
+                      <span>{intakeInviteNotice.message}</span>
+                    </div>
                   )}
                   <Link
                     href={`/admin/clients/${client.id}?tab=${detailTab}`}

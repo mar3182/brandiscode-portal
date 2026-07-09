@@ -104,6 +104,22 @@ jobs:
           fi
           echo "✅ All migrations validated"
 
+  # Job 3b: Live Preview Smoke Tests for Intake Flow
+  smoke-tests-intake-preview:
+    name: Smoke Tests - Intake Preview
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run live preview smoke tests
+        env:
+          PREVIEW_URL: ${{ needs.deploy-staging.outputs.preview-url }}
+        run: |
+          cd client-portal
+          node scripts/intake-route-contract-tests.mjs
+
   # Job 3: Smoke Tests Suite A (No Authentication)
   smoke-tests-no-auth:
     name: Smoke Tests - No Auth
@@ -193,7 +209,7 @@ jobs:
   deployment-summary:
     name: Staging Deployment Summary
     if: always()
-    needs: [deploy-staging, migration-validate, smoke-tests-no-auth, health-check-staging]
+    needs: [deploy-staging, migration-validate, smoke-tests-no-auth, smoke-tests-intake-preview, health-check-staging]
     runs-on: ubuntu-latest
     steps:
       - name: Write deployment summary
@@ -202,6 +218,7 @@ jobs:
           DEPLOY_RESULT: ${{ needs.deploy-staging.result }}
           MIGRATION_RESULT: ${{ needs.migration-validate.result }}
           SMOKE_RESULT: ${{ needs.smoke-tests-no-auth.result }}
+          INTAKE_SMOKE_RESULT: ${{ needs.smoke-tests-intake-preview.result }}
           HEALTH_RESULT: ${{ needs.health-check-staging.result }}
         run: |
           cat >> $GITHUB_STEP_SUMMARY << EOF
@@ -212,6 +229,7 @@ jobs:
           | Vercel Deploy | $DEPLOY_RESULT |
           | Migration Validation | $MIGRATION_RESULT |
           | Smoke Tests (No Auth) | $SMOKE_RESULT |
+          | Smoke Tests (Intake Preview) | $INTAKE_SMOKE_RESULT |
           | Health Check | $HEALTH_RESULT |
           
           **Preview URL**: [\`$PREVIEW_URL\`]($PREVIEW_URL)
@@ -221,7 +239,7 @@ jobs:
           EOF
           
           # Check overall status
-          if [ "$DEPLOY_RESULT" = "success" ] && [ "$MIGRATION_RESULT" = "success" ] && [ "$SMOKE_RESULT" = "success" ] && [ "$HEALTH_RESULT" = "success" ]; then
+          if [ "$DEPLOY_RESULT" = "success" ] && [ "$MIGRATION_RESULT" = "success" ] && [ "$SMOKE_RESULT" = "success" ] && [ "$INTAKE_SMOKE_RESULT" = "success" ] && [ "$HEALTH_RESULT" = "success" ]; then
             echo "✅ **All checks passed** - Staging deployment healthy"
             exit 0
           else
