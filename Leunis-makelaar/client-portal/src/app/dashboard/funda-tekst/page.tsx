@@ -41,11 +41,30 @@ const PRESET_KENMERKEN = [
 ]
 
 type Lengte = 'kort' | 'normaal' | 'uitgebreid'
+type Prijsklasse = 'onbekend' | 'starter' | 'midden' | 'hoog' | 'luxe'
+type WoningtypeTag =
+  | 'vrijstaande-woning'
+  | 'tussenwoning'
+  | 'hoekwoning'
+  | '2-onder-1-kapwoning'
+  | 'appartement'
+  | 'boerderij'
+  | 'bungalow'
+  | 'anders'
+type LocatieTag = 'centrum' | 'rustig' | 'water' | 'landelijk' | 'nieuwbouw'
 
 const LENGTE_OPTIONS: { value: Lengte; label: string; desc: string }[] = [
   { value: 'kort', label: 'Kort', desc: '~200 woorden' },
   { value: 'normaal', label: 'Normaal', desc: '~400 woorden' },
   { value: 'uitgebreid', label: 'Uitgebreid', desc: '~600 woorden' },
+]
+
+const PRIJSKLASSE_OPTIONS: { value: Prijsklasse; label: string }[] = [
+  { value: 'onbekend', label: 'Onbekend / niet opgegeven' },
+  { value: 'starter', label: 'Starter / betaalbaar' },
+  { value: 'midden', label: 'Middenklasse' },
+  { value: 'hoog', label: 'Hoger segment' },
+  { value: 'luxe', label: 'Luxe segment' },
 ]
 
 const MEDIA_TABS: Array<{ id: MediaFormat; label: string; hint: string }> = [
@@ -74,38 +93,90 @@ const DEFAULT_PROMPT_EXTENSIONS = [
   'Start met een uitnodigende openingszin over sfeer en locatie, en sluit af met een duidelijke uitnodiging voor bezichtiging.',
 ]
 
-const PROMPT_GALLERY_ITEMS = [
+type PromptGalleryItem = {
+  id: string
+  title: string
+  subtitle: string
+  prompt: string
+  woningtypes: Array<WoningtypeTag>
+  locaties: Array<LocatieTag>
+  prijsklasses: Array<Prijsklasse>
+}
+
+const PROMPT_GALLERY_ITEMS: PromptGalleryItem[] = [
   {
     id: 'persoonlijk-direct',
     title: 'Persoonlijk en direct',
     subtitle: 'Meer menselijk contact',
     prompt: 'Spreek de lezer direct aan met je/u, maak de toon persoonlijker en laat elke alinea voelen alsof een makelaar de woning zelf laat zien.',
+    woningtypes: ['vrijstaande-woning', 'tussenwoning', 'hoekwoning', '2-onder-1-kapwoning', 'appartement', 'boerderij', 'bungalow', 'anders'],
+    locaties: ['centrum', 'rustig', 'water', 'landelijk', 'nieuwbouw'],
+    prijsklasses: ['starter', 'midden', 'hoog', 'luxe', 'onbekend'],
   },
   {
     id: 'sfeer-locatie',
     title: 'Sfeer en locatie sterker',
     subtitle: 'Opening met beleving',
     prompt: 'Geef de opening meer sfeer en locatiegevoel met een warme, beeldende eerste zin, zonder extra feiten toe te voegen.',
+    woningtypes: ['vrijstaande-woning', '2-onder-1-kapwoning', 'appartement', 'boerderij', 'bungalow'],
+    locaties: ['centrum', 'water', 'landelijk', 'rustig'],
+    prijsklasses: ['midden', 'hoog', 'luxe', 'onbekend'],
   },
   {
     id: 'heldere-structuur',
     title: 'Heldere structuur',
     subtitle: 'Beter scanbaar',
     prompt: 'Maak de tekst strakker en beter scanbaar met korte alinea\'s en duidelijke opbouw: opening, woning, ligging, afsluiting.',
+    woningtypes: ['vrijstaande-woning', 'tussenwoning', 'hoekwoning', '2-onder-1-kapwoning', 'appartement', 'boerderij', 'bungalow', 'anders'],
+    locaties: ['centrum', 'rustig', 'water', 'landelijk', 'nieuwbouw'],
+    prijsklasses: ['starter', 'midden', 'hoog', 'luxe', 'onbekend'],
   },
   {
     id: 'bezichtiging-cta',
     title: 'Sterkere bezichtigings-CTA',
     subtitle: 'Meer actiegericht',
     prompt: 'Laat de slotalinea overtuigender uitnodigen tot bezichtiging met een concrete en vriendelijke call-to-action.',
+    woningtypes: ['vrijstaande-woning', 'tussenwoning', 'hoekwoning', '2-onder-1-kapwoning', 'appartement', 'boerderij', 'bungalow', 'anders'],
+    locaties: ['centrum', 'rustig', 'water', 'landelijk', 'nieuwbouw'],
+    prijsklasses: ['starter', 'midden', 'hoog', 'luxe', 'onbekend'],
   },
   {
     id: 'brochure-zakelijk',
     title: 'Zakelijk brochuretoon',
     subtitle: 'Neutraal en professioneel',
     prompt: 'Herschrijf in een zakelijke, neutrale brochurestijl met feitelijke formuleringen en zonder overdreven marketingtaal.',
+    woningtypes: ['vrijstaande-woning', 'tussenwoning', 'hoekwoning', '2-onder-1-kapwoning', 'appartement', 'boerderij', 'bungalow', 'anders'],
+    locaties: ['centrum', 'rustig', 'water', 'landelijk', 'nieuwbouw'],
+    prijsklasses: ['starter', 'midden', 'hoog', 'luxe', 'onbekend'],
   },
-] as const
+  {
+    id: 'starter-compact',
+    title: 'Starterproof en compact',
+    subtitle: 'Betaalbare woningen',
+    prompt: 'Benadruk praktische indeling, betaalbaarheid en direct bruikbare leefruimte voor starters, met een toegankelijke en enthousiaste toon.',
+    woningtypes: ['tussenwoning', 'hoekwoning', 'appartement'],
+    locaties: ['centrum', 'nieuwbouw', 'rustig'],
+    prijsklasses: ['starter', 'midden'],
+  },
+  {
+    id: 'luxe-exclusief',
+    title: 'Exclusief en verfijnd',
+    subtitle: 'Hoger en luxe segment',
+    prompt: 'Gebruik een premium, elegante toon met nadruk op kwaliteit, afwerking en exclusieve woonbeleving, zonder overdrijving.',
+    woningtypes: ['vrijstaande-woning', '2-onder-1-kapwoning', 'boerderij', 'bungalow'],
+    locaties: ['water', 'landelijk', 'rustig'],
+    prijsklasses: ['hoog', 'luxe'],
+  },
+  {
+    id: 'water-buitenleven',
+    title: 'Buitenleven en water',
+    subtitle: 'Natuur/ligging centraal',
+    prompt: 'Leg extra nadruk op buitenruimte, rust, natuur en eventuele ligging aan of nabij water in een beeldende stijl.',
+    woningtypes: ['vrijstaande-woning', '2-onder-1-kapwoning', 'appartement', 'boerderij', 'bungalow'],
+    locaties: ['water', 'landelijk', 'rustig'],
+    prijsklasses: ['midden', 'hoog', 'luxe', 'onbekend'],
+  },
+]
 
 type PromptExtensionItem = {
   id: string
@@ -121,6 +192,7 @@ interface FormState {
   perceeloppervlakte: string
   kamers: string
   slaapkamers: string
+  prijsklasse: Prijsklasse
   ligging: string
   staat: string
   bijzonderheden: string
@@ -135,6 +207,7 @@ const initialForm: FormState = {
   perceeloppervlakte: '',
   kamers: '',
   slaapkamers: '',
+  prijsklasse: 'onbekend',
   ligging: '',
   staat: 'Instapklaar',
   bijzonderheden: '',
@@ -228,6 +301,46 @@ export default function FundaTekstPage() {
       return [{ id: crypto.randomUUID(), text: normalized, enabled: true }, ...prev]
     })
   }
+
+  function normalizeWoningtypeToTag(value: string): WoningtypeTag {
+    const key = value.toLowerCase().trim()
+    if (key.includes('vrijstaande')) return 'vrijstaande-woning'
+    if (key.includes('tussenwoning')) return 'tussenwoning'
+    if (key.includes('hoekwoning')) return 'hoekwoning'
+    if (key.includes('2-onder-1-kap')) return '2-onder-1-kapwoning'
+    if (key.includes('appartement')) return 'appartement'
+    if (key.includes('boerderij')) return 'boerderij'
+    if (key.includes('bungalow')) return 'bungalow'
+    return 'anders'
+  }
+
+  function detectLocatieTags(text: string): Array<LocatieTag> {
+    const value = text.toLowerCase()
+    const tags: Array<LocatieTag> = []
+    if (/(centrum|binnenstad|dorpskern|winkel)/.test(value)) tags.push('centrum')
+    if (/(rustig|kindvriendelijk|woonwijk|straat)/.test(value)) tags.push('rustig')
+    if (/(water|haven|dijk|kade|meer|zee)/.test(value)) tags.push('water')
+    if (/(landelijk|polder|buitengebied|boeren|groen)/.test(value)) tags.push('landelijk')
+    if (/(nieuwbouw|recent|nieuw)/.test(value)) tags.push('nieuwbouw')
+    return tags
+  }
+
+  function scoreGalleryItem(item: PromptGalleryItem): number {
+    const woningtypeTag = normalizeWoningtypeToTag(form.woningtype)
+    const locatieTags = detectLocatieTags(form.ligging)
+    let score = 0
+
+    if (item.woningtypes.includes(woningtypeTag)) score += 3
+    if (item.prijsklasses.includes(form.prijsklasse)) score += 3
+    if (form.prijsklasse === 'onbekend') score += 1
+
+    const matchedLocaties = locatieTags.filter((tag) => item.locaties.includes(tag)).length
+    score += matchedLocaties * 2
+
+    return score
+  }
+
+  const sortedGalleryItems = [...PROMPT_GALLERY_ITEMS].sort((a, b) => scoreGalleryItem(b) - scoreGalleryItem(a))
 
   function togglePromptExtension(id: string) {
     setPromptExtensions((prev) =>
@@ -731,6 +844,29 @@ export default function FundaTekstPage() {
                   onChange={(e) => updateForm('slaapkamers', e.target.value)}
                 />
               </div>
+
+              {/* Prijsklasse */}
+              <div>
+                <label className={LABEL_CLASS}>Prijsklasse</label>
+                <div className="relative">
+                  <select
+                    className={SELECT_CLASS}
+                    value={form.prijsklasse}
+                    onChange={(e) => updateForm('prijsklasse', e.target.value as Prijsklasse)}
+                  >
+                    {PRIJSKLASSE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value} className="bg-[#1B2A4A]">
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                    <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1027,17 +1163,20 @@ export default function FundaTekstPage() {
               Prompt gallery
             </h2>
             <p className="text-xs text-white/40 mb-4">
-              Kies uit kant-en-klare verfijningsprompts. Gebruik ze direct in het verfijnveld of voeg ze toe als vaste uitbreiding voor toekomstige creaties.
+              Kies uit kant-en-klare verfijningsprompts. De lijst wordt automatisch gesorteerd op woningtype, ligging en prijsklasse.
             </p>
 
             <div className="space-y-3">
-              {PROMPT_GALLERY_ITEMS.map((item) => (
+              {sortedGalleryItems.map((item) => (
                 <div key={item.id} className="p-3 rounded-xl bg-white/5 border border-white/10">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-medium text-white/85">{item.title}</p>
                       <p className="text-xs text-white/45 mt-0.5">{item.subtitle}</p>
                     </div>
+                    <span className="text-[10px] px-2 py-1 rounded-full bg-white/10 border border-white/15 text-white/55">
+                      Relevantie {scoreGalleryItem(item)}
+                    </span>
                   </div>
 
                   <p className="text-xs text-white/70 mt-2 leading-relaxed">{item.prompt}</p>
