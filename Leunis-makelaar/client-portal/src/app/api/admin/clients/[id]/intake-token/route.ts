@@ -1,8 +1,15 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { Resend } from 'resend'
+import { buildIntakeInvitationEmail } from '@/lib/onboardingEmails.mjs'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
+
+function generateTemporaryPassword(): string {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+  return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+}
 
 async function checkAdmin() {
   const supabase = createClient()
@@ -29,7 +36,7 @@ export async function POST(
   // Verify client exists
   const { data: client, error: clientError } = await admin
     .from('clients')
-    .select('id, company, name')
+    .select('id, company, name, email')
     .eq('id', clientId)
     .single()
 
@@ -57,8 +64,47 @@ export async function POST(
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://portal.brandiscode.com'
   const url = `${baseUrl}/intake/${tokenRow.token}`
 
+  const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
+  const warnings: string[] = []
+
+  if (!resend) {
+    warnings.push('E-mailprovider is niet geconfigureerd (RESEND_API_KEY ontbreekt). Intake-uitnodiging is niet verstuurd.')
+  } else if (client.company || client.name) {
+    const mainEmail = client.email ?? null
+    if (mainEmail) {
+      try {
+        const temporaryPassword = generateTemporaryPassword()
+        const authUser = await admin.auth.admin.createUser({
+          email: mainEmail,
+          email_confirm: true,
+          password: temporaryPassword,
+          user_metadata: { name: client.name, company: client.company },
+        })
+
+        const alreadyRegistered = Boolean(authUser.error?.message.includes('already been registered'))
+        const { subject, html } = buildIntakeInvitationEmail({
+          name: client.name ?? client.company ?? 'Klant',
+          company: client.company ?? client.name,
+          email: mainEmail,
+          intakeUrl: url,
+          isExistingUser: alreadyRegistered,
+          temporaryPassword: alreadyRegistered ? undefined : temporaryPassword,
+        })
+
+        await resend.emails.send({
+          from: process.env.EMAIL_FROM ?? 'Brand is Code <noreply@brandiscode.com>',
+          to: mainEmail,
+          subject,
+          html,
+        })
+      } catch (error) {
+        warnings.push(`Intake-uitnodiging versturen naar hoofdaccount mislukt: ${String(error)}`)
+      }
+    }
+  }
+
   return NextResponse.json(
-    { token: tokenRow.token, url, expires_at: tokenRow.expires_at },
+    { token: tokenRow.token, url, expires_at: tokenRow.expires_at, ...(warnings.length ? { warnings } : {}) },
     { headers: { 'Cache-Control': 'no-store' } }
   )
 }

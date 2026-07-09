@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import OpenAI from 'openai'
+import { buildPortalReadyEmail, getTeamMemberEmailKind } from '@/lib/onboardingEmails.mjs'
 import type { IntakeSubmitBody, IntakeTeamMember } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
@@ -295,7 +296,7 @@ export async function POST(
   // Fetch client info
   const { data: client, error: clientError } = await admin
     .from('clients')
-    .select('id, company, name')
+    .select('id, company, name, email')
     .eq('id', tokenRow.client_id)
     .single()
 
@@ -437,14 +438,14 @@ export async function POST(
 
     if (resend) {
       try {
-        const isExistingUser = alreadyRegistered
+        const emailKind = getTeamMemberEmailKind(alreadyRegistered)
         await resend.emails.send({
           from: FROM,
           to: email,
-          subject: isExistingUser
+          subject: emailKind === 'existing-user'
             ? `Je portal-account staat klaar — ${companyName}`
             : `Welkom bij het Brand is Code portal — ${companyName}`,
-          html: isExistingUser
+          html: emailKind === 'existing-user'
             ? existingUserEmailHtml({
               name: member.name.trim(),
               company: companyName,
@@ -461,6 +462,25 @@ export async function POST(
         // Non-fatal: log but don't block the response
         errors.push(`E-mail versturen mislukt voor ${email}: ${String(emailErr)}`)
       }
+    }
+  }
+
+  if (resend && client.email) {
+    try {
+      const { subject, html } = buildPortalReadyEmail({
+        name: client.name,
+        company: companyName,
+        email: client.email,
+      })
+
+      await resend.emails.send({
+        from: FROM,
+        to: client.email,
+        subject,
+        html,
+      })
+    } catch (emailErr) {
+      errors.push(`Portal-welkomstmail versturen mislukt voor hoofdaccount: ${String(emailErr)}`)
     }
   }
 

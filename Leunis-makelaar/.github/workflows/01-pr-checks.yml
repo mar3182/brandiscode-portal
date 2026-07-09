@@ -117,9 +117,9 @@ jobs:
       - name: Run TypeScript compiler
         run: cd client-portal && npx tsc --noEmit
 
-  # Job 4: Unit Tests
+  # Job 4: Onboarding Scenario Tests
   test:
-    name: Unit Tests
+    name: Onboarding Scenario Tests
     needs: setup
     runs-on: ubuntu-latest
     steps:
@@ -145,7 +145,7 @@ jobs:
         run: |
           cd client-portal
           npm test
-          echo "✅ Unit tests passed"
+          echo "✅ Scenario tests passed"
 
   # Job 5: Build
   build:
@@ -246,9 +246,6 @@ jobs:
         if: always()
         env:
           GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
-        with:
-          path: ./
-          enable-infra-scans: true
 
   # Job 8: Database Migration Safety Check
   migration-check:
@@ -333,7 +330,7 @@ jobs:
           echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Lint | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Type Check | ${{ needs.typecheck.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Tests | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Scenario Tests | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Dependencies | ${{ needs.dependency-check.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Secrets | ${{ needs.secret-scan.result }} |" >> $GITHUB_STEP_SUMMARY

@@ -49,7 +49,7 @@ jobs:
             const REQUIRED_CHECKS = [
               'Lint & Code Quality',
               'Type Safety Check',
-              'Unit Tests',
+              'Onboarding Scenario Tests',
               'Build Artifact',
               'Dependency Vulnerability Scan',
               'Secret & Credential Scan',
