@@ -183,31 +183,77 @@ def fetch_image_unsplash(query: str) -> bytes:
         print("      Gratis aanmaken op: https://unsplash.com/developers")
         sys.exit(1)
 
-    print(f"  Unsplash afbeelding zoeken voor: '{query}'...")
+    # Vertaal Nederlandse query naar Engels voor betere resultaten
+    query_en = _nl_to_en_query(query)
+    print(f"  Unsplash afbeelding zoeken voor: '{query_en}'...")
     search_url = "https://api.unsplash.com/search/photos"
     params = {
-        "query": query,
+        "query": query_en,
         "orientation": "landscape",
         "per_page": 1,
         "order_by": "relevant",
     }
     headers = {"Authorization": f"Client-ID {access_key}"}
     r = requests.get(search_url, params=params, headers=headers, timeout=15)
+
+    if r.status_code == 401:
+        print("FOUT: Ongeldige Unsplash API key.")
+        print("      Maak een gratis key aan op: https://unsplash.com/developers")
+        print("      Of gebruik: --image free  (geen key nodig)")
+        sys.exit(1)
+
     r.raise_for_status()
 
     results = r.json().get("results", [])
     if not results:
-        print(f"  Geen Unsplash resultaten voor '{query}', probeer bredere zoekterm.")
-        sys.exit(1)
+        print(f"  Geen resultaten voor '{query_en}', overschakelen naar vrije foto...")
+        return fetch_image_free(query_en)
 
     photo = results[0]
-    download_url = photo["urls"]["regular"]  # 1080px breed
+    download_url = photo["urls"]["regular"]
     attribution = f"{photo['user']['name']} via Unsplash"
 
     img_r = requests.get(download_url, timeout=30)
     img_r.raise_for_status()
     print(f"  Foto gevonden: {attribution} ✓")
     return img_r.content
+
+
+def fetch_image_free(query: str) -> bytes:
+    """
+    Haal een gratis foto op via loremflickr.com — geen API key nodig.
+    Gebruikt Flickr Creative Commons foto's op basis van zoekwoorden.
+    """
+    # Gebruik max 2 Engelse zoekwoorden voor loremflickr
+    keywords = _nl_to_en_query(query).replace(" ", ",")
+    url = f"https://loremflickr.com/1792/1024/{keywords}"
+    print(f"  Gratis foto ophalen voor: '{keywords}'...")
+    r = requests.get(url, timeout=30, allow_redirects=True)
+    r.raise_for_status()
+    print(f"  Foto gevonden via loremflickr ✓")
+    return r.content
+
+
+def _nl_to_en_query(query: str) -> str:
+    """Eenvoudige vertaling van veelgebruikte Nederlandse termen naar Engels."""
+    translations = {
+        "MKB": "business SMB",
+        "bedrijf": "business",
+        "data strategie": "data strategy",
+        "CRM data": "CRM data",
+        "losse tools": "business tools workflow",
+        "automatisering": "automation",
+        "informatie architectuur": "information architecture",
+        "makelaar": "real estate",
+        "spreadsheet": "spreadsheet data",
+        "marketing": "marketing",
+        "sales": "sales",
+    }
+    result = query
+    for nl, en in translations.items():
+        result = result.replace(nl, en)
+    # Verwijder dubbele spaties en trim
+    return " ".join(result.split())[:60]
 
 
 def upload_image_to_wordpress(
@@ -218,8 +264,11 @@ def upload_image_to_wordpress(
     """Upload afbeelding naar WordPress mediabibliotheek. Retourneert media-ID."""
     upload_url = f"{API_BASE}/media"
 
-    # Verwijder Content-Type uit de auth headers — requests stelt multipart in
+    ext = filename.rsplit(".", 1)[-1].lower()
+    mime = "image/png" if ext == "png" else "image/jpeg"
+
     upload_headers = {k: v for k, v in auth_headers.items() if k != "Content-Type"}
+    upload_headers["Content-Type"] = mime
     upload_headers["Content-Disposition"] = f'attachment; filename="{filename}"'
 
     print(f"  Uploaden naar WordPress media...")
@@ -312,9 +361,14 @@ def main():
     )
     parser.add_argument(
         "--image",
-        choices=["dalle", "unsplash"],
+        choices=["dalle", "unsplash", "free"],
         default=None,
-        help="Genereer een featured image: 'dalle' (DALL-E 3) of 'unsplash' (gratis stockfoto).",
+        help=(
+            "Genereer een featured image: "
+            "'free' (geen key nodig, loremflickr), "
+            "'unsplash' (gratis Unsplash key nodig), "
+            "'dalle' (DALL-E 3, OpenAI key nodig)."
+        ),
     )
     parser.add_argument(
         "--dry-run",
@@ -366,9 +420,13 @@ def main():
         safe_slug = re.sub(r"[^a-z0-9]+", "-", parsed["title"].lower()).strip("-")
         media_id = upload_image_to_wordpress(image_bytes, f"{safe_slug}.png", headers)
     elif args.image == "unsplash":
-        # Gebruik SEO-focus als zoekterm, val terug op titel
         query = parsed["seo_focus"].split(",")[0].strip() or parsed["title"]
         image_bytes = fetch_image_unsplash(query)
+        safe_slug = re.sub(r"[^a-z0-9]+", "-", parsed["title"].lower()).strip("-")
+        media_id = upload_image_to_wordpress(image_bytes, f"{safe_slug}.jpg", headers)
+    elif args.image == "free":
+        query = parsed["seo_focus"].split(",")[0].strip() or parsed["title"]
+        image_bytes = fetch_image_free(query)
         safe_slug = re.sub(r"[^a-z0-9]+", "-", parsed["title"].lower()).strip("-")
         media_id = upload_image_to_wordpress(image_bytes, f"{safe_slug}.jpg", headers)
 
