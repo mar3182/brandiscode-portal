@@ -74,6 +74,39 @@ const DEFAULT_PROMPT_EXTENSIONS = [
   'Start met een uitnodigende openingszin over sfeer en locatie, en sluit af met een duidelijke uitnodiging voor bezichtiging.',
 ]
 
+const PROMPT_GALLERY_ITEMS = [
+  {
+    id: 'persoonlijk-direct',
+    title: 'Persoonlijk en direct',
+    subtitle: 'Meer menselijk contact',
+    prompt: 'Spreek de lezer direct aan met je/u, maak de toon persoonlijker en laat elke alinea voelen alsof een makelaar de woning zelf laat zien.',
+  },
+  {
+    id: 'sfeer-locatie',
+    title: 'Sfeer en locatie sterker',
+    subtitle: 'Opening met beleving',
+    prompt: 'Geef de opening meer sfeer en locatiegevoel met een warme, beeldende eerste zin, zonder extra feiten toe te voegen.',
+  },
+  {
+    id: 'heldere-structuur',
+    title: 'Heldere structuur',
+    subtitle: 'Beter scanbaar',
+    prompt: 'Maak de tekst strakker en beter scanbaar met korte alinea\'s en duidelijke opbouw: opening, woning, ligging, afsluiting.',
+  },
+  {
+    id: 'bezichtiging-cta',
+    title: 'Sterkere bezichtigings-CTA',
+    subtitle: 'Meer actiegericht',
+    prompt: 'Laat de slotalinea overtuigender uitnodigen tot bezichtiging met een concrete en vriendelijke call-to-action.',
+  },
+  {
+    id: 'brochure-zakelijk',
+    title: 'Zakelijk brochuretoon',
+    subtitle: 'Neutraal en professioneel',
+    prompt: 'Herschrijf in een zakelijke, neutrale brochurestijl met feitelijke formuleringen en zonder overdreven marketingtaal.',
+  },
+] as const
+
 type PromptExtensionItem = {
   id: string
   text: string
@@ -236,6 +269,16 @@ export default function FundaTekstPage() {
     })
 
     setPromptNoticeMessage('Standaardset hersteld en geactiveerd.')
+  }
+
+  function addGalleryPromptToExtensions(prompt: string) {
+    addPromptExtension(prompt)
+    setPromptNoticeMessage('Gallery prompt toegevoegd aan uitbreidingen.')
+  }
+
+  function useGalleryPromptAsRefinement(prompt: string) {
+    setVerfijnInput(prompt)
+    setPromptNoticeMessage('Gallery prompt geladen in verfijnveld.')
   }
 
   function updateForm(field: keyof FormState, value: string) {
@@ -976,6 +1019,48 @@ export default function FundaTekstPage() {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Sectie 7: Prompt gallery */}
+          <div className="glass-card p-6 rounded-2xl">
+            <h2 className="text-sm font-semibold text-white/80 uppercase tracking-wider mb-1">
+              Prompt gallery
+            </h2>
+            <p className="text-xs text-white/40 mb-4">
+              Kies uit kant-en-klare verfijningsprompts. Gebruik ze direct in het verfijnveld of voeg ze toe als vaste uitbreiding voor toekomstige creaties.
+            </p>
+
+            <div className="space-y-3">
+              {PROMPT_GALLERY_ITEMS.map((item) => (
+                <div key={item.id} className="p-3 rounded-xl bg-white/5 border border-white/10">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-white/85">{item.title}</p>
+                      <p className="text-xs text-white/45 mt-0.5">{item.subtitle}</p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-white/70 mt-2 leading-relaxed">{item.prompt}</p>
+
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      type="button"
+                      onClick={() => useGalleryPromptAsRefinement(item.prompt)}
+                      className="px-3 py-1.5 rounded-lg bg-brand-blue/20 border border-brand-blue/40 text-brand-blue text-xs font-medium hover:bg-brand-blue/30 transition-all"
+                    >
+                      Gebruik nu
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addGalleryPromptToExtensions(item.prompt)}
+                      className="px-3 py-1.5 rounded-lg bg-brand-gold/20 border border-brand-gold/40 text-brand-gold text-xs font-medium hover:bg-brand-gold/30 transition-all"
+                    >
+                      Voeg toe als vaste uitbreiding
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Genereer knoppen */}
