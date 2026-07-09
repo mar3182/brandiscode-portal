@@ -1,25 +1,28 @@
 #!/usr/bin/env python3
 """
-Brand is Code — Automatisch Blog naar WordPress Draft
+Brand is Code — Automatisch Blog naar WordPress Draft (met afbeelding)
 
-Leest een BLOG-XX-*.md bestand uit docs/ en plaatst de bloginhoud
-als concept (draft) in WordPress via de REST API.
+Leest een BLOG-XX-*.md bestand uit docs/, genereert een featured image
+en plaatst alles als concept (draft) in WordPress via de REST API.
 
 GEBRUIK:
     python3 publish_blog_to_wordpress.py docs/BLOG-01-CRM-DATA-DRAFT.md
+    python3 publish_blog_to_wordpress.py docs/BLOG-01-CRM-DATA-DRAFT.md --image dalle
+    python3 publish_blog_to_wordpress.py docs/BLOG-01-CRM-DATA-DRAFT.md --image unsplash
     python3 publish_blog_to_wordpress.py docs/BLOG-01-CRM-DATA-DRAFT.md --dry-run
 
-VEREISTEN:
-    pip install markdown requests
-    Omgevingsvariabelen (of .env bestand):
-        WP_USER          — WordPress-gebruikersnaam
-        WP_APP_PASSWORD  — Application Password (aanmaken via WP Admin → Gebruikers → Profiel)
+AFBEELDINGSBRONNEN:
+    --image dalle     DALL-E 3 via OpenAI (~€0,04/afbeelding). Vereist OPENAI_API_KEY in .env
+    --image unsplash  Gratis stockfoto via Unsplash. Vereist UNSPLASH_ACCESS_KEY in .env
+    (geen --image)    Geen featured image, alleen tekst
 
-APPLICATION PASSWORD aanmaken:
-    1. Ga naar https://brandiscode.com/wp-admin/profile.php
-    2. Scroll naar "Toepassingswachtwoorden"
-    3. Voer naam in (bijv. "Copilot Blog Publisher") → klik "Toevoegen"
-    4. Kopieer het wachtwoord (inclusief spaties) en sla op als WP_APP_PASSWORD
+VEREISTEN:
+    pip install markdown requests openai
+    .env bestand:
+        WP_USER             — WordPress-gebruikersnaam
+        WP_APP_PASSWORD     — Application Password
+        OPENAI_API_KEY      — alleen bij --image dalle
+        UNSPLASH_ACCESS_KEY — alleen bij --image unsplash
 """
 
 import os
@@ -28,6 +31,7 @@ import sys
 import json
 import base64
 import argparse
+import tempfile
 import requests
 import markdown as md_lib
 from pathlib import Path
@@ -124,7 +128,122 @@ def markdown_to_html(md_text: str) -> str:
     )
 
 
-def create_draft_post(parsed: dict, headers: dict, dry_run: bool) -> None:
+# ── Afbeelding genereren ──────────────────────────────────────────────────────
+
+def _dalle_prompt(title: str, pillar: str) -> str:
+    """Genereer een DALL-E prompt die past bij de Brand is Code stijl."""
+    style = (
+        "Minimalist professional illustration, dark navy background, "
+        "subtle data/network grid lines, clean typography feel, "
+        "deep blue and white tones, modern corporate tech aesthetic, "
+        "no text in image, 16:9 ratio"
+    )
+    return (
+        f"Blog header image for a Dutch B2B technology strategy article titled "
+        f"'{title}'. Theme: {pillar}. Style: {style}."
+    )
+
+
+def generate_image_dalle(title: str, pillar: str) -> bytes:
+    """Genereer een featured image via DALL-E 3. Retourneert de afbeelding als bytes."""
+    try:
+        from openai import OpenAI
+    except ImportError:
+        print("FOUT: openai niet geïnstalleerd. Voer uit: pip install openai")
+        sys.exit(1)
+
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        print("FOUT: OPENAI_API_KEY ontbreekt in .env")
+        sys.exit(1)
+
+    client = OpenAI(api_key=api_key)
+    prompt = _dalle_prompt(title, pillar)
+
+    print(f"  DALL-E 3 afbeelding genereren...")
+    response = client.images.generate(
+        model="dall-e-3",
+        prompt=prompt,
+        size="1792x1024",
+        quality="standard",
+        n=1,
+    )
+    image_url = response.data[0].url
+    img_response = requests.get(image_url, timeout=60)
+    img_response.raise_for_status()
+    print(f"  Afbeelding gegenereerd ✓")
+    return img_response.content
+
+
+def fetch_image_unsplash(query: str) -> bytes:
+    """Haal een relevante stockfoto op via de Unsplash API. Retourneert bytes."""
+    access_key = os.environ.get("UNSPLASH_ACCESS_KEY", "").strip()
+    if not access_key:
+        print("FOUT: UNSPLASH_ACCESS_KEY ontbreekt in .env")
+        print("      Gratis aanmaken op: https://unsplash.com/developers")
+        sys.exit(1)
+
+    print(f"  Unsplash afbeelding zoeken voor: '{query}'...")
+    search_url = "https://api.unsplash.com/search/photos"
+    params = {
+        "query": query,
+        "orientation": "landscape",
+        "per_page": 1,
+        "order_by": "relevant",
+    }
+    headers = {"Authorization": f"Client-ID {access_key}"}
+    r = requests.get(search_url, params=params, headers=headers, timeout=15)
+    r.raise_for_status()
+
+    results = r.json().get("results", [])
+    if not results:
+        print(f"  Geen Unsplash resultaten voor '{query}', probeer bredere zoekterm.")
+        sys.exit(1)
+
+    photo = results[0]
+    download_url = photo["urls"]["regular"]  # 1080px breed
+    attribution = f"{photo['user']['name']} via Unsplash"
+
+    img_r = requests.get(download_url, timeout=30)
+    img_r.raise_for_status()
+    print(f"  Foto gevonden: {attribution} ✓")
+    return img_r.content
+
+
+def upload_image_to_wordpress(
+    image_bytes: bytes,
+    filename: str,
+    auth_headers: dict,
+) -> int:
+    """Upload afbeelding naar WordPress mediabibliotheek. Retourneert media-ID."""
+    upload_url = f"{API_BASE}/media"
+
+    # Verwijder Content-Type uit de auth headers — requests stelt multipart in
+    upload_headers = {k: v for k, v in auth_headers.items() if k != "Content-Type"}
+    upload_headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+    print(f"  Uploaden naar WordPress media...")
+    response = requests.post(
+        upload_url,
+        headers=upload_headers,
+        data=image_bytes,
+        timeout=60,
+    )
+
+    if response.status_code in (200, 201):
+        media_id = response.json().get("id")
+        print(f"  Media geüpload ✓  (ID: {media_id})")
+        return media_id
+    else:
+        print(f"  WAARSCHUWING: Media upload mislukt (HTTP {response.status_code})")
+        try:
+            print(f"  {response.json().get('message', response.text[:150])}")
+        except Exception:
+            pass
+        return 0
+
+
+def create_draft_post(parsed: dict, headers: dict, dry_run: bool, media_id: int = 0) -> None:
     """Maak een draft post aan in WordPress."""
     html_content = markdown_to_html(parsed["markdown"])
 
@@ -133,20 +252,23 @@ def create_draft_post(parsed: dict, headers: dict, dry_run: bool) -> None:
         "slug": parsed["slug"],
         "content": html_content,
         "status": "draft",
-        "categories": [],   # Vul in met category-ID indien gewenst
+        "categories": [],
         "meta": {
-            # Yoast SEO velden (werkt alleen als Yoast actief is)
             "_yoast_wpseo_focuskw": parsed["seo_focus"].split(",")[0].strip(),
             "_yoast_wpseo_metadesc": f"Lees hoe {parsed['seo_focus']} jouw bedrijf raakt — Brand is Code.",
         },
     }
 
+    if media_id:
+        payload["featured_media"] = media_id
+
     if dry_run:
         print("\n── DRY RUN — Geen wijzigingen gemaakt ──────────────────────────")
-        print(f"  Titel:      {payload['title']}")
-        print(f"  Slug:       {payload['slug']}")
-        print(f"  SEO focus:  {parsed['seo_focus']}")
-        print(f"  Status:     {payload['status']}")
+        print(f"  Titel:          {payload['title']}")
+        print(f"  Slug:           {payload['slug']}")
+        print(f"  SEO focus:      {parsed['seo_focus']}")
+        print(f"  Status:         {payload['status']}")
+        print(f"  Featured image: {'media_id=' + str(media_id) if media_id else 'geen'}")
         print(f"\n  HTML preview (eerste 400 tekens):\n")
         print(html_content[:400] + "...")
         print("\n────────────────────────────────────────────────────────────────")
@@ -164,6 +286,8 @@ def create_draft_post(parsed: dict, headers: dict, dry_run: bool) -> None:
         print(f"  Post ID:  {post_id}")
         print(f"  Bewerk:   {edit_url}")
         print(f"  Status:   {post.get('status')}")
+        if media_id:
+            print(f"  Afbeelding: featured image ingesteld (media {media_id})")
     else:
         print(f"\nFOUT: WordPress gaf HTTP {response.status_code}")
         try:
@@ -184,8 +308,13 @@ def main():
     parser.add_argument(
         "file",
         nargs="?",
-        help="Pad naar BLOG-*.md bestand (bijv. docs/BLOG-01-CRM-DATA-DRAFT.md). "
-             "Laat leeg voor automatische detectie van het nieuwste bestand.",
+        help="Pad naar BLOG-*.md bestand. Laat leeg voor automatische detectie.",
+    )
+    parser.add_argument(
+        "--image",
+        choices=["dalle", "unsplash"],
+        default=None,
+        help="Genereer een featured image: 'dalle' (DALL-E 3) of 'unsplash' (gratis stockfoto).",
     )
     parser.add_argument(
         "--dry-run",
@@ -214,16 +343,37 @@ def main():
 
     # Parseer bestand
     parsed = parse_blog_file(blog_path)
-    print(f"  Titel gevonden:  {parsed['title']}")
-    print(f"  SEO focus:       {parsed['seo_focus']}")
+    print(f"  Titel:     {parsed['title']}")
+    print(f"  SEO focus: {parsed['seo_focus']}")
 
-    # Credentials pas nodig bij echte publicatie
+    # Pillar uit bestand (voor DALL-E prompt)
+    pillar_match = re.search(r"^\*\*Pillar:\*\*\s*(.+)$",
+                             blog_path.read_text(), re.MULTILINE)
+    pillar = pillar_match.group(1).strip() if pillar_match else "data strategie"
+
     if args.dry_run:
         create_draft_post(parsed, headers={}, dry_run=True)
-    else:
-        user, password = load_credentials()
-        headers = auth_header(user, password)
-        create_draft_post(parsed, headers, dry_run=False)
+        return
+
+    # Credentials laden
+    user, password = load_credentials()
+    headers = auth_header(user, password)
+
+    # Afbeelding genereren en uploaden
+    media_id = 0
+    if args.image == "dalle":
+        image_bytes = generate_image_dalle(parsed["title"], pillar)
+        safe_slug = re.sub(r"[^a-z0-9]+", "-", parsed["title"].lower()).strip("-")
+        media_id = upload_image_to_wordpress(image_bytes, f"{safe_slug}.png", headers)
+    elif args.image == "unsplash":
+        # Gebruik SEO-focus als zoekterm, val terug op titel
+        query = parsed["seo_focus"].split(",")[0].strip() or parsed["title"]
+        image_bytes = fetch_image_unsplash(query)
+        safe_slug = re.sub(r"[^a-z0-9]+", "-", parsed["title"].lower()).strip("-")
+        media_id = upload_image_to_wordpress(image_bytes, f"{safe_slug}.jpg", headers)
+
+    # Post aanmaken
+    create_draft_post(parsed, headers, dry_run=False, media_id=media_id)
 
 
 if __name__ == "__main__":
