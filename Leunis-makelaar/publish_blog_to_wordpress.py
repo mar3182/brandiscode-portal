@@ -7,22 +7,31 @@ en plaatst alles als concept (draft) in WordPress via de REST API.
 
 GEBRUIK:
     python3 publish_blog_to_wordpress.py docs/BLOG-01-CRM-DATA-DRAFT.md
+    python3 publish_blog_to_wordpress.py docs/BLOG-01-CRM-DATA-DRAFT.md --image pexels
     python3 publish_blog_to_wordpress.py docs/BLOG-01-CRM-DATA-DRAFT.md --image dalle
-    python3 publish_blog_to_wordpress.py docs/BLOG-01-CRM-DATA-DRAFT.md --image unsplash
+    python3 publish_blog_to_wordpress.py docs/BLOG-01-CRM-DATA-DRAFT.md --photo-advice
     python3 publish_blog_to_wordpress.py docs/BLOG-01-CRM-DATA-DRAFT.md --dry-run
 
 AFBEELDINGSBRONNEN:
+    --image pexels    Gratis Pexels stockfoto. Vereist PEXELS_API_KEY in .env
+    --image unsplash  Gratis Unsplash stockfoto. Vereist UNSPLASH_ACCESS_KEY in .env
     --image dalle     DALL-E 3 via OpenAI (~€0,04/afbeelding). Vereist OPENAI_API_KEY in .env
-    --image unsplash  Gratis stockfoto via Unsplash. Vereist UNSPLASH_ACCESS_KEY in .env
+    --image free      Loremflickr, geen key nodig (lage relevantie)
     (geen --image)    Geen featured image, alleen tekst
+
+FOTO ADVIES (eigen camera):
+    --photo-advice    Geeft een shooting brief voor jouw Canon EOS R7 kit:
+                      Sigma 18-35mm f/1.8 Art | RF 50mm f/1.8
+                      Geen WordPress-actie — alleen advies uitprinten.
 
 VEREISTEN:
     pip install markdown requests openai
     .env bestand:
         WP_USER             — WordPress-gebruikersnaam
         WP_APP_PASSWORD     — Application Password
-        OPENAI_API_KEY      — alleen bij --image dalle
-        UNSPLASH_ACCESS_KEY — alleen bij --image unsplash
+        PEXELS_API_KEY      — bij --image pexels  (gratis: pexels.com/api)
+        OPENAI_API_KEY      — bij --image dalle of --photo-advice (optioneel)
+        UNSPLASH_ACCESS_KEY — bij --image unsplash
 """
 
 import os
@@ -219,6 +228,41 @@ def fetch_image_unsplash(query: str) -> bytes:
     return img_r.content
 
 
+def fetch_image_pexels(query: str) -> bytes:
+    """Haal een relevante foto op via de Pexels API. Retourneert bytes."""
+    api_key = os.environ.get("PEXELS_API_KEY", "").strip()
+    if not api_key:
+        print("FOUT: PEXELS_API_KEY ontbreekt in .env")
+        print("      Gratis key aanmaken op: https://www.pexels.com/api/")
+        sys.exit(1)
+
+    query_en = _nl_to_en_query(query)
+    print(f"  Pexels afbeelding zoeken voor: '{query_en}'...")
+    r = requests.get(
+        "https://api.pexels.com/v1/search",
+        headers={"Authorization": api_key},
+        params={"query": query_en, "orientation": "landscape", "per_page": 1, "size": "large"},
+        timeout=15,
+    )
+
+    if r.status_code == 401:
+        print("FOUT: Ongeldige Pexels API key. Controleer je .env")
+        sys.exit(1)
+
+    r.raise_for_status()
+    photos = r.json().get("photos", [])
+    if not photos:
+        print(f"  Geen Pexels resultaten voor '{query_en}', val terug op loremflickr...")
+        return fetch_image_free(query_en)
+
+    photo_url = photos[0]["src"]["large2x"]
+    photographer = photos[0]["photographer"]
+    img_r = requests.get(photo_url, timeout=30)
+    img_r.raise_for_status()
+    print(f"  Foto gevonden: {photographer} via Pexels ✓")
+    return img_r.content
+
+
 def fetch_image_free(query: str) -> bytes:
     """
     Haal een gratis foto op via loremflickr.com — geen API key nodig.
@@ -232,6 +276,125 @@ def fetch_image_free(query: str) -> bytes:
     r.raise_for_status()
     print(f"  Foto gevonden via loremflickr ✓")
     return r.content
+
+
+# ── Fotografie-advies (eigen camera) ─────────────────────────────────────────
+
+# Gear specificaties
+CAMERA_GEAR = {
+    "body": "Canon EOS R7 (32.5MP APS-C, IBIS, 4K)",
+    "lenses": [
+        {
+            "name": "Sigma 18-35mm f/1.8 Art (via adapter)",
+            "focal_range": "18-35mm (≈29-56mm FF equivalent op APS-C)",
+            "strengths": "Scherpe achtergrond-context, werkruimte, omgevingsshots, storytelling met diepte",
+            "sweet_spot": "f/2.8, 24mm",
+        },
+        {
+            "name": "RF 50mm f/1.8 STM",
+            "focal_range": "50mm (≈80mm FF equivalent op APS-C)",
+            "strengths": "Scherpgestelde details, scherm/laptop close-up, portret-stijl productshot, bokeh",
+            "sweet_spot": "f/2.2, 50mm",
+        },
+    ],
+}
+
+# Pillar → visuele stijlrichtlijn
+PILLAR_VISUAL_GUIDE = {
+    "Data als kompas": {
+        "concept": "Data die richting geeft: dashboards, grafieken op scherm, notities en aantekeningen",
+        "mood": "Helder, overzichtelijk, gefocust",
+        "light": "Zacht daglicht van opzij (raam), of warm bureaulamp",
+        "props": "Laptop met open dashboard, notitieboek, pen, koffie op bureau",
+    },
+    "Code als fundament": {
+        "concept": "Het systeem dat werkt: code-editor op scherm, server-rack, handen op toetsenbord",
+        "mood": "Donker, technisch, gestructureerd",
+        "light": "Scherm-glow in donkere ruimte, of directe bureaulamp op toetsenbord",
+        "props": "Code-editor, terminal venster, meerdere schermen",
+    },
+    "AI als versneller": {
+        "concept": "Mens en technologie samen: handen op laptop met AI-interface, grafiek die stijgt",
+        "mood": "Energiek, toekomstgericht, optimistisch",
+        "light": "Helder natuurlijk licht, schoon en fris",
+        "props": "Laptop, telefoon met app, whiteboard met pijlen omhoog",
+    },
+    "Architectuur als strategie": {
+        "concept": "Overzicht en planning: plattegrond/schema op whiteboard, vogelvlucht perspectief",
+        "mood": "Strategisch, kalm, doordacht",
+        "light": "Egaal daglicht, geen harde schaduwen",
+        "props": "Whiteboard met schema's, post-its, overhead shot van bureau met documenten",
+    },
+    "Positionering": {
+        "concept": "Identiteit en vertrouwen: persoonlijk portret, of Brand is Code branding in context",
+        "mood": "Professioneel, menselijk, zelfverzekerd",
+        "light": "Portrait lighting: raamlicht van voren-opzij, reflector of wit vel als fill",
+        "props": "Neutraal of merkkleur achtergrond, laptop als prop",
+    },
+}
+
+
+def generate_photo_advice(parsed: dict, pillar: str) -> None:
+    """Print een gedetailleerde shooting brief voor de Canon EOS R7 kit."""
+    guide = PILLAR_VISUAL_GUIDE.get(pillar, PILLAR_VISUAL_GUIDE["Data als kompas"])
+
+    # Kies lens op basis van pillar
+    if pillar in ("Architectuur als strategie", "Code als fundament"):
+        primary_lens = CAMERA_GEAR["lenses"][0]  # Sigma 18-35mm — omgeving
+        secondary_lens = CAMERA_GEAR["lenses"][1]  # RF 50mm — details
+    elif pillar == "Positionering":
+        primary_lens = CAMERA_GEAR["lenses"][1]  # RF 50mm — portret
+        secondary_lens = CAMERA_GEAR["lenses"][0]
+    else:
+        primary_lens = CAMERA_GEAR["lenses"][0]  # Sigma 18-35mm — context
+        secondary_lens = CAMERA_GEAR["lenses"][1]  # RF 50mm — detail
+
+    print()
+    print("═" * 62)
+    print(f"  FOTOGRAFIE BRIEF — {parsed['title'][:45]}")
+    print("═" * 62)
+    print(f"  Camera:   {CAMERA_GEAR['body']}")
+    print()
+    print(f"  CONCEPT")
+    print(f"  {guide['concept']}")
+    print()
+    print(f"  MOOD / STIJL")
+    print(f"  {guide['mood']}")
+    print()
+    print(f"  PRIMAIRE LENS  →  {primary_lens['name']}")
+    print(f"  Gebruik voor:  {primary_lens['strengths']}")
+    print(f"  Sweet spot:    {primary_lens['sweet_spot']}")
+    print()
+    print(f"  INSTELLINGEN (primaire shot)")
+    aperture = primary_lens['sweet_spot'].split(',')[0].strip()
+    print(f"  Mode:      Av (Aperture Priority)")
+    print(f"  Diafragma: {aperture}")
+    print(f"  ISO:       Auto (max 3200 met IBIS aan)")
+    print(f"  Sluitertijd: laat camera bepalen, min. 1/60s")
+    print(f"  Picture Style: Neutraal (bewerk in Lightroom)")
+    print(f"  RAW + JPEG: aan")
+    print()
+    print(f"  DETAIL LENS  →  {secondary_lens['name']}")
+    print(f"  Gebruik voor: {secondary_lens['strengths']}")
+    print(f"  Sweet spot:   {secondary_lens['sweet_spot']}")
+    print()
+    print(f"  LICHT")
+    print(f"  {guide['light']}")
+    print()
+    print(f"  PROPS / SCENE")
+    print(f"  {guide['props']}")
+    print()
+    print(f"  COMPOSITIE TIPS")
+    print(f"  • Regel van derden: onderwerp op snijpunten")
+    print(f"  • Zorg voor 1 scherp focal point, rest zacht (bokeh)")
+    print(f"  • Maak 3 varianten: wide (18-24mm), medium (35mm), close-up (50mm)")
+    print(f"  • Scherm/laptop altijd met zichtbare maar niet afleide inhoud")
+    print()
+    print(f"  BESTANDSNAAM VOOR WORDPRESS")
+    safe = re.sub(r'[^a-z0-9]+', '-', parsed['title'].lower()).strip('-')
+    print(f"  blog-{safe[:40]}-hero.jpg")
+    print("═" * 62)
+    print()
 
 
 def _nl_to_en_query(query: str) -> str:
@@ -361,14 +524,20 @@ def main():
     )
     parser.add_argument(
         "--image",
-        choices=["dalle", "unsplash", "free"],
+        choices=["pexels", "dalle", "unsplash", "free"],
         default=None,
         help=(
             "Genereer een featured image: "
-            "'free' (geen key nodig, loremflickr), "
-            "'unsplash' (gratis Unsplash key nodig), "
+            "'pexels' (aanbevolen, gratis key via pexels.com/api), "
+            "'free' (geen key nodig), "
+            "'unsplash' (Unsplash key nodig), "
             "'dalle' (DALL-E 3, OpenAI key nodig)."
         ),
+    )
+    parser.add_argument(
+        "--photo-advice",
+        action="store_true",
+        help="Print een shooting brief voor je Canon EOS R7 kit. Geen WordPress-actie.",
     )
     parser.add_argument(
         "--dry-run",
@@ -400,10 +569,16 @@ def main():
     print(f"  Titel:     {parsed['title']}")
     print(f"  SEO focus: {parsed['seo_focus']}")
 
-    # Pillar uit bestand (voor DALL-E prompt)
+    # Pillar uit bestand (voor DALL-E prompt en foto-advies)
     pillar_match = re.search(r"^\*\*Pillar:\*\*\s*(.+)$",
                              blog_path.read_text(), re.MULTILINE)
-    pillar = pillar_match.group(1).strip() if pillar_match else "data strategie"
+    pillar = pillar_match.group(1).strip() if pillar_match else "Data als kompas"
+
+    # Foto-advies: altijd eerst printen, ook gecombineerd met --dry-run
+    if args.photo_advice:
+        generate_photo_advice(parsed, pillar)
+        if not args.image and not args.dry_run:
+            return
 
     if args.dry_run:
         create_draft_post(parsed, headers={}, dry_run=True)
@@ -415,19 +590,21 @@ def main():
 
     # Afbeelding genereren en uploaden
     media_id = 0
-    if args.image == "dalle":
+    safe_slug = re.sub(r"[^a-z0-9]+", "-", parsed["title"].lower()).strip("-")
+    if args.image == "pexels":
+        query = parsed["seo_focus"].split(",")[0].strip() or parsed["title"]
+        image_bytes = fetch_image_pexels(query)
+        media_id = upload_image_to_wordpress(image_bytes, f"{safe_slug}.jpg", headers)
+    elif args.image == "dalle":
         image_bytes = generate_image_dalle(parsed["title"], pillar)
-        safe_slug = re.sub(r"[^a-z0-9]+", "-", parsed["title"].lower()).strip("-")
         media_id = upload_image_to_wordpress(image_bytes, f"{safe_slug}.png", headers)
     elif args.image == "unsplash":
         query = parsed["seo_focus"].split(",")[0].strip() or parsed["title"]
         image_bytes = fetch_image_unsplash(query)
-        safe_slug = re.sub(r"[^a-z0-9]+", "-", parsed["title"].lower()).strip("-")
         media_id = upload_image_to_wordpress(image_bytes, f"{safe_slug}.jpg", headers)
     elif args.image == "free":
         query = parsed["seo_focus"].split(",")[0].strip() or parsed["title"]
         image_bytes = fetch_image_free(query)
-        safe_slug = re.sub(r"[^a-z0-9]+", "-", parsed["title"].lower()).strip("-")
         media_id = upload_image_to_wordpress(image_bytes, f"{safe_slug}.jpg", headers)
 
     # Post aanmaken
