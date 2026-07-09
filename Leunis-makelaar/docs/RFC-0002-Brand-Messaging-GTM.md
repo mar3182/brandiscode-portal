@@ -2,7 +2,7 @@
 
 **RFC ID:** RFC-0002
 **Version:** 1.0
-**Status:** Draft
+**Status:** Accepted
 **Owner:** Brand is Code — Strateeg
 **Date:** 2026-07-09
 

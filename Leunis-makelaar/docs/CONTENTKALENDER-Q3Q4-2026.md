@@ -235,20 +235,20 @@ Wat heeft een gezond MKB-bedrijf qua informatiesystemen nodig? Een concreet over
 
 ## Publicatieplanning Q3/Q4 2026
 
-| Week  | Start  | Blog #  | Status  |
-| ----- | ------ | ------- | ------- |
-| Wk 1  | 14 jul | Blog 1  | Gepland |
-| Wk 2  | 21 jul | Blog 2  | Gepland |
-| Wk 3  | 28 jul | Blog 3  | Gepland |
-| Wk 4  | 4 aug  | Blog 4  | Gepland |
-| Wk 5  | 11 aug | Blog 5  | Gepland |
-| Wk 6  | 18 aug | Blog 6  | Gepland |
-| Wk 7  | 25 aug | Blog 7  | Gepland |
-| Wk 8  | 1 sep  | Blog 8  | Gepland |
-| Wk 9  | 8 sep  | Blog 9  | Gepland |
-| Wk 10 | 15 sep | Blog 10 | Gepland |
-| Wk 11 | 22 sep | Blog 11 | Gepland |
-| Wk 12 | 29 sep | Blog 12 | Gepland |
+| Week  | Start     | Blog #  | Status            |
+| ----- | --------- | ------- | ----------------- |
+| Wk 1  | **9 jul** | Blog 1  | **In uitvoering** |
+| Wk 2  | 21 jul    | Blog 2  | Gepland           |
+| Wk 3  | 28 jul    | Blog 3  | Gepland           |
+| Wk 4  | 4 aug     | Blog 4  | Gepland           |
+| Wk 5  | 11 aug    | Blog 5  | Gepland           |
+| Wk 6  | 18 aug    | Blog 6  | Gepland           |
+| Wk 7  | 25 aug    | Blog 7  | Gepland           |
+| Wk 8  | 1 sep     | Blog 8  | Gepland           |
+| Wk 9  | 8 sep     | Blog 9  | Gepland           |
+| Wk 10 | 15 sep    | Blog 10 | Gepland           |
+| Wk 11 | 22 sep    | Blog 11 | Gepland           |
+| Wk 12 | 29 sep    | Blog 12 | Gepland           |
 
 ---
 

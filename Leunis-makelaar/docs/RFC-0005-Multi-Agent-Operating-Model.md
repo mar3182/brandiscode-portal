@@ -109,7 +109,7 @@ Sprint einde:
 
 ---
 
-## Sprint Plan: Sprint 1 (Week 1–2, start: 2026-07-14)
+## Sprint Plan: Sprint 1 (Week 1–2, start: 2026-07-09 — doel: productie voor 2026-07-16)
 
 ### Track A — Merk & Website (Strateeg + Frontend)
 
