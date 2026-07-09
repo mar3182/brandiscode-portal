@@ -64,8 +64,16 @@ const SUPPORTED_IMAGE_MIME_TYPES = new Set([
 ])
 
 const AUTO_CONVERT_IMAGE_MIME_TYPES = new Set(['image/heic', 'image/heif'])
+const PROMPT_EXTENSION_STORAGE_KEY = 'funda-agent-prompt-extensions-v1'
 const PROMPT_ADDITION_STORAGE_KEY = 'funda-agent-prompt-addition'
+const PROMPT_EXTENSION_MAX_CHARS = 320
 const PROMPT_ADDITION_MAX_CHARS = 800
+
+type PromptExtensionItem = {
+  id: string
+  text: string
+  enabled: boolean
+}
 
 interface FormState {
   woningtype: string
@@ -113,21 +121,54 @@ export default function FundaTekstPage() {
   const [verfijnLoading, setVerfijnLoading] = useState(false)
   const [copiedTab, setCopiedTab] = useState<MediaFormat | null>(null)
   const [verfijnSuccess, setVerfijnSuccess] = useState(false)
-  const [promptAdditionDraft, setPromptAdditionDraft] = useState('')
-  const [savedPromptAddition, setSavedPromptAddition] = useState('')
+  const [promptExtensionDraft, setPromptExtensionDraft] = useState('')
+  const [promptExtensions, setPromptExtensions] = useState<PromptExtensionItem[]>([])
   const [promptNotice, setPromptNotice] = useState('')
   const [applyVerfijnToFuture, setApplyVerfijnToFuture] = useState(false)
   const lastRequestRef = useRef<FundaTekstRequest | null>(null)
 
   useEffect(() => {
-    const saved = localStorage.getItem(PROMPT_ADDITION_STORAGE_KEY) ?? ''
-    const normalized = normalizePromptAddition(saved)
-    setSavedPromptAddition(normalized)
-    setPromptAdditionDraft(normalized)
+    const savedJson = localStorage.getItem(PROMPT_EXTENSION_STORAGE_KEY)
+    if (savedJson) {
+      try {
+        const parsed = JSON.parse(savedJson) as PromptExtensionItem[]
+        const normalizedItems = parsed
+          .filter((item) => item && typeof item.id === 'string' && typeof item.text === 'string')
+          .map((item) => ({
+            id: item.id,
+            text: normalizePromptExtensionText(item.text),
+            enabled: Boolean(item.enabled),
+          }))
+          .filter((item) => item.text)
+
+        setPromptExtensions(normalizedItems)
+        return
+      } catch {
+        // Fallback to legacy key below.
+      }
+    }
+
+    const legacy = normalizePromptExtensionText(localStorage.getItem(PROMPT_ADDITION_STORAGE_KEY) ?? '')
+    if (legacy) {
+      setPromptExtensions([{ id: crypto.randomUUID(), text: legacy, enabled: true }])
+      localStorage.removeItem(PROMPT_ADDITION_STORAGE_KEY)
+    }
   }, [])
 
-  function normalizePromptAddition(value: string): string {
-    return value.trim().slice(0, PROMPT_ADDITION_MAX_CHARS)
+  useEffect(() => {
+    localStorage.setItem(PROMPT_EXTENSION_STORAGE_KEY, JSON.stringify(promptExtensions))
+  }, [promptExtensions])
+
+  function normalizePromptExtensionText(value: string): string {
+    return value.trim().slice(0, PROMPT_EXTENSION_MAX_CHARS)
+  }
+
+  function buildPromptAdditionFromList(items: PromptExtensionItem[]): string {
+    return items
+      .filter((item) => item.enabled)
+      .map((item) => `- ${item.text}`)
+      .join('\n')
+      .slice(0, PROMPT_ADDITION_MAX_CHARS)
   }
 
   function setPromptNoticeMessage(message: string) {
@@ -135,26 +176,34 @@ export default function FundaTekstPage() {
     setTimeout(() => setPromptNotice(''), 3000)
   }
 
-  function savePromptAddition(value: string) {
-    const normalized = normalizePromptAddition(value)
-    setSavedPromptAddition(normalized)
-    setPromptAdditionDraft(normalized)
-    if (normalized) {
-      localStorage.setItem(PROMPT_ADDITION_STORAGE_KEY, normalized)
-      setPromptNoticeMessage('Standaard prompt-uitbreiding opgeslagen.')
-      return
-    }
-    localStorage.removeItem(PROMPT_ADDITION_STORAGE_KEY)
-    setPromptNoticeMessage('Standaard prompt-uitbreiding verwijderd.')
+  function addPromptExtension(text: string) {
+    const normalized = normalizePromptExtensionText(text)
+    if (!normalized) return
+
+    setPromptExtensions((prev) => {
+      const existing = prev.find((item) => item.text.toLowerCase() === normalized.toLowerCase())
+      if (existing) {
+        return prev.map((item) =>
+          item.id === existing.id ? { ...item, enabled: true } : item
+        )
+      }
+      return [{ id: crypto.randomUUID(), text: normalized, enabled: true }, ...prev]
+    })
   }
 
-  function mergePromptAddition(existing: string, addition: string): string {
-    const cleanExisting = normalizePromptAddition(existing)
-    const cleanAddition = normalizePromptAddition(addition)
-    if (!cleanAddition) return cleanExisting
-    if (!cleanExisting) return cleanAddition
-    if (cleanExisting.includes(cleanAddition)) return cleanExisting
-    return normalizePromptAddition(`${cleanExisting}\n${cleanAddition}`)
+  function togglePromptExtension(id: string) {
+    setPromptExtensions((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, enabled: !item.enabled } : item))
+    )
+  }
+
+  function removePromptExtension(id: string) {
+    setPromptExtensions((prev) => prev.filter((item) => item.id !== id))
+  }
+
+  function clearPromptExtensions() {
+    setPromptExtensions([])
+    setPromptNoticeMessage('Alle prompt-uitbreidingen verwijderd.')
   }
 
   function updateForm(field: keyof FormState, value: string) {
@@ -187,6 +236,8 @@ export default function FundaTekstPage() {
   }
 
   async function handleGenerate(request?: FundaTekstRequest) {
+    const activePromptAddition = buildPromptAdditionFromList(promptExtensions)
+
     if (!request) {
       if (!validate()) return
       request = {
@@ -203,7 +254,7 @@ export default function FundaTekstPage() {
         bijzonderheden: form.bijzonderheden || undefined,
         lengte: form.lengte,
         images: images.length > 0 ? images : undefined,
-        prompt_addition: savedPromptAddition || undefined,
+        prompt_addition: activePromptAddition || undefined,
       }
     }
 
@@ -377,6 +428,8 @@ export default function FundaTekstPage() {
 
   async function handleGenerateAll() {
     if (!validate()) return
+    const activePromptAddition = buildPromptAdditionFromList(promptExtensions)
+
     const request: FundaTekstRequest = {
       woningtype: form.woningtype,
       adres: form.adres.trim(),
@@ -391,7 +444,7 @@ export default function FundaTekstPage() {
       bijzonderheden: form.bijzonderheden || undefined,
       lengte: form.lengte,
       images: images.length > 0 ? images : undefined,
-      prompt_addition: savedPromptAddition || undefined,
+      prompt_addition: activePromptAddition || undefined,
     }
     lastRequestRef.current = request
     setLoading(true)
@@ -450,8 +503,8 @@ export default function FundaTekstPage() {
       setVerfijnInput('')
 
       if (applyVerfijnToFuture) {
-        const merged = mergePromptAddition(savedPromptAddition, refinementInstruction)
-        savePromptAddition(merged)
+        addPromptExtension(refinementInstruction)
+        setPromptNoticeMessage('Verfijn-instructie toegevoegd aan prompt-uitbreidingen.')
       }
 
       setVerfijnSuccess(true)
@@ -822,13 +875,13 @@ export default function FundaTekstPage() {
 
             <textarea
               className={`${INPUT_CLASS} min-h-[92px] resize-y text-sm`}
-              value={promptAdditionDraft}
-              onChange={(e) => setPromptAdditionDraft(e.target.value.slice(0, PROMPT_ADDITION_MAX_CHARS))}
+              value={promptExtensionDraft}
+              onChange={(e) => setPromptExtensionDraft(e.target.value.slice(0, PROMPT_EXTENSION_MAX_CHARS))}
               placeholder="Bijv. Spreek de lezer direct aan met je/u en schrijf persoonlijker, zonder feiten toe te voegen."
             />
             <div className="flex items-center justify-between mt-2 text-xs text-white/35">
-              <span>{promptAdditionDraft.length}/{PROMPT_ADDITION_MAX_CHARS}</span>
-              {savedPromptAddition && <span className="text-green-300/90">Standaard actief</span>}
+              <span>{promptExtensionDraft.length}/{PROMPT_EXTENSION_MAX_CHARS}</span>
+              {promptExtensions.length > 0 && <span className="text-green-300/90">{promptExtensions.filter((item) => item.enabled).length} actief</span>}
             </div>
 
             {promptNotice && (
@@ -840,19 +893,50 @@ export default function FundaTekstPage() {
             <div className="flex gap-2 mt-3">
               <button
                 type="button"
-                onClick={() => savePromptAddition(promptAdditionDraft)}
+                onClick={() => {
+                  const normalized = normalizePromptExtensionText(promptExtensionDraft)
+                  if (!normalized) return
+                  addPromptExtension(normalized)
+                  setPromptExtensionDraft('')
+                  setPromptNoticeMessage('Prompt-uitbreiding toegevoegd.')
+                }}
                 className="px-4 py-2 rounded-xl bg-brand-blue/20 border border-brand-blue/40 text-brand-blue text-xs font-medium hover:bg-brand-blue/30 transition-all"
               >
-                Opslaan als standaard
+                Toevoegen
               </button>
               <button
                 type="button"
-                onClick={() => savePromptAddition('')}
+                onClick={clearPromptExtensions}
                 className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white/60 text-xs font-medium hover:bg-white/10 hover:text-white transition-all"
               >
-                Resetten
+                Alles verwijderen
               </button>
             </div>
+
+            {promptExtensions.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {promptExtensions.map((item) => (
+                  <div key={item.id} className="flex items-start gap-2 p-2.5 rounded-lg bg-white/5 border border-white/10">
+                    <input
+                      type="checkbox"
+                      checked={item.enabled}
+                      onChange={() => togglePromptExtension(item.id)}
+                      className="mt-0.5 rounded border-white/20 bg-white/5 text-brand-blue focus:ring-brand-blue/40"
+                    />
+                    <div className="flex-1 text-xs text-white/75 leading-relaxed">
+                      {item.text}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removePromptExtension(item.id)}
+                      className="text-xs text-red-300/80 hover:text-red-200 transition-colors"
+                    >
+                      Verwijder
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Genereer knoppen */}
