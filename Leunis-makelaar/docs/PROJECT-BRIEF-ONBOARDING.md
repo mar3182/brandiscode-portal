@@ -11,12 +11,16 @@ Dit document blijft de bron voor de onboarding-basis. Voor actuele Sprint 1 Leun
 1. `docs/PLAN-VAN-AANPAK-PORTAL.md` — actuele scope, status en termijnen
 2. `docs/TRAINING-COMMUNICATIE-TEMPLATES.md` — klantcommunicatie templates (incl. planningswijzigingen)
 3. `docs/DATA-SAFETY-PROTOCOL.md` — verplichte data safety aanpak voor alle agents
+4. `docs/Data-First AI Platform-Strategy.md` — RFC-0001 (foundational)
+5. `docs/RFC-GOVERNANCE.md` — RFC governance regels
 
 Werkwijze voor alle agents:
 
 - Lees altijd sectie 0 van dit document + bovengenoemde documenten bij start.
 - Bij statuswijzigingen: update eerst `docs/PLAN-VAN-AANPAK-PORTAL.md`, daarna dit document als onboarding-impact wijzigt.
 - Datawijzigingen (SQL/API/seed) mogen alleen door met expliciete Data Safety Gate check uit `docs/DATA-SAFETY-PROTOCOL.md`.
+- Geen feature of architectuurbeslissing mag in conflict zijn met RFC-0001.
+- Nieuwe RFC's moeten RFC-0001 expliciet refereren volgens `docs/RFC-TEMPLATE.md`.
 
 ---
 
@@ -217,6 +221,16 @@ De onboarding is af wanneer:
 - [ ] Admin ziet voortgang per klant
 - [ ] `npx tsc --noEmit` EXIT:0
 - [ ] Live op portal.brandiscode.com
+
+---
+
+## 10. RFC COMPLIANCE GATE (VERPLICHT)
+
+Voor elke architectuur- of scopewijziging moet expliciet worden vastgelegd:
+
+1. RFC-0001 alignment statement
+2. Referentie naar `docs/RFC-GOVERNANCE.md`
+3. Bij nieuwe RFC's: `Compatibility with RFC-0001` + `References` sectie volgens `docs/RFC-TEMPLATE.md`
 
 ---
 

@@ -301,11 +301,35 @@ jobs:
           All validated for destructive operations & required metadata.
           EOF
 
+  # Job 9: RFC Governance Check
+  rfc-governance-check:
+    name: RFC Governance Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate RFC references to RFC-0001
+        run: |
+          FAILED=0
+          for file in $(find docs -maxdepth 1 -type f -name 'RFC-*.md' ! -name 'RFC-0001*.md' 2>/dev/null); do
+            echo "Checking RFC reference: $file"
+            if ! grep -q "RFC-0001" "$file"; then
+              echo "❌ $file mist verplichte referentie naar RFC-0001"
+              FAILED=1
+            fi
+          done
+
+          if [ $FAILED -eq 1 ]; then
+            exit 1
+          fi
+          echo "✅ RFC governance check passed"
+
   # Summary: all quality gates must pass
   quality-gates-summary:
     name: Quality Gates Summary
     if: always()
-    needs: [lint, typecheck, test, build, dependency-check, secret-scan, migration-check]
+    needs: [lint, typecheck, test, build, dependency-check, secret-scan, migration-check, rfc-governance-check]
     runs-on: ubuntu-latest
     steps:
       - name: Check all gates passed
@@ -315,7 +339,8 @@ jobs:
              [[ "${{ needs.build.result }}" != "success" ]] || \
              [[ "${{ needs.dependency-check.result }}" != "success" ]] || \
              [[ "${{ needs.secret-scan.result }}" != "success" ]] || \
-             [[ "${{ needs.migration-check.result }}" != "success" ]]; then
+             [[ "${{ needs.migration-check.result }}" != "success" ]] || \
+             [[ "${{ needs.rfc-governance-check.result }}" != "success" ]]; then
             echo "❌ Quality gates FAILED"
             exit 1
           fi
@@ -335,13 +360,15 @@ jobs:
           echo "| Dependencies | ${{ needs.dependency-check.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Secrets | ${{ needs.secret-scan.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Migrations | ${{ needs.migration-check.result }} |" >> $GITHUB_STEP_SUMMARY
+           echo "| RFC Governance | ${{ needs.rfc-governance-check.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           if [[ "${{ needs.lint.result }}" == "success" ]] && \
              [[ "${{ needs.typecheck.result }}" == "success" ]] && \
              [[ "${{ needs.build.result }}" == "success" ]] && \
              [[ "${{ needs.dependency-check.result }}" == "success" ]] && \
              [[ "${{ needs.secret-scan.result }}" == "success" ]] && \
-             [[ "${{ needs.migration-check.result }}" == "success" ]]; then
+             [[ "${{ needs.migration-check.result }}" == "success" ]] && \
+             [[ "${{ needs.rfc-governance-check.result }}" == "success" ]]; then
             echo "**Result**: ✅ ALL PASSED — merge allowed" >> $GITHUB_STEP_SUMMARY
           else
             echo "**Result**: ❌ FAILED — fix required before merge" >> $GITHUB_STEP_SUMMARY

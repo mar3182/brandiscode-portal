@@ -1,5 +1,15 @@
 # CI/CD Architecture & Deployment Flow
 
+## RFC Compliance Foundation
+
+This CI/CD architecture must comply with RFC-0001 (Data-First AI Platform Strategy).
+
+Governance references:
+
+- `docs/Data-First AI Platform-Strategy.md` (RFC-0001)
+- `docs/RFC-GOVERNANCE.md`
+- `docs/RFC-TEMPLATE.md`
+
 ## System Architecture Overview
 
 ```mermaid

@@ -53,7 +53,8 @@ jobs:
               'Build Artifact',
               'Dependency Vulnerability Scan',
               'Secret & Credential Scan',
-              'Database Migration Safety Validation'
+              'Database Migration Safety Validation',
+              'RFC Governance Validation'
             ];
             
             const { data } = await github.rest.checks.listForRef({
