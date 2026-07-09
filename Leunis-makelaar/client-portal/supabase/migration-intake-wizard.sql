@@ -23,3 +23,6 @@ ALTER TABLE clients ADD COLUMN IF NOT EXISTS ai_goals text;
 
 -- Extra kolom op client_users voor functietitel
 ALTER TABLE client_users ADD COLUMN IF NOT EXISTS function_title text;
+
+-- Koppeling met Supabase Auth user voor portal-login en beheer
+ALTER TABLE client_users ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;
