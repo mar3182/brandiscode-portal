@@ -91,6 +91,7 @@ export async function POST(req: NextRequest) {
 
 Woningtype: ${body.woningtype}
 Adres: ${body.adres}
+${body.vraagprijs ? `Vraagprijs: ${body.vraagprijs}` : ''}
 ${body.bouwjaar ? `Bouwjaar: ${body.bouwjaar}` : ''}
 ${body.woonoppervlakte ? `Woonoppervlakte: ${body.woonoppervlakte} m²` : ''}
 ${body.perceeloppervlakte ? `Perceeloppervlakte: ${body.perceeloppervlakte} m²` : ''}

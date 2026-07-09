@@ -187,6 +187,7 @@ type PromptExtensionItem = {
 interface FormState {
   woningtype: string
   adres: string
+  vraagprijs: string
   bouwjaar: string
   woonoppervlakte: string
   perceeloppervlakte: string
@@ -202,6 +203,7 @@ interface FormState {
 const initialForm: FormState = {
   woningtype: 'Vrijstaande woning',
   adres: '',
+  vraagprijs: '',
   bouwjaar: '',
   woonoppervlakte: '',
   perceeloppervlakte: '',
@@ -303,6 +305,22 @@ export default function FundaTekstPage() {
     })
   }
 
+  function parseVraagprijs(value: string): number | null {
+    const digits = value.replace(/[^0-9]/g, '')
+    if (!digits) return null
+    const parsed = Number(digits)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  function derivePrijsklasseFromVraagprijs(value: string): Prijsklasse {
+    const amount = parseVraagprijs(value)
+    if (!amount) return 'onbekend'
+    if (amount < 325000) return 'starter'
+    if (amount < 550000) return 'midden'
+    if (amount < 850000) return 'hoog'
+    return 'luxe'
+  }
+
   function normalizeWoningtypeToTag(value: string): WoningtypeTag {
     const key = value.toLowerCase().trim()
     if (key.includes('vrijstaande')) return 'vrijstaande-woning'
@@ -329,11 +347,13 @@ export default function FundaTekstPage() {
   function scoreGalleryItem(item: PromptGalleryItem): number {
     const woningtypeTag = normalizeWoningtypeToTag(form.woningtype)
     const locatieTags = detectLocatieTags(form.ligging)
+    const derivedPrijsklasse = derivePrijsklasseFromVraagprijs(form.vraagprijs)
+    const actievePrijsklasse = derivedPrijsklasse !== 'onbekend' ? derivedPrijsklasse : form.prijsklasse
     let score = 0
 
     if (item.woningtypes.includes(woningtypeTag)) score += 3
-    if (item.prijsklasses.includes(form.prijsklasse)) score += 3
-    if (form.prijsklasse === 'onbekend') score += 1
+    if (item.prijsklasses.includes(actievePrijsklasse)) score += 3
+    if (actievePrijsklasse === 'onbekend') score += 1
 
     const matchedLocaties = locatieTags.filter((tag) => item.locaties.includes(tag)).length
     score += matchedLocaties * 2
@@ -435,6 +455,7 @@ export default function FundaTekstPage() {
       request = {
         woningtype: form.woningtype,
         adres: form.adres.trim(),
+        vraagprijs: form.vraagprijs.trim() || undefined,
         bouwjaar: form.bouwjaar || undefined,
         woonoppervlakte: form.woonoppervlakte || undefined,
         perceeloppervlakte: form.perceeloppervlakte || undefined,
@@ -625,6 +646,7 @@ export default function FundaTekstPage() {
     const request: FundaTekstRequest = {
       woningtype: form.woningtype,
       adres: form.adres.trim(),
+      vraagprijs: form.vraagprijs.trim() || undefined,
       bouwjaar: form.bouwjaar || undefined,
       woonoppervlakte: form.woonoppervlakte || undefined,
       perceeloppervlakte: form.perceeloppervlakte || undefined,
@@ -779,6 +801,18 @@ export default function FundaTekstPage() {
                 )}
               </div>
 
+              {/* Vraagprijs */}
+              <div>
+                <label className={LABEL_CLASS}>Vraagprijs</label>
+                <input
+                  type="text"
+                  className={INPUT_CLASS}
+                  placeholder="bijv. € 425.000 k.k."
+                  value={form.vraagprijs}
+                  onChange={(e) => updateForm('vraagprijs', e.target.value)}
+                />
+              </div>
+
               {/* Row: Bouwjaar + Kamers */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -870,6 +904,11 @@ export default function FundaTekstPage() {
                     </svg>
                   </div>
                 </div>
+                {derivePrijsklasseFromVraagprijs(form.vraagprijs) !== 'onbekend' && (
+                  <p className="mt-1 text-[11px] text-white/45">
+                    Automatisch afgeleid uit vraagprijs: {derivePrijsklasseFromVraagprijs(form.vraagprijs)}
+                  </p>
+                )}
               </div>
             </div>
           </div>
