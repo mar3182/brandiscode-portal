@@ -236,6 +236,7 @@ export default function FundaTekstPage() {
   const [promptExtensions, setPromptExtensions] = useState<PromptExtensionItem[]>([])
   const [promptNotice, setPromptNotice] = useState('')
   const [applyVerfijnToFuture, setApplyVerfijnToFuture] = useState(false)
+  const [showRelevantOnly, setShowRelevantOnly] = useState(false)
   const lastRequestRef = useRef<FundaTekstRequest | null>(null)
 
   useEffect(() => {
@@ -341,6 +342,9 @@ export default function FundaTekstPage() {
   }
 
   const sortedGalleryItems = [...PROMPT_GALLERY_ITEMS].sort((a, b) => scoreGalleryItem(b) - scoreGalleryItem(a))
+  const visibleGalleryItems = showRelevantOnly
+    ? sortedGalleryItems.filter((item) => scoreGalleryItem(item) > 0)
+    : sortedGalleryItems
 
   function togglePromptExtension(id: string) {
     setPromptExtensions((prev) =>
@@ -1166,8 +1170,18 @@ export default function FundaTekstPage() {
               Kies uit kant-en-klare verfijningsprompts. De lijst wordt automatisch gesorteerd op woningtype, ligging en prijsklasse.
             </p>
 
+            <label className="inline-flex items-center gap-2 mb-4 text-xs text-white/65">
+              <input
+                type="checkbox"
+                checked={showRelevantOnly}
+                onChange={(e) => setShowRelevantOnly(e.target.checked)}
+                className="rounded border-white/20 bg-white/5 text-brand-blue focus:ring-brand-blue/40"
+              />
+              Alleen relevante prompts tonen
+            </label>
+
             <div className="space-y-3">
-              {sortedGalleryItems.map((item) => (
+              {visibleGalleryItems.map((item) => (
                 <div key={item.id} className="p-3 rounded-xl bg-white/5 border border-white/10">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -1199,6 +1213,12 @@ export default function FundaTekstPage() {
                   </div>
                 </div>
               ))}
+
+              {visibleGalleryItems.length === 0 && (
+                <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-xs text-white/55">
+                  Geen prompts gevonden die matchen met de huidige woningselectie. Zet de filter uit om alle prompts te bekijken.
+                </div>
+              )}
             </div>
           </div>
 
