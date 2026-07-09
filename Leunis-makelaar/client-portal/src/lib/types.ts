@@ -275,6 +275,7 @@ export type FundaTekstRequest = {
   bijzonderheden?: string      // vrije tekst extra info
   lengte: 'kort' | 'normaal' | 'uitgebreid'  // kort ~200w, normaal ~400w, uitgebreid ~600w
   images?: string[]            // base64 data URLs van foto's / plattegrond (max 4)
+  prompt_addition?: string     // optionele, veilige uitbreidingsinstructie van gebruiker (basisprompt blijft leidend)
 }
 
 export type FundaTekstResponse = {

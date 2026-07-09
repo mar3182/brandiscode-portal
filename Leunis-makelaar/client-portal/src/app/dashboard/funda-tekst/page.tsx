@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Sparkles, Loader2, Copy, Check, RotateCcw, Upload, X, Pen } from 'lucide-react'
 import type { FundaTekstRequest, FundaTekstResponse, FundaMultiResponse, MediaFormat } from '@/lib/types'
 
@@ -64,6 +64,8 @@ const SUPPORTED_IMAGE_MIME_TYPES = new Set([
 ])
 
 const AUTO_CONVERT_IMAGE_MIME_TYPES = new Set(['image/heic', 'image/heif'])
+const PROMPT_ADDITION_STORAGE_KEY = 'funda-agent-prompt-addition'
+const PROMPT_ADDITION_MAX_CHARS = 800
 
 interface FormState {
   woningtype: string
@@ -111,7 +113,49 @@ export default function FundaTekstPage() {
   const [verfijnLoading, setVerfijnLoading] = useState(false)
   const [copiedTab, setCopiedTab] = useState<MediaFormat | null>(null)
   const [verfijnSuccess, setVerfijnSuccess] = useState(false)
+  const [promptAdditionDraft, setPromptAdditionDraft] = useState('')
+  const [savedPromptAddition, setSavedPromptAddition] = useState('')
+  const [promptNotice, setPromptNotice] = useState('')
+  const [applyVerfijnToFuture, setApplyVerfijnToFuture] = useState(false)
   const lastRequestRef = useRef<FundaTekstRequest | null>(null)
+
+  useEffect(() => {
+    const saved = localStorage.getItem(PROMPT_ADDITION_STORAGE_KEY) ?? ''
+    const normalized = normalizePromptAddition(saved)
+    setSavedPromptAddition(normalized)
+    setPromptAdditionDraft(normalized)
+  }, [])
+
+  function normalizePromptAddition(value: string): string {
+    return value.trim().slice(0, PROMPT_ADDITION_MAX_CHARS)
+  }
+
+  function setPromptNoticeMessage(message: string) {
+    setPromptNotice(message)
+    setTimeout(() => setPromptNotice(''), 3000)
+  }
+
+  function savePromptAddition(value: string) {
+    const normalized = normalizePromptAddition(value)
+    setSavedPromptAddition(normalized)
+    setPromptAdditionDraft(normalized)
+    if (normalized) {
+      localStorage.setItem(PROMPT_ADDITION_STORAGE_KEY, normalized)
+      setPromptNoticeMessage('Standaard prompt-uitbreiding opgeslagen.')
+      return
+    }
+    localStorage.removeItem(PROMPT_ADDITION_STORAGE_KEY)
+    setPromptNoticeMessage('Standaard prompt-uitbreiding verwijderd.')
+  }
+
+  function mergePromptAddition(existing: string, addition: string): string {
+    const cleanExisting = normalizePromptAddition(existing)
+    const cleanAddition = normalizePromptAddition(addition)
+    if (!cleanAddition) return cleanExisting
+    if (!cleanExisting) return cleanAddition
+    if (cleanExisting.includes(cleanAddition)) return cleanExisting
+    return normalizePromptAddition(`${cleanExisting}\n${cleanAddition}`)
+  }
 
   function updateForm(field: keyof FormState, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -159,6 +203,7 @@ export default function FundaTekstPage() {
         bijzonderheden: form.bijzonderheden || undefined,
         lengte: form.lengte,
         images: images.length > 0 ? images : undefined,
+        prompt_addition: savedPromptAddition || undefined,
       }
     }
 
@@ -346,6 +391,7 @@ export default function FundaTekstPage() {
       bijzonderheden: form.bijzonderheden || undefined,
       lengte: form.lengte,
       images: images.length > 0 ? images : undefined,
+      prompt_addition: savedPromptAddition || undefined,
     }
     lastRequestRef.current = request
     setLoading(true)
@@ -376,6 +422,7 @@ export default function FundaTekstPage() {
   async function handleVerfijn() {
     const currentTekst = multiResult ? multiResult[activeTab] : result?.tekst
     if (!currentTekst || !verfijnInput.trim()) return
+    const refinementInstruction = verfijnInput.trim()
     setVerfijnLoading(true)
     setApiError('')
     try {
@@ -384,7 +431,7 @@ export default function FundaTekstPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tekst: currentTekst,
-          instructie: verfijnInput.trim(),
+          instructie: refinementInstruction,
           format: multiResult ? activeTab : 'funda',
         }),
       })
@@ -401,6 +448,12 @@ export default function FundaTekstPage() {
         )
       }
       setVerfijnInput('')
+
+      if (applyVerfijnToFuture) {
+        const merged = mergePromptAddition(savedPromptAddition, refinementInstruction)
+        savePromptAddition(merged)
+      }
+
       setVerfijnSuccess(true)
       setTimeout(() => setVerfijnSuccess(false), 3000)
     } catch (err) {
@@ -755,6 +808,53 @@ export default function FundaTekstPage() {
             </div>
           </div>
 
+          {/* Sectie 6: Agent prompt-uitbreiding */}
+          <div className="glass-card p-6 rounded-2xl">
+            <h2 className="text-sm font-semibold text-white/80 uppercase tracking-wider mb-1">
+              Agent prompt-uitbreiding
+            </h2>
+            <p className="text-xs text-white/40 mb-3">
+              Je kunt de agent veilig uitbreiden met extra stijlregels. De basisprompt blijft altijd beschermd en kan niet worden overschreven.
+            </p>
+            <div className="mb-3 p-3 rounded-xl bg-amber-500/10 border border-amber-400/20 text-amber-200/90 text-xs">
+              Waarschuwing: extra instructies kunnen de toon, structuur en reacties van de output veranderen.
+            </div>
+
+            <textarea
+              className={`${INPUT_CLASS} min-h-[92px] resize-y text-sm`}
+              value={promptAdditionDraft}
+              onChange={(e) => setPromptAdditionDraft(e.target.value.slice(0, PROMPT_ADDITION_MAX_CHARS))}
+              placeholder="Bijv. Spreek de lezer direct aan met je/u en schrijf persoonlijker, zonder feiten toe te voegen."
+            />
+            <div className="flex items-center justify-between mt-2 text-xs text-white/35">
+              <span>{promptAdditionDraft.length}/{PROMPT_ADDITION_MAX_CHARS}</span>
+              {savedPromptAddition && <span className="text-green-300/90">Standaard actief</span>}
+            </div>
+
+            {promptNotice && (
+              <div className="mt-3 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-green-300 text-xs">
+                {promptNotice}
+              </div>
+            )}
+
+            <div className="flex gap-2 mt-3">
+              <button
+                type="button"
+                onClick={() => savePromptAddition(promptAdditionDraft)}
+                className="px-4 py-2 rounded-xl bg-brand-blue/20 border border-brand-blue/40 text-brand-blue text-xs font-medium hover:bg-brand-blue/30 transition-all"
+              >
+                Opslaan als standaard
+              </button>
+              <button
+                type="button"
+                onClick={() => savePromptAddition('')}
+                className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white/60 text-xs font-medium hover:bg-white/10 hover:text-white transition-all"
+              >
+                Resetten
+              </button>
+            </div>
+          </div>
+
           {/* Genereer knoppen */}
           <div className="grid grid-cols-2 gap-3">
             <button
@@ -883,6 +983,15 @@ export default function FundaTekstPage() {
                     Verfijn
                   </button>
                 </div>
+                <label className="mt-2 inline-flex items-center gap-2 text-xs text-white/45">
+                  <input
+                    type="checkbox"
+                    checked={applyVerfijnToFuture}
+                    onChange={(e) => setApplyVerfijnToFuture(e.target.checked)}
+                    className="rounded border-white/20 bg-white/5 text-brand-blue focus:ring-brand-blue/40"
+                  />
+                  Deze verfijn-instructie ook als standaard toepassen op toekomstige creaties
+                </label>
               </div>
             </div>
           )}
@@ -969,6 +1078,15 @@ export default function FundaTekstPage() {
                     Verfijn
                   </button>
                 </div>
+                <label className="mt-2 inline-flex items-center gap-2 text-xs text-white/45">
+                  <input
+                    type="checkbox"
+                    checked={applyVerfijnToFuture}
+                    onChange={(e) => setApplyVerfijnToFuture(e.target.checked)}
+                    className="rounded border-white/20 bg-white/5 text-brand-blue focus:ring-brand-blue/40"
+                  />
+                  Deze verfijn-instructie ook als standaard toepassen op toekomstige creaties
+                </label>
               </div>
             </div>
           )}
