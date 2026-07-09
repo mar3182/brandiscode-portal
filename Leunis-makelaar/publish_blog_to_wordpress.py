@@ -20,9 +20,13 @@ AFBEELDINGSBRONNEN:
     (geen --image)    Geen featured image, alleen tekst
 
 FOTO ADVIES (eigen camera):
-    --photo-advice    Geeft een shooting brief voor jouw Canon EOS R7 kit:
-                      Sigma 18-35mm f/1.8 Art | RF 50mm f/1.8
-                      Geen WordPress-actie — alleen advies uitprinten.
+    --photo-advice    Voegt een shooting brief toe AAN de WordPress draft (gele balk onderaan).
+                      Je ziet de brief in de WordPress editor — verwijder hem vóór publicatie.
+                      Camera: Canon EOS R7 | Sigma 18-35mm f/1.8 Art | RF 50mm f/1.8
+
+UPDATE BESTAANDE DRAFT:
+    --update 1537     Update post ID 1537 in plaats van een nieuwe draft aanmaken.
+                      Handig voor: foto-brief toevoegen aan een al gepubliceerde draft.
 
 VEREISTEN:
     pip install markdown requests openai
@@ -334,8 +338,11 @@ PILLAR_VISUAL_GUIDE = {
 }
 
 
-def generate_photo_advice(parsed: dict, pillar: str) -> None:
-    """Print een gedetailleerde shooting brief voor de Canon EOS R7 kit."""
+def generate_photo_advice(parsed: dict, pillar: str) -> str:
+    """
+    Print een gedetailleerde shooting brief voor de Canon EOS R7 kit.
+    Retourneert ook de brief als HTML-string (voor in de WordPress draft).
+    """
     guide = PILLAR_VISUAL_GUIDE.get(pillar, PILLAR_VISUAL_GUIDE["Data als kompas"])
 
     # Kies lens op basis van pillar
@@ -349,6 +356,11 @@ def generate_photo_advice(parsed: dict, pillar: str) -> None:
         primary_lens = CAMERA_GEAR["lenses"][0]  # Sigma 18-35mm — context
         secondary_lens = CAMERA_GEAR["lenses"][1]  # RF 50mm — detail
 
+    aperture = primary_lens['sweet_spot'].split(',')[0].strip()
+    safe = re.sub(r'[^a-z0-9]+', '-', parsed['title'].lower()).strip('-')
+    filename = f"blog-{safe[:40]}-hero.jpg"
+
+    # Terminal output
     print()
     print("═" * 62)
     print(f"  FOTOGRAFIE BRIEF — {parsed['title'][:45]}")
@@ -366,7 +378,6 @@ def generate_photo_advice(parsed: dict, pillar: str) -> None:
     print(f"  Sweet spot:    {primary_lens['sweet_spot']}")
     print()
     print(f"  INSTELLINGEN (primaire shot)")
-    aperture = primary_lens['sweet_spot'].split(',')[0].strip()
     print(f"  Mode:      Av (Aperture Priority)")
     print(f"  Diafragma: {aperture}")
     print(f"  ISO:       Auto (max 3200 met IBIS aan)")
@@ -391,10 +402,52 @@ def generate_photo_advice(parsed: dict, pillar: str) -> None:
     print(f"  • Scherm/laptop altijd met zichtbare maar niet afleide inhoud")
     print()
     print(f"  BESTANDSNAAM VOOR WORDPRESS")
-    safe = re.sub(r'[^a-z0-9]+', '-', parsed['title'].lower()).strip('-')
-    print(f"  blog-{safe[:40]}-hero.jpg")
+    print(f"  {filename}")
     print("═" * 62)
     print()
+
+    # HTML-versie voor in de WordPress draft (duidelijk gemarkeerd als intern)
+    html = f"""
+<div style="background:#fff8e1;border:3px solid #D4A843;border-radius:10px;padding:28px 32px;margin-top:48px;font-family:monospace;font-size:14px;line-height:1.8;">
+  <p style="margin:0 0 16px;font-size:16px;font-weight:bold;color:#1B2A4A;font-family:sans-serif;"
+  >📷 FOTO BRIEF — Niet publiceren — verwijder voor publicatie</p>
+
+  <table style="width:100%;border-collapse:collapse;font-family:monospace;font-size:13px;">
+    <tr><td style="color:#888;width:180px;vertical-align:top;padding:4px 12px 4px 0;">Camera</td>
+        <td style="color:#333;">{CAMERA_GEAR['body']}</td></tr>
+    <tr><td style="color:#888;vertical-align:top;padding:4px 12px 4px 0;">Pillar</td>
+        <td style="color:#333;">{pillar}</td></tr>
+    <tr><td style="color:#888;vertical-align:top;padding:4px 12px 4px 0;">Concept</td>
+        <td style="color:#333;">{guide['concept']}</td></tr>
+    <tr><td style="color:#888;vertical-align:top;padding:4px 12px 4px 0;">Mood</td>
+        <td style="color:#333;">{guide['mood']}</td></tr>
+    <tr><td style="color:#888;vertical-align:top;padding:4px 12px 4px 0;">Licht</td>
+        <td style="color:#333;">{guide['light']}</td></tr>
+    <tr><td style="color:#888;vertical-align:top;padding:4px 12px 4px 0;">Props / scene</td>
+        <td style="color:#333;">{guide['props']}</td></tr>
+    <tr><td colspan="2" style="padding:12px 0 4px;"><strong>Primaire lens</strong> — {primary_lens['name']}</td></tr>
+    <tr><td style="color:#888;vertical-align:top;padding:4px 12px 4px 0;">Gebruik voor</td>
+        <td style="color:#333;">{primary_lens['strengths']}</td></tr>
+    <tr><td style="color:#888;vertical-align:top;padding:4px 12px 4px 0;">Sweet spot</td>
+        <td style="color:#333;">{primary_lens['sweet_spot']}</td></tr>
+    <tr><td style="color:#888;vertical-align:top;padding:4px 12px 4px 0;">Instellingen</td>
+        <td style="color:#333;">Av-modus · {aperture} · ISO Auto (max 3200) · min. 1/60s · RAW+JPEG · Picture Style Neutraal</td></tr>
+    <tr><td colspan="2" style="padding:12px 0 4px;"><strong>Detail lens</strong> — {secondary_lens['name']}</td></tr>
+    <tr><td style="color:#888;vertical-align:top;padding:4px 12px 4px 0;">Gebruik voor</td>
+        <td style="color:#333;">{secondary_lens['strengths']}</td></tr>
+    <tr><td style="color:#888;vertical-align:top;padding:4px 12px 4px 0;">Sweet spot</td>
+        <td style="color:#333;">{secondary_lens['sweet_spot']}</td></tr>
+    <tr><td colspan="2" style="padding:12px 0 4px;"><strong>Compositie tips</strong></td></tr>
+    <tr><td colspan="2" style="color:#333;padding-left:4px;">• Regel van derden: onderwerp op snijpunten<br>
+        • 1 scherp focal point, rest zachte bokeh<br>
+        • 3 varianten: wide (18-24mm) · medium (35mm) · close-up (50mm)<br>
+        • Scherm/laptop: zichtbare maar niet afleidende inhoud</td></tr>
+    <tr><td style="color:#888;vertical-align:top;padding:12px 12px 4px 0;">Bestandsnaam</td>
+        <td style="color:#333;padding-top:12px;">{filename}</td></tr>
+  </table>
+</div>
+"""
+    return html
 
 
 def _nl_to_en_query(query: str) -> str:
@@ -455,9 +508,19 @@ def upload_image_to_wordpress(
         return 0
 
 
-def create_draft_post(parsed: dict, headers: dict, dry_run: bool, media_id: int = 0) -> None:
+def create_draft_post(
+    parsed: dict,
+    headers: dict,
+    dry_run: bool,
+    media_id: int = 0,
+    photo_brief_html: str = "",
+) -> None:
     """Maak een draft post aan in WordPress."""
     html_content = markdown_to_html(parsed["markdown"])
+
+    # Voeg foto-brief toe aan het einde van de content (duidelijk gemarkeerd)
+    if photo_brief_html:
+        html_content += photo_brief_html
 
     payload = {
         "title": parsed["title"],
@@ -513,6 +576,52 @@ def create_draft_post(parsed: dict, headers: dict, dry_run: bool, media_id: int 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+def update_draft_post(
+    post_id: int,
+    parsed: dict,
+    headers: dict,
+    media_id: int = 0,
+    photo_brief_html: str = "",
+) -> None:
+    """Update een bestaande WordPress draft post."""
+    html_content = markdown_to_html(parsed["markdown"])
+    if photo_brief_html:
+        html_content += photo_brief_html
+
+    payload = {
+        "title": parsed["title"],
+        "content": html_content,
+        "status": "draft",
+        "meta": {
+            "_yoast_wpseo_focuskw": parsed["seo_focus"].split(",")[0].strip(),
+            "_yoast_wpseo_metadesc": f"Lees hoe {parsed['seo_focus']} jouw bedrijf raakt — Brand is Code.",
+        },
+    }
+    if media_id:
+        payload["featured_media"] = media_id
+
+    url = f"{API_BASE}/posts/{post_id}"
+    response = requests.post(url, headers=headers, json=payload, timeout=30)
+
+    if response.status_code in (200, 201):
+        post = response.json()
+        edit_url = f"{SITE_URL}/wp-admin/post.php?post={post_id}&action=edit"
+        print(f"\n✓ Draft bijgewerkt!")
+        print(f"  Post ID:  {post_id}")
+        print(f"  Bewerk:   {edit_url}")
+        if photo_brief_html:
+            print(f"  Foto brief: zichtbaar onderaan in de editor (gele balk)")
+            print(f"             → verwijder vóór publicatie!")
+    else:
+        print(f"\nFOUT: WordPress gaf HTTP {response.status_code}")
+        try:
+            err = response.json()
+            print(f"  Code:    {err.get('code', '?')}")
+            print(f"  Bericht: {err.get('message', response.text[:200])}")
+        except Exception:
+            print(f"  Antwoord: {response.text[:300]}")
+        sys.exit(1)
+
 def main():
     parser = argparse.ArgumentParser(
         description="Publiceer een blog markdown-bestand als WordPress draft."
@@ -537,7 +646,18 @@ def main():
     parser.add_argument(
         "--photo-advice",
         action="store_true",
-        help="Print een shooting brief voor je Canon EOS R7 kit. Geen WordPress-actie.",
+        help=(
+            "Voeg een shooting brief voor de Canon EOS R7 kit toe aan de draft. "
+            "De brief wordt zichtbaar in de WordPress editor (gele balk) en "
+            "kan verwijderd worden vóór publicatie."
+        ),
+    )
+    parser.add_argument(
+        "--update",
+        type=int,
+        default=0,
+        metavar="POST_ID",
+        help="Update een bestaande WordPress draft in plaats van een nieuwe aan te maken. Geef het post ID mee.",
     )
     parser.add_argument(
         "--dry-run",
@@ -574,14 +694,15 @@ def main():
                              blog_path.read_text(), re.MULTILINE)
     pillar = pillar_match.group(1).strip() if pillar_match else "Data als kompas"
 
-    # Foto-advies: altijd eerst printen, ook gecombineerd met --dry-run
+    # Foto-advies: altijd eerst genereren, ook gecombineerd met --dry-run
+    photo_brief_html = ""
     if args.photo_advice:
-        generate_photo_advice(parsed, pillar)
-        if not args.image and not args.dry_run:
+        photo_brief_html = generate_photo_advice(parsed, pillar)
+        if not args.image and not args.dry_run and not args.update:
             return
 
     if args.dry_run:
-        create_draft_post(parsed, headers={}, dry_run=True)
+        create_draft_post(parsed, headers={}, dry_run=True, photo_brief_html=photo_brief_html)
         return
 
     # Credentials laden
@@ -607,8 +728,11 @@ def main():
         image_bytes = fetch_image_free(query)
         media_id = upload_image_to_wordpress(image_bytes, f"{safe_slug}.jpg", headers)
 
-    # Post aanmaken
-    create_draft_post(parsed, headers, dry_run=False, media_id=media_id)
+    # Post aanmaken of updaten
+    if args.update:
+        update_draft_post(args.update, parsed, headers, media_id=media_id, photo_brief_html=photo_brief_html)
+    else:
+        create_draft_post(parsed, headers, dry_run=False, media_id=media_id, photo_brief_html=photo_brief_html)
 
 
 if __name__ == "__main__":
