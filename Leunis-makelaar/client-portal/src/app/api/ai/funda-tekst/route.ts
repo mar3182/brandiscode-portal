@@ -4,6 +4,19 @@ import type { FundaTekstRequest, FundaTekstResponse } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 
+const SUPPORTED_IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+
+function normalizeImageDataUrl(value: string): string | null {
+  const match = value.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,/i)
+  if (!match) return null
+
+  let mime = match[1].toLowerCase()
+  if (mime === 'image/jpg') mime = 'image/jpeg'
+  if (!SUPPORTED_IMAGE_MIME_TYPES.has(mime)) return null
+
+  return value.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/i, `data:${mime};base64,`)
+}
+
 function getOpenAI(): OpenAI {
   if (process.env.GITHUB_TOKEN) {
     return new OpenAI({
@@ -58,7 +71,11 @@ export async function POST(req: NextRequest) {
       uitgebreid: 'Schrijf een uitgebreide tekst van circa 600 woorden met gedetailleerde kamer-voor-kamer beschrijving.',
     }[body.lengte]
 
-    const hasImages = Array.isArray(body.images) && body.images.length > 0
+    const normalizedImages = (body.images ?? [])
+      .map((img) => normalizeImageDataUrl(img))
+      .filter((img): img is string => Boolean(img))
+
+    const hasImages = normalizedImages.length > 0
 
     const imageNote = hasImages
       ? `\n\nJe hebt ${body.images!.length} afbeelding(en) ontvangen (foto's en/of plattegrond). Analyseer deze nauwkeurig. Baseer de ruimtebeschrijving uitsluitend op wat je daadwerkelijk ziet.`
@@ -87,7 +104,7 @@ ${lengteInstructie}${imageNote}`
             role: 'user',
             content: [
               { type: 'text', text: userPromptText },
-              ...body.images!.map((img) => ({
+              ...normalizedImages.map((img) => ({
                 type: 'image_url' as const,
                 image_url: { url: img, detail: 'low' as const },
               })),

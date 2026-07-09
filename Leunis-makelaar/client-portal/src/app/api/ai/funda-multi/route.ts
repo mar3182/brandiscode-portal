@@ -4,6 +4,19 @@ import type { FundaTekstRequest, FundaMultiResponse } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 
+const SUPPORTED_IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+
+function normalizeImageDataUrl(value: string): string | null {
+  const match = value.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,/i)
+  if (!match) return null
+
+  let mime = match[1].toLowerCase()
+  if (mime === 'image/jpg') mime = 'image/jpeg'
+  if (!SUPPORTED_IMAGE_MIME_TYPES.has(mime)) return null
+
+  return value.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/i, `data:${mime};base64,`)
+}
+
 function getOpenAI(): OpenAI {
   if (process.env.GITHUB_TOKEN) {
     return new OpenAI({
@@ -61,7 +74,11 @@ export async function POST(req: NextRequest) {
     const openai = getOpenAI()
     const body: FundaTekstRequest = await req.json()
 
-    const hasImages = Array.isArray(body.images) && body.images.length > 0
+    const normalizedImages = (body.images ?? [])
+      .map((img) => normalizeImageDataUrl(img))
+      .filter((img): img is string => Boolean(img))
+
+    const hasImages = normalizedImages.length > 0
 
     const imageNote = hasImages
       ? `\n\nJe hebt ${body.images!.length} afbeelding(en) ontvangen. Analyseer deze en baseer de beschrijvingen op wat je daadwerkelijk ziet.`
@@ -92,7 +109,7 @@ Geef je antwoord als JSON: { "funda": "...", "instagram": "...", "facebook": "..
             role: 'user',
             content: [
               { type: 'text', text: userPrompt },
-              ...body.images!.map((img) => ({
+              ...normalizedImages.map((img) => ({
                 type: 'image_url' as const,
                 image_url: { url: img, detail: 'low' as const },
               })),

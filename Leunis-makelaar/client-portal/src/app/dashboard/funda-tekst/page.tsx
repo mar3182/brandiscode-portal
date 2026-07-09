@@ -55,6 +55,16 @@ const MEDIA_TABS: Array<{ id: MediaFormat; label: string; hint: string }> = [
   { id: 'brochure', label: 'Brochure', hint: 'Print' },
 ]
 
+const SUPPORTED_IMAGE_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+])
+
+const AUTO_CONVERT_IMAGE_MIME_TYPES = new Set(['image/heic', 'image/heif'])
+
 interface FormState {
   woningtype: string
   adres: string
@@ -201,14 +211,114 @@ export default function FundaTekstPage() {
     })
   }
 
+  function loadImageFromFile(file: File): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(file)
+      const img = new Image()
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl)
+        resolve(img)
+      }
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl)
+        reject(new Error('Afbeelding kon niet worden geladen voor conversie'))
+      }
+      img.src = objectUrl
+    })
+  }
+
+  async function convertToJpeg(file: File): Promise<File> {
+    const image = await loadImageFromFile(file)
+    const canvas = document.createElement('canvas')
+    canvas.width = image.naturalWidth || image.width
+    canvas.height = image.naturalHeight || image.height
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) {
+      throw new Error('Canvas context is niet beschikbaar')
+    }
+
+    ctx.drawImage(image, 0, 0)
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (result) => {
+          if (result) resolve(result)
+          else reject(new Error('Conversie naar JPEG is mislukt'))
+        },
+        'image/jpeg',
+        0.9
+      )
+    })
+
+    const basename = file.name.replace(/\.[^.]+$/, '')
+    return new File([blob], `${basename}.jpg`, { type: 'image/jpeg' })
+  }
+
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     setImageError('')
     const files = Array.from(e.target.files || [])
     const remaining = 4 - images.length
     const toProcess = files.slice(0, remaining)
-    const tooLarge = files.some((f) => f.size > 4 * 1024 * 1024)
-    if (tooLarge) setImageError('Sommige afbeeldingen zijn groter dan 4MB en zijn overgeslagen.')
-    const validFiles = toProcess.filter((f) => f.size <= 4 * 1024 * 1024)
+    let tooLargeCount = 0
+    let unsupportedCount = 0
+    let convertedCount = 0
+    let conversionFailedCount = 0
+
+    const validFiles: File[] = []
+
+    for (const file of toProcess) {
+      if (file.size > 4 * 1024 * 1024) {
+        tooLargeCount += 1
+        continue
+      }
+
+      const type = (file.type || '').toLowerCase()
+
+      if (SUPPORTED_IMAGE_MIME_TYPES.has(type)) {
+        validFiles.push(file)
+        continue
+      }
+
+      if (AUTO_CONVERT_IMAGE_MIME_TYPES.has(type)) {
+        try {
+          const converted = await convertToJpeg(file)
+          if (converted.size > 4 * 1024 * 1024) {
+            tooLargeCount += 1
+            continue
+          }
+          validFiles.push(converted)
+          convertedCount += 1
+          continue
+        } catch {
+          conversionFailedCount += 1
+          continue
+        }
+      }
+
+      unsupportedCount += 1
+    }
+
+    const errorParts: string[] = []
+    if (tooLargeCount > 0) {
+      errorParts.push('Sommige afbeeldingen zijn groter dan 4MB en zijn overgeslagen.')
+    }
+    if (unsupportedCount > 0) {
+      errorParts.push('Alleen JPEG, PNG, GIF, WebP en HEIC/HEIF worden geaccepteerd.')
+    }
+    if (conversionFailedCount > 0) {
+      errorParts.push('HEIC/HEIF kon in deze browser niet automatisch worden omgezet naar JPEG.')
+    }
+    if (convertedCount > 0) {
+      errorParts.push(`${convertedCount} HEIC/HEIF afbeelding(en) automatisch omgezet naar JPEG.`)
+    }
+    if (errorParts.length > 0) setImageError(errorParts.join(' '))
+
+    if (validFiles.length === 0) {
+      e.target.value = ''
+      return
+    }
+
     const base64s = await Promise.all(validFiles.map(fileToBase64))
     setImages((prev) => [...prev, ...base64s])
     setImageNames((prev) => [...prev, ...validFiles.map((f) => f.name)])
@@ -584,7 +694,7 @@ export default function FundaTekstPage() {
                 <div className="flex flex-col items-center justify-center gap-2 p-5 border-2 border-dashed border-white/10 rounded-xl hover:border-brand-blue/40 hover:bg-white/5 transition-all">
                   <Upload className="w-5 h-5 text-white/30" />
                   <span className="text-sm text-white/40">Klik om foto&apos;s te uploaden</span>
-                  <span className="text-xs text-white/25">JPG, PNG — max 4MB per afbeelding, max 4 stuks</span>
+                  <span className="text-xs text-white/25">JPEG, PNG, GIF, WebP + HEIC/HEIF auto-conversie — max 4MB per afbeelding, max 4 stuks</span>
                 </div>
                 <input
                   type="file"
