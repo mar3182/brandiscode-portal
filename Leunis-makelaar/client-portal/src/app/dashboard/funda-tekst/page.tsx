@@ -68,6 +68,11 @@ const PROMPT_EXTENSION_STORAGE_KEY = 'funda-agent-prompt-extensions-v1'
 const PROMPT_ADDITION_STORAGE_KEY = 'funda-agent-prompt-addition'
 const PROMPT_EXTENSION_MAX_CHARS = 320
 const PROMPT_ADDITION_MAX_CHARS = 800
+const DEFAULT_PROMPT_EXTENSIONS = [
+  'Spreek de lezer direct aan met je/u en houd die aanspreekvorm consequent door de hele tekst.',
+  'Schrijf warm, persoonlijk en belevingsgericht, maar blijf feitelijk en noem geen kenmerken die niet zijn opgegeven.',
+  'Start met een uitnodigende openingszin over sfeer en locatie, en sluit af met een duidelijke uitnodiging voor bezichtiging.',
+]
 
 type PromptExtensionItem = {
   id: string
@@ -204,6 +209,33 @@ export default function FundaTekstPage() {
   function clearPromptExtensions() {
     setPromptExtensions([])
     setPromptNoticeMessage('Alle prompt-uitbreidingen verwijderd.')
+  }
+
+  function restoreDefaultPromptExtensions() {
+    setPromptExtensions((prev) => {
+      const map = new Map<string, PromptExtensionItem>()
+
+      for (const item of prev) {
+        const normalizedKey = item.text.toLowerCase()
+        map.set(normalizedKey, item)
+      }
+
+      for (const text of DEFAULT_PROMPT_EXTENSIONS) {
+        const normalizedText = normalizePromptExtensionText(text)
+        const key = normalizedText.toLowerCase()
+        const existing = map.get(key)
+
+        if (existing) {
+          map.set(key, { ...existing, enabled: true })
+        } else {
+          map.set(key, { id: crypto.randomUUID(), text: normalizedText, enabled: true })
+        }
+      }
+
+      return Array.from(map.values())
+    })
+
+    setPromptNoticeMessage('Standaardset hersteld en geactiveerd.')
   }
 
   function updateForm(field: keyof FormState, value: string) {
@@ -910,6 +942,13 @@ export default function FundaTekstPage() {
                 className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white/60 text-xs font-medium hover:bg-white/10 hover:text-white transition-all"
               >
                 Alles verwijderen
+              </button>
+              <button
+                type="button"
+                onClick={restoreDefaultPromptExtensions}
+                className="px-4 py-2 rounded-xl bg-brand-gold/20 border border-brand-gold/40 text-brand-gold text-xs font-medium hover:bg-brand-gold/30 transition-all"
+              >
+                Herstel standaardset
               </button>
             </div>
 
