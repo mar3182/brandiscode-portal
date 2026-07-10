@@ -312,6 +312,14 @@ export default function FundaTekstPage() {
     return Number.isFinite(parsed) ? parsed : null
   }
 
+  function formatVraagprijsInput(value: string): string {
+    const digits = value.replace(/[^0-9]/g, '')
+    if (!digits) return ''
+    const parsed = Number(digits)
+    if (!Number.isFinite(parsed)) return ''
+    return `€ ${new Intl.NumberFormat('nl-NL').format(parsed)}`
+  }
+
   function derivePrijsklasseFromVraagprijs(value: string): Prijsklasse {
     const amount = parseVraagprijs(value)
     if (!amount) return 'onbekend'
@@ -807,9 +815,9 @@ export default function FundaTekstPage() {
                 <input
                   type="text"
                   className={INPUT_CLASS}
-                  placeholder="bijv. € 425.000 k.k."
+                  placeholder="bijv. € 425.000"
                   value={form.vraagprijs}
-                  onChange={(e) => updateForm('vraagprijs', e.target.value)}
+                  onChange={(e) => updateForm('vraagprijs', formatVraagprijsInput(e.target.value))}
                 />
               </div>
 
