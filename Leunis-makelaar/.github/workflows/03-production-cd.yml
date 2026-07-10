@@ -2,6 +2,7 @@ name: Production CD Pipeline (Blue-Green Deployment)
 
 on:
   push:
+    branches: [main]
     tags: [release-*]
   workflow_dispatch:
     inputs:
