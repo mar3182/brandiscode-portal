@@ -499,6 +499,7 @@ function TrainingTab({
   const [planningIntakeId, setPlanningIntakeId] = useState<string | null>(null)
   const [sessionStart, setSessionStart] = useState('')
   const [sessionDuration, setSessionDuration] = useState<2 | 3 | ''>('')
+  const [sessionRescheduleWindowHours, setSessionRescheduleWindowHours] = useState<number>(24)
   const [sessionLocation, setSessionLocation] = useState('')
   const [sessionSaving, setSessionSaving] = useState(false)
   const [sessionError, setSessionError] = useState('')
@@ -565,6 +566,7 @@ function TrainingTab({
     setPlanningIntakeId(intakeId)
     setSessionStart('')
     setSessionDuration(trainingDuration === '2u' ? 2 : trainingDuration === '3u' ? 3 : '')
+    setSessionRescheduleWindowHours(24)
     setSessionLocation('')
     setSessionError('')
     setSessionSuccess('')
@@ -591,6 +593,7 @@ function TrainingTab({
         intake_id: planningIntakeId,
         session_start: new Date(sessionStart).toISOString(),
         proposed_duration_hours: sessionDuration || undefined,
+        reschedule_window_hours: sessionRescheduleWindowHours,
         location_or_link: sessionLocation || undefined,
       }),
     })
@@ -941,6 +944,19 @@ function TrainingTab({
                     <option value="2">2 uur</option>
                     <option value="3">3 uur</option>
                   </select>
+                </div>
+                <div>
+                  <label htmlFor={`session-reschedule-window-${t.id}`} className="block text-xs text-white/50 mb-1">Wijzigtermijn klant (uren)</label>
+                  <input
+                    id={`session-reschedule-window-${t.id}`}
+                    type="number"
+                    min={0}
+                    max={336}
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-brand-orange/50"
+                    value={sessionRescheduleWindowHours}
+                    onChange={(e) => setSessionRescheduleWindowHours(Math.max(0, Number(e.target.value || 0)))}
+                  />
+                  <p className="text-[11px] text-white/40 mt-1">Bijv. 24 = klant kan tot 24 uur voor sessie een later moment voorstellen.</p>
                 </div>
               </div>
 

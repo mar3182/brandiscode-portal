@@ -9,6 +9,17 @@ function noStore(payload: unknown, status = 200) {
   return NextResponse.json(payload, { status, headers: { 'Cache-Control': 'no-store' } })
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+}
+
+function parseIsoDate(value: unknown): Date | null {
+  if (typeof value !== 'string') return null
+  const ms = Date.parse(value)
+  if (Number.isNaN(ms)) return null
+  return new Date(ms)
+}
+
 /**
  * POST /api/training-intake/confirmation
  * Authenticated — klant bevestigt of stelt nieuwe datum voor vanuit het dashboard.
@@ -45,7 +56,7 @@ export async function POST(req: NextRequest) {
   // Haal sessie op en verifieer dat die bij deze klant hoort
   const { data: session, error: sessionError } = await admin
     .from('training_sessions')
-    .select('id, status, session_start, intake_id, confirm_token, training_intakes(contact_person, communication_channel, communication_email, clients(name, company, email))')
+    .select('id, status, session_start, intake_id, confirm_token, metadata, training_intakes(contact_person, communication_channel, communication_email, clients(name, company, email))')
     .eq('id', session_id)
     .single()
 
@@ -104,15 +115,49 @@ export async function POST(req: NextRequest) {
     return noStore({ ok: true, status: 'confirmed' })
   }
 
-  // propose_other_date — sla voorstel op in metadata, status blijft 'proposed' zodat admin het ziet
+  const sessionStartDate = parseIsoDate(session.session_start)
+  const proposedDate = parseIsoDate(proposed_datetime)
+  if (!sessionStartDate || !proposedDate) {
+    return noStore({ error: 'Huidige sessiedatum of tegenvoorstel is ongeldig' }, 400)
+  }
+
+  if (proposedDate.getTime() <= sessionStartDate.getTime()) {
+    return noStore({ error: 'Tegenvoorstel moet later zijn dan de huidige trainingsdatum' }, 422)
+  }
+
+  const metadata = asRecord(session.metadata)
+  const deadlineFromMeta = parseIsoDate(metadata.reschedule_until)
+  const windowHours =
+    typeof metadata.reschedule_window_hours === 'number'
+      ? metadata.reschedule_window_hours
+      : typeof metadata.reschedule_window_hours === 'string'
+        ? Number(metadata.reschedule_window_hours)
+        : Number(process.env.TRAINING_RESCHEDULE_DEFAULT_HOURS ?? 24)
+
+  const deadlineDate = deadlineFromMeta
+    ?? (Number.isFinite(windowHours)
+      ? new Date(sessionStartDate.getTime() - Math.max(0, windowHours) * 60 * 60 * 1000)
+      : null)
+
+  if (deadlineDate && new Date().getTime() > deadlineDate.getTime()) {
+    return noStore({
+      error: `Wijzigen kan niet meer. De wijzigtermijn liep tot ${deadlineDate.toLocaleString('nl-NL')}.`,
+    }, 422)
+  }
+
+  const nextMetadata = {
+    ...metadata,
+    client_proposed_datetime: proposed_datetime,
+    rescheduled_reason: note?.trim() || null,
+    proposed_at: now,
+  }
+
+  // propose_other_date — zet status terug op proposed zodat admin opnieuw kan beoordelen
   const { error: updateError } = await admin
     .from('training_sessions')
     .update({
-      metadata: {
-        client_proposed_datetime: proposed_datetime,
-        rescheduled_reason: note?.trim() || null,
-        proposed_at: now,
-      },
+      status: 'proposed',
+      metadata: nextMetadata,
     })
     .eq('id', session_id)
 

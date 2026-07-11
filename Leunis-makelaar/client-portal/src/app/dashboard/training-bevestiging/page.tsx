@@ -27,6 +27,14 @@ function fmtSlot(iso: string) {
   }).format(new Date(iso))
 }
 
+function toDatetimeLocal(iso: string | null): string | undefined {
+  if (!iso) return undefined
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return undefined
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 export default function TrainingBevestigingPage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -265,10 +273,10 @@ export default function TrainingBevestigingPage() {
       )}
 
       {/* Alternatieve datum voorstellen */}
-      {(canConfirm || hasSlots) && !selectedSlot && (
+      {(canConfirm || hasSlots || Boolean(selectedSlot)) && (
         <form onSubmit={handleProposeOtherDate} className="glass-card p-6 space-y-4">
           <h2 className="text-white font-semibold">Geen van deze momenten schikt?</h2>
-          <p className="text-sm text-white/60">Stel zelf een alternatief moment voor en we zoeken een oplossing.</p>
+          <p className="text-sm text-white/60">Stel zelf een later alternatief moment voor. Eerdere datums worden niet geaccepteerd.</p>
 
           <div>
             <label htmlFor="proposalDate" className="block text-sm text-white/60 mb-1.5">Nieuw voorkeursmoment *</label>
@@ -277,6 +285,7 @@ export default function TrainingBevestigingPage() {
               type="datetime-local"
               value={proposalDateTime}
               onChange={(e) => setProposalDateTime(e.target.value)}
+              min={toDatetimeLocal(session?.session_start ?? selectedSlot?.slot_start ?? null)}
               className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-brand-gold/50"
             />
           </div>

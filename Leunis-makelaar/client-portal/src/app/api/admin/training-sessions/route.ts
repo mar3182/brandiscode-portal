@@ -29,6 +29,7 @@ async function checkAdmin() {
  *   location_or_link:           string (optional)
  *   agenda:                     string (optional, newline-separated items)
  *   admin_notes:                string (optional)
+ *   reschedule_window_hours:    number (optional, default 24)
  *   send_email:                 boolean (optional, default true)
  *
  * Returneert de nieuwe sessie + confirm_token
@@ -39,7 +40,16 @@ export async function POST(req: NextRequest) {
   if (!user) return noStore({ error: 'Unauthorized' }, 401)
 
   const body = await req.json().catch(() => ({})) as Record<string, unknown>
-  const { intake_id, session_start, proposed_duration_hours, location_or_link, agenda, admin_notes, send_email } = body
+  const {
+    intake_id,
+    session_start,
+    proposed_duration_hours,
+    location_or_link,
+    agenda,
+    admin_notes,
+    reschedule_window_hours,
+    send_email,
+  } = body
 
   if (!intake_id || typeof intake_id !== 'string') {
     return noStore({ error: 'intake_id is verplicht' }, 400)
@@ -47,6 +57,17 @@ export async function POST(req: NextRequest) {
 
   if (!session_start || typeof session_start !== 'string' || isNaN(Date.parse(session_start))) {
     return noStore({ error: 'session_start is verplicht en moet een geldige ISO datetime zijn' }, 400)
+  }
+
+  const parsedWindowHours =
+    typeof reschedule_window_hours === 'number'
+      ? Math.floor(reschedule_window_hours)
+      : typeof reschedule_window_hours === 'string' && reschedule_window_hours.trim() !== ''
+        ? Math.floor(Number(reschedule_window_hours))
+        : Number(process.env.TRAINING_RESCHEDULE_DEFAULT_HOURS ?? 24)
+
+  if (!Number.isFinite(parsedWindowHours) || parsedWindowHours < 0 || parsedWindowHours > 336) {
+    return noStore({ error: 'reschedule_window_hours moet tussen 0 en 336 uur liggen' }, 400)
   }
 
   const admin = createAdminClient()
@@ -78,6 +99,7 @@ export async function POST(req: NextRequest) {
       location_or_link: typeof location_or_link === 'string' ? location_or_link.trim() || null : null,
       agenda: typeof agenda === 'string' ? agenda.trim() || null : null,
       admin_notes: typeof admin_notes === 'string' ? admin_notes.trim() || null : null,
+      metadata: { reschedule_window_hours: parsedWindowHours },
       created_by: user.id,
       updated_by: user.id,
       updated_at: new Date().toISOString(),
