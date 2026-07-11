@@ -17,8 +17,10 @@ import {
   GraduationCap,
   Loader2,
   Mail,
+  MessageSquare,
   Phone,
   Sparkles,
+  Star,
   User,
   X,
 } from 'lucide-react'
@@ -31,6 +33,7 @@ import type {
   Deliverable,
   Factuur,
   FactuurStatus,
+  Feedback,
   Offerte,
   OfferteStatus,
   Sprint,
@@ -39,6 +42,16 @@ import type {
 } from '@/lib/types'
 
 // ── local sub-types ───────────────────────────────────────────────────────────
+interface TrainingIntakeMemberRow {
+  id: string
+  full_name: string | null
+  role: string | null
+  top_tasks: string[]
+  digital_skill: number | null
+  ai_experience: string | null
+  sort_order: number
+}
+
 interface TrainingRow extends TrainingIntake {
   completeness: number
   readyForTraining: boolean
@@ -52,6 +65,7 @@ interface TrainingRow extends TrainingIntake {
     location_or_link: string | null
     confirmed_at: string | null
   }>
+  training_intake_members?: TrainingIntakeMemberRow[]
 }
 
 interface SprintWithDeliverables extends Sprint {
@@ -67,6 +81,10 @@ interface ClientDetail {
   offertes: OfferteRow[]
   trainingen: TrainingRow[]
   facturen: Factuur[]
+}
+
+interface FeedbackRow extends Feedback {
+  sprints: { title: string } | null
 }
 
 type SanitizedClientAiSettings = Pick<
@@ -194,20 +212,55 @@ function fmtDateTime(iso: string | null) {
   })
 }
 
+function StarRating({ rating }: { rating: number | null }) {
+  const count = rating ?? 0
+  return (
+    <span className="flex items-center gap-0.5" aria-label={`${count} van 5 sterren`}>
+      {[1, 2, 3, 4, 5].map(i => (
+        <Star key={i} size={12} className={i <= count ? 'text-yellow-400 fill-yellow-400' : 'text-white/20'} />
+      ))}
+    </span>
+  )
+}
+
 // ── tabs ──────────────────────────────────────────────────────────────────────
-type Tab = 'overzicht' | 'offertes' | 'training' | 'facturen' | 'ai'
+type Tab = 'overzicht' | 'offertes' | 'training' | 'facturen' | 'feedback' | 'ai'
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'overzicht', label: 'Overzicht', icon: <User size={15} /> },
   { id: 'offertes', label: 'Offertes', icon: <FileText size={15} /> },
   { id: 'training', label: 'Training', icon: <GraduationCap size={15} /> },
   { id: 'facturen', label: 'Facturen', icon: <CreditCard size={15} /> },
+  { id: 'feedback', label: 'Feedback', icon: <MessageSquare size={15} /> },
   { id: 'ai', label: 'AI Instellingen', icon: <Sparkles size={15} /> },
 ]
 
 // ── sub-sections ──────────────────────────────────────────────────────────────
 
 function OverzichtTab({ client }: { client: Client }) {
+  const [visitNotes, setVisitNotes] = useState(client.visit_notes ?? '')
+  const [visitSaving, setVisitSaving] = useState(false)
+  const [visitSavedAt, setVisitSavedAt] = useState<Date | null>(null)
+  const [visitError, setVisitError] = useState('')
+
+  async function handleSaveVisitNotes() {
+    setVisitSaving(true)
+    setVisitError('')
+    const res = await fetch(`/api/admin/clients/${client.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ visit_notes: visitNotes }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setVisitError((data as { error?: string }).error || 'Opslaan mislukt.')
+      setVisitSaving(false)
+      return
+    }
+    setVisitSavedAt(new Date())
+    setVisitSaving(false)
+  }
+
   const fields: [string, string | null][] = [
     ['Naam', client.name],
     ['E-mail', client.email],
@@ -225,20 +278,52 @@ function OverzichtTab({ client }: { client: Client }) {
   ]
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {fields.map(([label, value]) => (
-        <div key={label} className="bg-white/5 border border-white/10 rounded-xl p-4">
-          <p className="text-xs text-white/40 mb-1">{label}</p>
-          <p className="text-sm text-white">{value || <span className="text-white/30 italic">niet ingevuld</span>}</p>
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {fields.map(([label, value]) => (
+          <div key={label} className="bg-white/5 border border-white/10 rounded-xl p-4">
+            <p className="text-xs text-white/40 mb-1">{label}</p>
+            <p className="text-sm text-white">{value || <span className="text-white/30 italic">niet ingevuld</span>}</p>
+          </div>
+        ))}
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4 sm:col-span-2">
+          <p className="text-xs text-white/40 mb-1">Onboarding</p>
+          <p className="text-sm text-white flex items-center gap-2">
+            {client.onboarding_completed_at
+              ? <><CheckCircle2 size={14} className="text-green-400" /> Voltooid op {fmtDate(client.onboarding_completed_at)}</>
+              : <><Clock size={14} className="text-yellow-400" /> Nog niet voltooid</>}
+          </p>
         </div>
-      ))}
-      <div className="bg-white/5 border border-white/10 rounded-xl p-4 sm:col-span-2">
-        <p className="text-xs text-white/40 mb-1">Onboarding</p>
-        <p className="text-sm text-white flex items-center gap-2">
-          {client.onboarding_completed_at
-            ? <><CheckCircle2 size={14} className="text-green-400" /> Voltooid op {fmtDate(client.onboarding_completed_at)}</>
-            : <><Clock size={14} className="text-yellow-400" /> Nog niet voltooid</>}
-        </p>
+      </div>
+
+      {/* Bezoeknotities */}
+      <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+        <p className="text-xs text-white/40 mb-2">Bezoeknotities / Contactlog</p>
+        <textarea
+          rows={5}
+          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-brand-orange/50 resize-y"
+          placeholder="Notities over gesprekken, bezoeken, acties..."
+          value={visitNotes}
+          onChange={(e) => setVisitNotes(e.target.value)}
+        />
+        {visitError && (
+          <p className="text-xs text-red-300 mt-1" role="alert">{visitError}</p>
+        )}
+        <div className="flex items-center justify-between mt-2">
+          {visitSavedAt ? (
+            <p className="text-xs text-white/40">
+              Opgeslagen om {visitSavedAt.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          ) : <span />}
+          <button
+            onClick={handleSaveVisitNotes}
+            disabled={visitSaving}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-orange text-white text-xs font-medium disabled:opacity-60"
+          >
+            {visitSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+            Opslaan
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -347,6 +432,7 @@ function TrainingTab({
   const [sessionSaving, setSessionSaving] = useState(false)
   const [sessionError, setSessionError] = useState('')
   const [sessionSuccess, setSessionSuccess] = useState('')
+  const [openIntakeDetails, setOpenIntakeDetails] = useState<Record<string, boolean>>({})
 
   function openPlanningForm(intakeId: string, trainingDuration: string | null) {
     setPlanningIntakeId(intakeId)
@@ -445,6 +531,94 @@ function TrainingTab({
             <span className="flex items-center gap-1"><BookOpen size={11} /> {t.sessionCount} sessies</span>
             {t.preferred_datetime && (
               <span className="flex items-center gap-1"><Clock size={11} /> {fmtDate(t.preferred_datetime)}</span>
+            )}
+          </div>
+
+          {/* Ingevulde intake gegevens */}
+          <div className="mt-4 border-t border-white/10 pt-4">
+            <button
+              onClick={() => setOpenIntakeDetails(prev => ({ ...prev, [t.id]: !prev[t.id] }))}
+              className="flex items-center justify-between w-full text-xs text-white/40 hover:text-white/70 transition-colors"
+              aria-expanded={!!openIntakeDetails[t.id]}
+            >
+              <span>Ingevulde intake gegevens</span>
+              <ChevronDown size={14} className={`transition-transform ${openIntakeDetails[t.id] ? 'rotate-180' : ''}`} />
+            </button>
+            {openIntakeDetails[t.id] && (
+              <div className="mt-3 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {t.focus_area ? (
+                    <div className="bg-white/5 rounded-lg p-2">
+                      <p className="text-xs text-white/40">Focusgebied</p>
+                      <p className="text-xs text-white mt-0.5">{t.focus_area}</p>
+                    </div>
+                  ) : null}
+                  {t.preferred_datetime ? (
+                    <div className="bg-white/5 rounded-lg p-2">
+                      <p className="text-xs text-white/40">Voorkeursdatum</p>
+                      <p className="text-xs text-white mt-0.5">{fmtDate(t.preferred_datetime)}</p>
+                    </div>
+                  ) : null}
+                  {t.contact_person ? (
+                    <div className="bg-white/5 rounded-lg p-2">
+                      <p className="text-xs text-white/40">Contactpersoon</p>
+                      <p className="text-xs text-white mt-0.5">{t.contact_person}</p>
+                    </div>
+                  ) : null}
+                  {t.contact_email ? (
+                    <div className="bg-white/5 rounded-lg p-2">
+                      <p className="text-xs text-white/40">Contact e-mail</p>
+                      <p className="text-xs text-white mt-0.5">{t.contact_email}</p>
+                    </div>
+                  ) : null}
+                  {t.communication_channel ? (
+                    <div className="bg-white/5 rounded-lg p-2">
+                      <p className="text-xs text-white/40">Communicatiekanaal</p>
+                      <p className="text-xs text-white mt-0.5 capitalize">{t.communication_channel}</p>
+                    </div>
+                  ) : null}
+                  {t.privacy_constraints ? (
+                    <div className="bg-white/5 rounded-lg p-2 sm:col-span-2">
+                      <p className="text-xs text-white/40">Privacy beperkingen</p>
+                      <p className="text-xs text-white mt-0.5">{t.privacy_constraints}</p>
+                    </div>
+                  ) : null}
+                </div>
+                {Array.isArray(t.training_intake_members) && t.training_intake_members.length > 0 && (
+                  <div>
+                    <p className="text-xs text-white/40 mb-2">Teamleden</p>
+                    <div className="space-y-2">
+                      {t.training_intake_members
+                        .slice()
+                        .sort((a, b) => a.sort_order - b.sort_order)
+                        .map(member => (
+                          <div key={member.id} className="bg-white/5 rounded-lg p-3">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <div>
+                                <p className="text-xs font-medium text-white">{member.full_name || '—'}</p>
+                                <p className="text-xs text-white/40">{member.role || '—'}</p>
+                              </div>
+                              <StarRating rating={member.digital_skill} />
+                            </div>
+                            {member.ai_experience ? (
+                              <p className="text-xs text-white/60 mt-1">AI ervaring: {member.ai_experience}</p>
+                            ) : null}
+                            {Array.isArray(member.top_tasks) && member.top_tasks.length > 0 ? (
+                              <div className="mt-1">
+                                <p className="text-xs text-white/40">Taken:</p>
+                                <ul className="list-disc list-inside mt-0.5 space-y-0.5">
+                                  {member.top_tasks.map((task, idx) => (
+                                    <li key={idx} className="text-xs text-white/60">{task}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : null}
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -792,6 +966,107 @@ function FacturenTab({
         </div>
       )}
     </>
+  )
+}
+
+function FeedbackTab({ clientId }: { clientId: string }) {
+  const [items, setItems] = useState<FeedbackRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [markingRead, setMarkingRead] = useState<Record<string, boolean>>({})
+
+  async function load() {
+    setLoading(true)
+    setError('')
+    const res = await fetch(`/api/admin/clients/${clientId}/feedback`)
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setError((data as { error?: string }).error || 'Feedback laden mislukt.')
+      setLoading(false)
+      return
+    }
+    setItems((data as { feedback: FeedbackRow[] }).feedback ?? [])
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId])
+
+  async function markAsRead(feedbackId: string) {
+    setMarkingRead(prev => ({ ...prev, [feedbackId]: true }))
+    const res = await fetch(`/api/admin/feedback/${feedbackId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_read: true }),
+    })
+    if (res.ok) {
+      setItems(prev => prev.map(item => item.id === feedbackId ? { ...item, is_read: true } : item))
+    }
+    setMarkingRead(prev => ({ ...prev, [feedbackId]: false }))
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12 gap-3 text-white/60">
+        <Loader2 className="w-5 h-5 animate-spin text-brand-orange" /> Feedback laden...
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <p className="text-red-300 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3" role="alert">{error}</p>
+    )
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <MessageSquare size={32} className="mx-auto text-white/20 mb-3" />
+        <p className="text-white/40 text-sm">Geen feedback voor deze klant</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      {items.map(item => (
+        <div
+          key={item.id}
+          className={`bg-white/5 border rounded-xl p-4 ${!item.is_read ? 'border-yellow-500/30' : 'border-white/10'}`}
+        >
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <div className="flex items-start gap-2">
+              {!item.is_read && (
+                <span className="w-2 h-2 rounded-full bg-yellow-400 shrink-0 mt-1" aria-label="Ongelezen" />
+              )}
+              <div>
+                <p className="text-xs text-white/40">{fmtDate(item.created_at)}</p>
+                <p className="text-xs text-white/60 mt-0.5">
+                  {item.sprints?.title ? `Sprint: ${item.sprints.title}` : 'Algemeen'}
+                </p>
+              </div>
+            </div>
+            <StarRating rating={item.rating} />
+          </div>
+          <p className="text-sm text-white/80 mb-3">{item.message}</p>
+          {!item.is_read && (
+            <button
+              onClick={() => markAsRead(item.id)}
+              disabled={!!markingRead[item.id]}
+              className="inline-flex items-center gap-1.5 text-xs text-white/50 hover:text-white transition-colors disabled:opacity-60"
+            >
+              {markingRead[item.id]
+                ? <Loader2 className="w-3 h-3 animate-spin" />
+                : <CheckCircle2 className="w-3 h-3" />}
+              Markeer als gelezen
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -1145,7 +1420,7 @@ export default function ClientDetailPage() {
 
   // Derive active tab directly from URL — avoids state-reset race with searchParams effect
   const rawTab = searchParams.get('tab')
-  const tab: Tab = (rawTab === 'overzicht' || rawTab === 'offertes' || rawTab === 'training' || rawTab === 'facturen' || rawTab === 'ai') ? rawTab : 'overzicht'
+  const tab: Tab = (rawTab === 'overzicht' || rawTab === 'offertes' || rawTab === 'training' || rawTab === 'facturen' || rawTab === 'feedback' || rawTab === 'ai') ? rawTab : 'overzicht'
 
   function handleTabChange(tabId: Tab) {
     router.replace(`/admin/clients/${id}?tab=${tabId}`)
@@ -1193,6 +1468,7 @@ export default function ClientDetailPage() {
     offertes: offertes.length,
     training: trainingen.length,
     facturen: facturen.length,
+    feedback: 0,
     ai: 0,
   }
 
@@ -1254,6 +1530,7 @@ export default function ClientDetailPage() {
           {tab === 'offertes' && <OffertesTab offertes={offertes} clientId={client.id} />}
           {tab === 'training' && <TrainingTab trainingen={trainingen} clientId={client.id} onSessionPlanned={loadClientDetail} />}
           {tab === 'facturen' && <FacturenTab facturen={facturen} clientId={client.id} onRefresh={loadClientDetail} />}
+          {tab === 'feedback' && <FeedbackTab clientId={client.id} />}
           {tab === 'ai' && <AiSettingsTab clientId={client.id} />}
         </div>
       </div>

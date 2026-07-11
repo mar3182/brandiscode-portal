@@ -88,13 +88,25 @@ export async function PATCH(
     intake_id?: string
     communication_consent?: boolean
     communication_notes?: string
+    visit_notes?: string
+  }
+
+  const admin = createAdminClient()
+
+  // Handle visit_notes update on clients table
+  if (typeof body.visit_notes === 'string') {
+    const { error } = await admin
+      .from('clients')
+      .update({ visit_notes: body.visit_notes.trim() || null })
+      .eq('id', clientId)
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: true })
   }
 
   if (typeof body.communication_consent !== 'boolean' && typeof body.communication_notes !== 'string') {
     return NextResponse.json({ error: 'Geen geldige velden om bij te werken' }, { status: 400 })
   }
-
-  const admin = createAdminClient()
 
   const { data: existing, error: existingError } = await admin
     .from('training_intakes')

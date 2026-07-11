@@ -87,6 +87,7 @@ export interface Client {
   microsoft_subscription: MicrosoftSubscription | null
   software_inventory: string[] | null
   ai_goals: string | null
+  visit_notes: string | null
   created_at: string
 }
 
