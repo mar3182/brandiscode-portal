@@ -104,13 +104,15 @@ export async function POST(req: NextRequest) {
     return noStore({ ok: true, status: 'confirmed' })
   }
 
-  // propose_other_date
+  // propose_other_date — sla voorstel op in metadata, status blijft 'proposed' zodat admin het ziet
   const { error: updateError } = await admin
     .from('training_sessions')
     .update({
-      status: 'rescheduled',
-      client_proposed_datetime: proposed_datetime,
-      rescheduled_reason: note?.trim() || null,
+      metadata: {
+        client_proposed_datetime: proposed_datetime,
+        rescheduled_reason: note?.trim() || null,
+        proposed_at: now,
+      },
     })
     .eq('id', session_id)
 

@@ -54,17 +54,18 @@ export async function POST(
     return noStore({ error: 'Dit tijdslot is al gekozen' }, 422)
   }
 
-  // Maak een confirmed training_session aan
+  // Maak een training_session aan — status 'proposed' want klant heeft gekozen, admin bevestigt definitief
   const { data: session, error: sessionError } = await admin
     .from('training_sessions')
     .insert({
       intake_id: slot.intake_id,
       client_id: slot.client_id,
-      status: 'confirmed',
+      status: 'proposed',
       session_start: slot.slot_start,
       session_end: slot.slot_end,
       proposed_duration_hours: null,
       location_or_link: slot.location_or_link,
+      metadata: { chosen_by_client: true },
     })
     .select('id')
     .single()
