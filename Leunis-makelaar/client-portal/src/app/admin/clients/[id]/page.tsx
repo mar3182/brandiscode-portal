@@ -608,6 +608,28 @@ function TrainingTab({
     setSessionSaving(false)
   }
 
+  // Intake aanmaken state
+  const [creatingIntake, setCreatingIntake] = useState(false)
+  const [createIntakeError, setCreateIntakeError] = useState('')
+
+  async function handleCreateIntake() {
+    setCreatingIntake(true)
+    setCreateIntakeError('')
+    const res = await fetch('/api/admin/training-intakes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: clientId }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setCreateIntakeError(data.error || 'Intake aanmaken mislukt')
+      setCreatingIntake(false)
+      return
+    }
+    await onSessionPlanned()
+    setCreatingIntake(false)
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
@@ -619,7 +641,18 @@ function TrainingTab({
         </Link>
       </div>
       {trainingen.length === 0 && (
-        <p className="text-white/40 text-sm text-center py-8">Geen training intakes voor deze klant</p>
+        <div className="text-center py-8 space-y-3">
+          <p className="text-white/40 text-sm">Geen training intakes voor deze klant</p>
+          {createIntakeError && <p className="text-red-300 text-xs">{createIntakeError}</p>}
+          <button
+            onClick={handleCreateIntake}
+            disabled={creatingIntake}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-orange/20 hover:bg-brand-orange/30 text-brand-orange text-sm disabled:opacity-60"
+          >
+            {creatingIntake ? <Loader2 size={14} className="animate-spin" /> : <GraduationCap size={14} />}
+            Intake aanmaken voor deze klant
+          </button>
+        </div>
       )}
       {trainingen.map(t => (
         <div key={t.id} className="bg-white/5 border border-white/10 rounded-xl p-4">
