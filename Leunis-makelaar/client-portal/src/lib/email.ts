@@ -7,6 +7,16 @@ function getResend() {
 const FROM = process.env.EMAIL_FROM ?? 'Brand is Code <noreply@brandiscode.com>'
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://portal.brandiscode.com'
 
+// Als TEST_EMAIL_OVERRIDE is ingesteld gaan ALLE emails naar dat adres (voor testen)
+function resolveRecipient(to: string): string {
+  const override = process.env.TEST_EMAIL_OVERRIDE
+  if (override) {
+    console.warn(`[TEST MODE] Email omgeleid van ${to} naar ${override}`)
+    return override
+  }
+  return to
+}
+
 // ── types ─────────────────────────────────────────────────────────────────────
 
 export interface TrainingProposalEmailData {
@@ -141,7 +151,7 @@ function trainingProposalHtml(data: TrainingProposalEmailData): string {
 export async function sendTrainingProposalEmail(data: TrainingProposalEmailData) {
   const { error } = await getResend().emails.send({
     from: FROM,
-    to: [data.to],
+    to: [resolveRecipient(data.to)],
     subject: `Trainingsvoorstel ${fmtDateTime(data.sessionStart)} — Brand is Code`,
     html: trainingProposalHtml(data),
   })
@@ -227,7 +237,7 @@ export async function sendFeedbackRequestEmail(data: FeedbackRequestEmailData) {
 
   const { error } = await getResend().emails.send({
     from: FROM,
-    to: [data.to],
+    to: [resolveRecipient(data.to)],
     subject: `Hoe was Sprint ${data.sprintNumber} — ${data.sprintTitle}?`,
     html,
   })
