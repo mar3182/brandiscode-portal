@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import type { FundaTekstRequest, FundaTekstResponse } from '@/lib/types'
+import { createClient } from '@/lib/supabase/server'
+import { resolveClientId, checkAiLimit, logAiUsage, limitReachedMessage } from '@/lib/ai-usage'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,6 +68,27 @@ WOORDAANTALLEN:
 - uitgebreid: ~600 woorden`
 
 export async function POST(req: NextRequest) {
+  // Auth + limiet-check
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const provider = process.env.GITHUB_TOKEN ? 'github-models' : 'openai'
+  const model = 'gpt-4o'
+  let clientId: string | null = null
+
+  if (user?.email) {
+    clientId = await resolveClientId(user.email)
+    if (clientId) {
+      const usage = await checkAiLimit(clientId)
+      if (!usage.allowed) {
+        return NextResponse.json(
+          { error: limitReachedMessage(usage.usedThisMonth, usage.limit!) },
+          { status: 429, headers: { 'Cache-Control': 'no-store' } }
+        )
+      }
+    }
+  }
+
   try {
     const openai = getOpenAI()
     const body: FundaTekstRequest = await req.json()
@@ -137,11 +160,26 @@ ${lengteInstructie}${imageNote}`
     const tekst = completion.choices[0]?.message?.content ?? ''
     const woorden = tekst.split(/\s+/).filter(Boolean).length
 
+    if (clientId) {
+      await logAiUsage({
+        clientId,
+        toolName: 'funda-tekst',
+        provider,
+        model,
+        inputTokens: completion.usage?.prompt_tokens,
+        outputTokens: completion.usage?.completion_tokens,
+        status: 'success',
+      })
+    }
+
     const response: FundaTekstResponse = { tekst, woorden }
     return NextResponse.json(response, { headers: { 'Cache-Control': 'no-store' } })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('Funda-tekst fout:', message)
+    if (clientId) {
+      await logAiUsage({ clientId, toolName: 'funda-tekst', provider, model, status: 'error' })
+    }
     return NextResponse.json(
       { error: `Fout bij genereren: ${message}` },
       { status: 500, headers: { 'Cache-Control': 'no-store' } }

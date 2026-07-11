@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { Sparkles, Loader2, Copy, Check, RotateCcw, Upload, X, Pen } from 'lucide-react'
+import { Sparkles, Loader2, Copy, Check, RotateCcw, Upload, X, Pen, AlertTriangle, Info } from 'lucide-react'
 import type { FundaTekstRequest, FundaTekstResponse, FundaMultiResponse, MediaFormat } from '@/lib/types'
 
 const INPUT_CLASS =
@@ -240,6 +240,14 @@ export default function FundaTekstPage() {
   const [applyVerfijnToFuture, setApplyVerfijnToFuture] = useState(false)
   const [showRelevantOnly, setShowRelevantOnly] = useState(false)
   const lastRequestRef = useRef<FundaTekstRequest | null>(null)
+  const [usageData, setUsageData] = useState<{ usedThisMonth: number; limit: number | null; percentUsed: number | null } | null>(null)
+
+  useEffect(() => {
+    fetch('/api/ai/usage')
+      .then((r) => r.json())
+      .then((d) => { if (d.limit) setUsageData(d) })
+      .catch(() => {/* niet-kritisch */})
+  }, [multiResult, result])
 
   useEffect(() => {
     const savedJson = localStorage.getItem(PROMPT_EXTENSION_STORAGE_KEY)
@@ -759,7 +767,52 @@ export default function FundaTekstPage() {
         </p>
       </div>
 
-      {/* Two-column layout */}
+      {/* Usage banner — alleen zichtbaar als er een maandlimiet is ingesteld */}
+      {usageData?.limit && (
+        <div className={`mb-6 rounded-2xl border p-4 flex items-start gap-3 ${
+          (usageData.percentUsed ?? 0) >= 100
+            ? 'bg-red-500/10 border-red-500/30'
+            : (usageData.percentUsed ?? 0) >= 80
+            ? 'bg-amber-500/10 border-amber-500/30'
+            : 'bg-white/5 border-white/10'
+        }`}>
+          {(usageData.percentUsed ?? 0) >= 80
+            ? <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-400" />
+            : <Info className="w-4 h-4 mt-0.5 shrink-0 text-white/40" />}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-sm font-medium text-white/80">
+                Generaties deze maand
+              </span>
+              <span className={`text-sm font-semibold tabular-nums ${
+                (usageData.percentUsed ?? 0) >= 100 ? 'text-red-400' :
+                (usageData.percentUsed ?? 0) >= 80 ? 'text-amber-400' : 'text-white/60'
+              }`}>
+                {usageData.usedThisMonth} / {usageData.limit}
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  (usageData.percentUsed ?? 0) >= 100 ? 'bg-red-500' :
+                  (usageData.percentUsed ?? 0) >= 80 ? 'bg-amber-400' : 'bg-brand-blue'
+                }`}
+                style={{ width: `${Math.min(usageData.percentUsed ?? 0, 100)}%` }}
+              />
+            </div>
+            {(usageData.percentUsed ?? 0) >= 100 && (
+              <p className="mt-2 text-xs text-red-300 leading-relaxed">
+                Je maandlimiet is bereikt. De portal is een ontwikkeltool — zodra de Microsoft Copilot-inrichting klaar is, genereer je woningbeschrijvingen rechtstreeks vanuit jouw eigen Microsoft-omgeving. Neem contact op met Brand is Code om je limiet te verhogen.
+              </p>
+            )}
+            {(usageData.percentUsed ?? 0) >= 80 && (usageData.percentUsed ?? 0) < 100 && (
+              <p className="mt-2 text-xs text-amber-300/80">
+                Je bent bijna op je maandlimiet. Neem contact op met Brand is Code als je meer nodig hebt.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* LEFT — Form */}
         <div className="space-y-6">

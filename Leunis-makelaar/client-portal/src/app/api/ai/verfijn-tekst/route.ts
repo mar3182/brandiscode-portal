@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import type { VerfijnRequest, VerfijnResponse } from '@/lib/types'
+import { createClient } from '@/lib/supabase/server'
+import { resolveClientId, logAiUsage } from '@/lib/ai-usage'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +27,14 @@ const FORMAT_CONTEXT: Record<string, string> = {
 }
 
 export async function POST(req: NextRequest) {
+  // Haal client_id op voor logging (verfijnen telt NIET mee als generatie)
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const provider = process.env.GITHUB_TOKEN ? 'github-models' : 'openai'
+  const model = 'gpt-4o'
+  let clientId: string | null = null
+  if (user?.email) clientId = await resolveClientId(user.email)
+
   try {
     const openai = getOpenAI()
     const body: VerfijnRequest = await req.json()
@@ -56,6 +66,19 @@ export async function POST(req: NextRequest) {
 
     const tekst = completion.choices[0]?.message?.content?.trim() ?? ''
     const response: VerfijnResponse = { tekst }
+
+    if (clientId) {
+      await logAiUsage({
+        clientId,
+        toolName: 'verfijn-tekst',
+        provider,
+        model,
+        inputTokens: completion.usage?.prompt_tokens,
+        outputTokens: completion.usage?.completion_tokens,
+        status: 'success',
+      })
+    }
+
     return NextResponse.json(response, { headers: { 'Cache-Control': 'no-store' } })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
