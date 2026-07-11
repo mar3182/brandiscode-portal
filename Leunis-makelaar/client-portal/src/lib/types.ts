@@ -147,6 +147,26 @@ export interface IntakeSubmitBody {
   software_inventory?: string[]
   ai_goals?: string
   team_members: IntakeTeamMember[]
+  /** Sprint 1 UUID die de klant heeft goedgekeurd in de intake (optioneel) */
+  sprint1_id?: string
+  /** Base64 PNG handtekening voor de offerte-goedkeuring (optioneel) */
+  offerte_signature?: string
+}
+
+/** Offerte + Sprint 1 data zoals teruggegeven door GET /api/intake/[token] */
+export interface IntakeOfferteData {
+  id: string
+  title: string
+  description: string | null
+  total_amount: number
+  sprint1: {
+    id: string
+    number: number
+    title: string
+    description: string | null
+    amount: number
+    deliverables: { id: string; title: string }[]
+  } | null
 }
 
 export interface Offerte {

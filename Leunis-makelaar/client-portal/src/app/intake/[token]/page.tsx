@@ -18,7 +18,8 @@ import {
   formatBtwInput,
   formatIbanInput,
 } from '@/lib/companyProfileValidation'
-import type { IntakeSubmitBody, IntakeTeamMember, IntakeTeamMemberProfile, MicrosoftSubscription } from '@/lib/types'
+import type { IntakeSubmitBody, IntakeTeamMember, IntakeTeamMemberProfile, MicrosoftSubscription, IntakeOfferteData } from '@/lib/types'
+import SignatureCanvas from '@/components/SignatureCanvas'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -210,6 +211,7 @@ export default function IntakePage() {
   const [companyName, setCompanyName] = useState('')
   const [sector, setSector] = useState<IntakeSector>('generic')
   const [profileOverrides, setProfileOverrides] = useState<IntakeProfileOverrides | null>(null)
+  const [offerteData, setOfferteData] = useState<IntakeOfferteData | null>(null)
 
   // Wizard state
   const [step, setStep] = useState(1)
@@ -217,6 +219,10 @@ export default function IntakePage() {
   const [submitError, setSubmitError] = useState('')
   const [submitWarnings, setSubmitWarnings] = useState<string[]>([])
   const [teamCount, setTeamCount] = useState(0)
+
+  // Offerte-goedkeuring state
+  const [offerteSignature, setOfferteSignature] = useState<string | null>(null)
+  const [offerteSignError, setOfferteSignError] = useState('')
 
   // Forms
   const [form, setForm] = useState<Step1Form>(emptyStep1)
@@ -228,6 +234,12 @@ export default function IntakePage() {
   const [teamError, setTeamError] = useState('')
 
   const effectiveSector = form.sector_raw.trim() ? inferSectorFromRaw(form.sector_raw) : sector
+
+  // Step 2 (offerte-goedkeuring) wordt alleen getoond als er een openstaande offerte is
+  const hasOfferteStep = Boolean(offerteData?.sprint1)
+  const totalSteps = hasOfferteStep ? 3 : 2
+  // Stap-nummers: 1 = bedrijfsgegevens, 2 = offerte (conditoneel), 3 = teamleden
+  // Als geen offerte: stap 1 = bedrijfsgegevens, stap 2 = teamleden
 
   const sectorSoftwareOptions =
     effectiveSector === 'real_estate'
@@ -282,10 +294,12 @@ export default function IntakePage() {
             intake_profile?: IntakeProfileOverrides | null
           }
           valid: boolean
+          offerte?: IntakeOfferteData | null
         }
         setCompanyName(data.client.company ?? '')
         setSector(resolveSector(data.client.sector))
         setProfileOverrides(data.client.intake_profile ?? null)
+        setOfferteData(data.offerte ?? null)
         setPageState('wizard')
       } catch {
         setTokenError('Er is een fout opgetreden bij het laden van de pagina. Probeer het opnieuw.')
@@ -350,9 +364,26 @@ export default function IntakePage() {
 
   function handleNextStep() {
     if (validateStep1()) {
-      setStep(2)
+      setStep(hasOfferteStep ? 2 : 3)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
+  }
+
+  function handleOfferteNext() {
+    if (!offerteSignature) {
+      setOfferteSignError('Zet eerst je handtekening om door te gaan.')
+      return
+    }
+    setOfferteSignError('')
+    setStep(3)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function handleOfferteSkip() {
+    setOfferteSignature(null)
+    setOfferteSignError('')
+    setStep(3)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   // ── Team member logic ────────────────────────────────────────────────────
@@ -459,6 +490,10 @@ export default function IntakePage() {
       ...(software.length > 0 ? { software_inventory: software } : {}),
       ...(form.ai_goals.trim() ? { ai_goals: form.ai_goals.trim() } : {}),
       team_members: teamMembers,
+      // Offerte-goedkeuring (alleen als handtekening gezet en sprint1 aanwezig)
+      ...(offerteSignature && offerteData?.sprint1
+        ? { sprint1_id: offerteData.sprint1.id, offerte_signature: offerteSignature }
+        : {}),
     }
 
     try {
@@ -564,37 +599,46 @@ export default function IntakePage() {
       {/* Progress bar */}
       <div className="max-w-2xl mx-auto mb-8">
         <div className="flex items-center gap-3 mb-3">
-          {[1, 2].map((s) => (
-            <div key={s} className="flex items-center gap-3 flex-1">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 transition-all ${
-                  s < step
-                    ? 'bg-brand-gold text-brand-dark'
-                    : s === step
-                    ? 'bg-brand-gold/20 border-2 border-brand-gold text-brand-gold'
-                    : 'bg-white/5 border border-white/10 text-white/40'
-                }`}
-              >
-                {s < step ? <CheckCircle2 className="w-4 h-4" /> : s}
+          {Array.from({ length: totalSteps }, (_, i) => i + 1).map((s) => {
+            const isStep2Offerte = hasOfferteStep && s === 2
+            const isStep3 = hasOfferteStep ? s === 3 : s === 2
+            const labelMap: Record<number, string> = hasOfferteStep
+              ? { 1: 'Bedrijfsgegevens', 2: 'Offerte', 3: 'Teamleden' }
+              : { 1: 'Bedrijfsgegevens', 2: 'Teamleden' }
+            // Map wizard step numbers for comparison
+            const wizardStep = isStep3 ? 3 : isStep2Offerte ? 2 : 1
+            return (
+              <div key={s} className="flex items-center gap-3 flex-1">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 transition-all ${
+                    wizardStep < step
+                      ? 'bg-brand-gold text-brand-dark'
+                      : wizardStep === step
+                      ? 'bg-brand-gold/20 border-2 border-brand-gold text-brand-gold'
+                      : 'bg-white/5 border border-white/10 text-white/40'
+                  }`}
+                >
+                  {wizardStep < step ? <CheckCircle2 className="w-4 h-4" /> : s}
+                </div>
+                <span
+                  className={`text-sm hidden sm:block ${
+                    wizardStep === step ? 'text-white font-medium' : 'text-white/40'
+                  }`}
+                >
+                  {labelMap[s]}
+                </span>
+                {s < totalSteps && <div className="flex-1 h-px bg-white/10 hidden sm:block" />}
               </div>
-              <span
-                className={`text-sm hidden sm:block ${
-                  s === step ? 'text-white font-medium' : 'text-white/40'
-                }`}
-              >
-                {s === 1 ? 'Bedrijfsgegevens' : 'Teamleden'}
-              </span>
-              {s < 2 && <div className="flex-1 h-px bg-white/10 hidden sm:block" />}
-            </div>
-          ))}
+            )
+          })}
         </div>
         <div className="h-1 bg-white/10 rounded-full overflow-hidden">
           <div
             className="h-full bg-gradient-to-r from-brand-gold to-brand-gold/70 rounded-full transition-all duration-500"
-            style={{ width: step === 1 ? '50%' : '100%' }}
+            style={{ width: `${((step - 1) / (totalSteps - 1)) * 100}%` }}
           />
         </div>
-        <p className="text-white/40 text-xs mt-2">Stap {step} van 2</p>
+        <p className="text-white/40 text-xs mt-2">Stap {step} van {totalSteps}</p>
       </div>
 
       {/* Step content */}
@@ -610,6 +654,22 @@ export default function IntakePage() {
             onIbanChange={handleIbanChange}
             onToggleSoftware={toggleSoftware}
             onNext={handleNextStep}
+          />
+        ) : step === 2 && hasOfferteStep && offerteData ? (
+          <StepOfferte
+            offerte={offerteData}
+            signature={offerteSignature}
+            error={offerteSignError}
+            onSignature={(dataUrl) => {
+              setOfferteSignature(dataUrl)
+              setOfferteSignError('')
+            }}
+            onNext={handleOfferteNext}
+            onSkip={handleOfferteSkip}
+            onBack={() => {
+              setStep(1)
+              window.scrollTo({ top: 0, behavior: 'smooth' })
+            }}
           />
         ) : (
           <Step2
@@ -630,7 +690,7 @@ export default function IntakePage() {
             onAddMember={handleAddMember}
             onRemoveMember={handleRemoveMember}
             onBack={() => {
-              setStep(1)
+              setStep(hasOfferteStep ? 2 : 1)
               window.scrollTo({ top: 0, behavior: 'smooth' })
             }}
             onSubmit={handleSubmit}
@@ -897,7 +957,136 @@ function Step1({
   )
 }
 
-// ─── Step 2 ───────────────────────────────────────────────────────────────────
+// ─── Step Offerte ─────────────────────────────────────────────────────────────
+
+interface StepOfferteProps {
+  offerte: IntakeOfferteData
+  signature: string | null
+  error: string
+  onSignature: (dataUrl: string) => void
+  onNext: () => void
+  onSkip: () => void
+  onBack: () => void
+}
+
+function StepOfferte({ offerte, signature, error, onSignature, onNext, onSkip, onBack }: StepOfferteProps) {
+  const sprint = offerte.sprint1
+  const formatEuro = (amount: number) =>
+    new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(amount)
+
+  return (
+    <div className="glass-card p-6 md:p-8 space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold text-white">Offerte goedkeuren</h2>
+        <p className="text-white/50 text-sm mt-1">
+          Bekijk en onderteken de offerte om verder te gaan met de onboarding.
+        </p>
+      </div>
+
+      {/* Offerte samenvatting */}
+      <div className="rounded-xl border border-white/10 bg-white/3 p-5 space-y-4">
+        <div>
+          <p className="text-xs text-white/40 uppercase tracking-wider mb-1">Offerte</p>
+          <p className="text-white font-semibold">{offerte.title}</p>
+          {offerte.description && (
+            <p className="text-white/60 text-sm mt-1">{offerte.description}</p>
+          )}
+        </div>
+
+        {sprint && (
+          <div className="border-t border-white/10 pt-4 space-y-3">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs text-white/40 uppercase tracking-wider mb-1">Sprint {sprint.number}</p>
+                <p className="text-white font-medium">{sprint.title}</p>
+                {sprint.description && (
+                  <p className="text-white/60 text-sm mt-1">{sprint.description}</p>
+                )}
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className="text-xs text-white/40 uppercase tracking-wider mb-1">Bedrag</p>
+                <p className="text-brand-gold font-semibold">{formatEuro(sprint.amount)}</p>
+                <p className="text-white/30 text-xs">excl. BTW</p>
+              </div>
+            </div>
+
+            {sprint.deliverables.length > 0 && (
+              <div>
+                <p className="text-xs text-white/40 uppercase tracking-wider mb-2">Deliverables</p>
+                <ul className="space-y-1">
+                  {sprint.deliverables.map((d) => (
+                    <li key={d.id} className="flex items-start gap-2 text-sm text-white/70">
+                      <span className="text-brand-gold mt-0.5">✓</span>
+                      {d.title}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Totaalregel */}
+        <div className="border-t border-white/10 pt-4 flex justify-between items-center">
+          <p className="text-white/60 text-sm">Totaal offerte</p>
+          <p className="text-white font-semibold">{formatEuro(offerte.total_amount)}</p>
+        </div>
+      </div>
+
+      {/* Handtekening */}
+      <div className="space-y-3">
+        <p className="text-sm font-medium text-white">
+          Handtekening {signature ? <span className="text-emerald-400 text-xs ml-2">✓ Ondertekend</span> : ''}
+        </p>
+        {signature ? (
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+            <p className="text-emerald-300 text-sm">Handtekening geplaatst. Je kunt verder gaan.</p>
+          </div>
+        ) : (
+          <SignatureCanvas onSave={onSignature} />
+        )}
+        {error && (
+          <p className="text-red-400 text-sm flex items-center gap-1.5">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            {error}
+          </p>
+        )}
+      </div>
+
+      {/* Navigatie */}
+      <div className="flex items-center justify-between pt-2 gap-3 flex-wrap">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex items-center gap-2 px-4 py-2.5 text-white/60 hover:text-white transition-all text-sm"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Terug
+        </button>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onSkip}
+            className="px-4 py-2.5 text-white/40 hover:text-white/60 transition-all text-sm underline underline-offset-2"
+          >
+            Overslaan
+          </button>
+          <button
+            type="button"
+            onClick={onNext}
+            className="flex items-center gap-2 px-6 py-3 bg-brand-gold text-brand-dark font-semibold rounded-xl hover:bg-brand-gold/90 transition-all"
+          >
+            Akkoord & verder
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Step 2 (Teamleden) ───────────────────────────────────────────────────────
 
 interface Step2Props {
   teamMembers: IntakeTeamMember[]

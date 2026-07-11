@@ -260,6 +260,68 @@ export async function GET(
     return NextResponse.json({ error: 'Klant niet gevonden' }, { status: 404, headers: NO_STORE })
   }
 
+  // Haal openstaande offerte op (verstuurd of bekeken)
+  const { data: offerte } = await admin
+    .from('offertes')
+    .select('id, title, description, total_amount, status')
+    .eq('client_id', tokenRow.client_id)
+    .in('status', ['verstuurd', 'bekeken'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  let offerteData: {
+    id: string
+    title: string
+    description: string | null
+    total_amount: number
+    sprint1: {
+      id: string
+      number: number
+      title: string
+      description: string | null
+      amount: number
+      deliverables: { id: string; title: string }[]
+    } | null
+  } | null = null
+
+  if (offerte) {
+    const { data: sprint1 } = await admin
+      .from('sprints')
+      .select('id, number, title, description, amount')
+      .eq('offerte_id', offerte.id)
+      .order('number', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    let deliverables: { id: string; title: string }[] = []
+    if (sprint1) {
+      const { data: dels } = await admin
+        .from('deliverables')
+        .select('id, title')
+        .eq('sprint_id', sprint1.id)
+        .order('created_at', { ascending: true })
+      deliverables = dels ?? []
+    }
+
+    offerteData = {
+      id: offerte.id,
+      title: offerte.title,
+      description: offerte.description ?? null,
+      total_amount: offerte.total_amount,
+      sprint1: sprint1
+        ? {
+            id: sprint1.id,
+            number: sprint1.number,
+            title: sprint1.title,
+            description: sprint1.description ?? null,
+            amount: sprint1.amount,
+            deliverables,
+          }
+        : null,
+    }
+  }
+
   return NextResponse.json(
     {
       valid: true,
@@ -275,6 +337,7 @@ export async function GET(
         sector_confidence: typeof client.sector_confidence === 'number' ? client.sector_confidence : null,
         intake_profile: client.intake_profile ?? null,
       },
+      offerte: offerteData,
     },
     { headers: NO_STORE }
   )
@@ -347,6 +410,53 @@ export async function POST(
         { error: `AI-ervaring ontbreekt of is ongeldig voor teamlid: ${member.name}` },
         { status: 400, headers: NO_STORE }
       )
+    }
+  }
+
+  // ── 0. Verwerk offerte-goedkeuring (optioneel) ───────────────────────────
+  if (body.sprint1_id && body.offerte_signature) {
+    const sprintId = body.sprint1_id.trim()
+    const signatureData = body.offerte_signature.trim()
+
+    // Valideer dat de sprint bij de klant hoort
+    const { data: sprintRow, error: sprintFetchError } = await admin
+      .from('sprints')
+      .select('id, offerte_id, client_approved')
+      .eq('id', sprintId)
+      .maybeSingle()
+
+    if (!sprintFetchError && sprintRow) {
+      // Controleer dat de offerte bij deze klant hoort
+      const { data: offerteRow } = await admin
+        .from('offertes')
+        .select('id, client_id, status')
+        .eq('id', sprintRow.offerte_id)
+        .eq('client_id', tokenRow.client_id)
+        .maybeSingle()
+
+      if (offerteRow) {
+        const now = new Date().toISOString()
+
+        // Idempotent: alleen updaten als sprint nog niet goedgekeurd is
+        if (!sprintRow.client_approved) {
+          await admin
+            .from('sprints')
+            .update({ client_approved: true, client_approved_at: now })
+            .eq('id', sprintId)
+        }
+
+        // Idempotent: alleen tekenen als offerte nog niet getekend is
+        if (offerteRow.status !== 'getekend') {
+          await admin
+            .from('offertes')
+            .update({
+              status: 'getekend',
+              signed_at: now,
+              signature_data: signatureData,
+            })
+            .eq('id', offerteRow.id)
+        }
+      }
     }
   }
 
