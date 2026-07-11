@@ -1,19 +1,23 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Feedback, Sprint } from '@/lib/types'
 import { MessageSquare, Send, Star, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { nl } from 'date-fns/locale'
 
-export default function FeedbackPage() {
+function FeedbackPageInner() {
+  const searchParams = useSearchParams()
+  const preselectedSprint = searchParams.get('sprint') ?? ''
+
   const [feedbackList, setFeedbackList] = useState<(Feedback & { sprint?: Sprint })[]>([])
   const [sprints, setSprints] = useState<Sprint[]>([])
   const [message, setMessage] = useState('')
   const [rating, setRating] = useState(0)
   const [hoveredRating, setHoveredRating] = useState(0)
-  const [selectedSprint, setSelectedSprint] = useState('')
+  const [selectedSprint, setSelectedSprint] = useState(preselectedSprint)
   const [sending, setSending] = useState(false)
   const [clientId, setClientId] = useState('')
   const supabase = createClient()
@@ -210,5 +214,13 @@ export default function FeedbackPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function FeedbackPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-white/40" /></div>}>
+      <FeedbackPageInner />
+    </Suspense>
   )
 }
