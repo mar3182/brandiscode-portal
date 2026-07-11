@@ -12,13 +12,16 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
+  Copy,
   CreditCard,
+  ExternalLink,
   FileText,
   GraduationCap,
   Loader2,
   Mail,
   MessageSquare,
   Phone,
+  RefreshCw,
   Sparkles,
   Star,
   User,
@@ -40,6 +43,12 @@ import type {
   TrainingIntake,
   TrainingIntakeStatus,
 } from '@/lib/types'
+
+// ── publish result ───────────────────────────────────────────────────────────
+interface PublishResult {
+  wordpress: { success?: boolean; url?: string; skipped?: boolean; reason?: string }
+  socialPosts: { linkedin: string; instagram: string; facebook: string }
+}
 
 // ── local sub-types ───────────────────────────────────────────────────────────
 interface TrainingIntakeMemberRow {
@@ -329,12 +338,59 @@ function OverzichtTab({ client }: { client: Client }) {
   )
 }
 
-function OffertesTab({ offertes, clientId }: { offertes: OfferteRow[]; clientId: string }) {
+function OffertesTab({ offertes, clientId, clientEmail }: { offertes: OfferteRow[]; clientId: string; clientEmail?: string | null }) {
   const [open, setOpen] = useState<Record<string, boolean>>({})
+  const [localOffertes, setLocalOffertes] = useState<OfferteRow[]>(offertes)
+  const [completingSprint, setCompletingSprint] = useState<Record<string, boolean>>({})
+  const [sprintToast, setSprintToast] = useState<{ msg: string; isError: boolean } | null>(null)
+
+  useEffect(() => {
+    setLocalOffertes(offertes)
+  }, [offertes])
+
   const toggle = (id: string) => setOpen(p => ({ ...p, [id]: !p[id] }))
+
+  async function handleAfronden(sprintId: string, sprintTitle: string) {
+    if (!confirm(`Sprint "${sprintTitle}" afronden? Dit stuurt een feedback-verzoek naar de klant.`)) return
+
+    setCompletingSprint(prev => ({ ...prev, [sprintId]: true }))
+    const res = await fetch(`/api/admin/sprints/${sprintId}/afronden`, { method: 'POST' })
+    const data = await res.json().catch(() => ({} as { error?: string; clientEmail?: string }))
+
+    if (!res.ok) {
+      setSprintToast({ msg: (data as { error?: string }).error ?? 'Sprint afronden mislukt.', isError: true })
+      setCompletingSprint(prev => ({ ...prev, [sprintId]: false }))
+      setTimeout(() => setSprintToast(null), 4000)
+      return
+    }
+
+    setLocalOffertes(prev => prev.map(o => ({
+      ...o,
+      sprints: o.sprints.map(s => s.id === sprintId ? { ...s, status: 'afgerond' as const } : s),
+    })))
+
+    const email = (data as { clientEmail?: string }).clientEmail ?? clientEmail ?? 'klant'
+    setSprintToast({ msg: `Sprint afgerond — feedback verzoek verstuurd naar ${email}`, isError: false })
+    setCompletingSprint(prev => ({ ...prev, [sprintId]: false }))
+    setTimeout(() => setSprintToast(null), 5000)
+  }
 
   return (
     <div className="space-y-3">
+      {/* Toast */}
+      {sprintToast && (
+        <div
+          className={`text-xs px-4 py-2.5 rounded-xl border ${
+            sprintToast.isError
+              ? 'bg-red-500/10 border-red-500/20 text-red-300'
+              : 'bg-green-500/10 border-green-500/20 text-green-300'
+          }`}
+          role={sprintToast.isError ? 'alert' : 'status'}
+        >
+          {sprintToast.msg}
+        </div>
+      )}
+
       <div className="flex justify-end">
         <Link
           href={`/admin/offertes?client=${clientId}`}
@@ -343,10 +399,10 @@ function OffertesTab({ offertes, clientId }: { offertes: OfferteRow[]; clientId:
           Nieuwe offerte <ChevronRight size={12} />
         </Link>
       </div>
-      {offertes.length === 0 && (
+      {localOffertes.length === 0 && (
         <p className="text-white/40 text-sm text-center py-8">Geen offertes voor deze klant</p>
       )}
-      {offertes.map(o => (
+      {localOffertes.map(o => (
         <div key={o.id} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
           <button
             onClick={() => toggle(o.id)}
@@ -375,16 +431,30 @@ function OffertesTab({ offertes, clientId }: { offertes: OfferteRow[]; clientId:
                   const pct = total > 0 ? Math.round((done / total) * 100) : 0
                   return (
                     <div key={s.id} className="bg-white/5 rounded-lg px-3 py-2 space-y-2">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
                         <div>
                           <p className="text-xs text-white">Sprint {s.number} — {s.title}</p>
                           <p className="text-xs text-white/40">{fmt(s.amount)}</p>
                         </div>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          s.status === 'afgerond' ? 'bg-green-500/20 text-green-300' :
-                          s.status === 'actief' ? 'bg-blue-500/20 text-blue-300' :
-                          'bg-white/10 text-white/50'
-                        }`}>{s.status}</span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            s.status === 'afgerond' ? 'bg-green-500/20 text-green-300' :
+                            s.status === 'actief' ? 'bg-blue-500/20 text-blue-300' :
+                            'bg-white/10 text-white/50'
+                          }`}>{s.status}</span>
+                          {s.status !== 'afgerond' && (
+                            <button
+                              onClick={() => handleAfronden(s.id, s.title)}
+                              disabled={!!completingSprint[s.id]}
+                              className="inline-flex items-center gap-1 text-xs px-3 py-1 rounded-full bg-green-600/20 border border-green-500/30 text-green-300 hover:bg-green-600/30 transition-colors disabled:opacity-60"
+                            >
+                              {completingSprint[s.id]
+                                ? <Loader2 size={10} className="animate-spin" />
+                                : <CheckCircle2 size={10} />}
+                              Sprint afronden
+                            </button>
+                          )}
+                        </div>
                       </div>
                       {total > 0 && (
                         <div>
@@ -969,11 +1039,35 @@ function FacturenTab({
   )
 }
 
-function FeedbackTab({ clientId }: { clientId: string }) {
+type SocialTab = 'linkedin' | 'instagram' | 'facebook'
+
+function FeedbackTab({ clientId, companyName }: { clientId: string; companyName: string }) {
   const [items, setItems] = useState<FeedbackRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [markingRead, setMarkingRead] = useState<Record<string, boolean>>({})
+
+  // Publish modal
+  const [publishModal, setPublishModal] = useState<{
+    open: boolean
+    feedbackId: string | null
+    feedbackText: string
+    feedbackRating: number | null
+    data: PublishResult | null
+    loading: boolean
+    error: string
+  }>({
+    open: false,
+    feedbackId: null,
+    feedbackText: '',
+    feedbackRating: null,
+    data: null,
+    loading: false,
+    error: '',
+  })
+  const [socialTab, setSocialTab] = useState<SocialTab>('linkedin')
+  const [copiedTab, setCopiedTab] = useState<SocialTab | null>(null)
+  const [regenerating, setRegenerating] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -1007,6 +1101,61 @@ function FeedbackTab({ clientId }: { clientId: string }) {
     setMarkingRead(prev => ({ ...prev, [feedbackId]: false }))
   }
 
+  async function openPublishModal(item: FeedbackRow) {
+    setPublishModal({
+      open: true,
+      feedbackId: item.id,
+      feedbackText: item.message,
+      feedbackRating: item.rating,
+      data: null,
+      loading: true,
+      error: '',
+    })
+    setSocialTab('linkedin')
+
+    const res = await fetch(`/api/admin/feedback/${item.id}/publiceer`, { method: 'POST' })
+    const data = await res.json().catch(() => ({} as { error?: string }))
+
+    if (!res.ok) {
+      setPublishModal(prev => ({
+        ...prev,
+        loading: false,
+        error: (data as { error?: string }).error ?? 'Publiceren mislukt.',
+      }))
+      return
+    }
+
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, is_published: true } : i))
+    setPublishModal(prev => ({ ...prev, loading: false, data: data as PublishResult }))
+  }
+
+  async function regenerateSocialPosts() {
+    if (!publishModal.feedbackId) return
+    setRegenerating(true)
+    const res = await fetch(`/api/admin/feedback/${publishModal.feedbackId}/social-post`)
+    const data = await res.json().catch(() => ({} as { socialPosts?: PublishResult['socialPosts'] }))
+    if (res.ok && publishModal.data) {
+      const socialPosts = (data as { socialPosts?: PublishResult['socialPosts'] }).socialPosts
+      if (socialPosts) {
+        setPublishModal(prev => ({
+          ...prev,
+          data: prev.data ? { ...prev.data, socialPosts } : null,
+        }))
+      }
+    }
+    setRegenerating(false)
+  }
+
+  async function copyToClipboard(text: string, tab: SocialTab) {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedTab(tab)
+      setTimeout(() => setCopiedTab(null), 2000)
+    } catch {
+      // clipboard not available
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12 gap-3 text-white/60">
@@ -1030,43 +1179,216 @@ function FeedbackTab({ clientId }: { clientId: string }) {
     )
   }
 
+  const SOCIAL_TABS: SocialTab[] = ['linkedin', 'instagram', 'facebook']
+
   return (
-    <div className="space-y-3">
-      {items.map(item => (
-        <div
-          key={item.id}
-          className={`bg-white/5 border rounded-xl p-4 ${!item.is_read ? 'border-yellow-500/30' : 'border-white/10'}`}
-        >
-          <div className="flex items-start justify-between gap-3 mb-2">
-            <div className="flex items-start gap-2">
-              {!item.is_read && (
-                <span className="w-2 h-2 rounded-full bg-yellow-400 shrink-0 mt-1" aria-label="Ongelezen" />
-              )}
-              <div>
-                <p className="text-xs text-white/40">{fmtDate(item.created_at)}</p>
-                <p className="text-xs text-white/60 mt-0.5">
-                  {item.sprints?.title ? `Sprint: ${item.sprints.title}` : 'Algemeen'}
-                </p>
+    <>
+      <div className="space-y-3">
+        {items.map(item => (
+          <div
+            key={item.id}
+            className={`bg-white/5 border rounded-xl p-4 ${!item.is_read ? 'border-yellow-500/30' : 'border-white/10'}`}
+          >
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <div className="flex items-start gap-2">
+                {!item.is_read && (
+                  <span className="w-2 h-2 rounded-full bg-yellow-400 shrink-0 mt-1" aria-label="Ongelezen" />
+                )}
+                <div>
+                  <p className="text-xs text-white/40">{fmtDate(item.created_at)}</p>
+                  <p className="text-xs text-white/60 mt-0.5">
+                    {item.sprints?.title ? `Sprint: ${item.sprints.title}` : 'Algemeen'}
+                  </p>
+                </div>
               </div>
+              <StarRating rating={item.rating} />
             </div>
-            <StarRating rating={item.rating} />
+            <p className="text-sm text-white/80 mb-3">{item.message}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              {!item.is_read && (
+                <button
+                  onClick={() => markAsRead(item.id)}
+                  disabled={!!markingRead[item.id]}
+                  className="inline-flex items-center gap-1.5 text-xs text-white/50 hover:text-white transition-colors disabled:opacity-60"
+                >
+                  {markingRead[item.id]
+                    ? <Loader2 className="w-3 h-3 animate-spin" />
+                    : <CheckCircle2 className="w-3 h-3" />}
+                  Markeer als gelezen
+                </button>
+              )}
+              {item.is_published ? (
+                <span className="inline-flex items-center gap-1 text-xs px-3 py-1 rounded-full bg-green-600/20 border border-green-500/30 text-green-300">
+                  <CheckCircle2 size={10} /> Gepubliceerd ✓
+                </span>
+              ) : (
+                <button
+                  onClick={() => openPublishModal(item)}
+                  className="inline-flex items-center gap-1 text-xs px-3 py-1 rounded-full bg-purple-600/20 border border-purple-500/30 text-purple-300 hover:bg-purple-600/30 transition-colors"
+                >
+                  <Sparkles size={10} /> Publiceer
+                </button>
+              )}
+            </div>
           </div>
-          <p className="text-sm text-white/80 mb-3">{item.message}</p>
-          {!item.is_read && (
-            <button
-              onClick={() => markAsRead(item.id)}
-              disabled={!!markingRead[item.id]}
-              className="inline-flex items-center gap-1.5 text-xs text-white/50 hover:text-white transition-colors disabled:opacity-60"
-            >
-              {markingRead[item.id]
-                ? <Loader2 className="w-3 h-3 animate-spin" />
-                : <CheckCircle2 className="w-3 h-3" />}
-              Markeer als gelezen
-            </button>
-          )}
+        ))}
+      </div>
+
+      {/* Publish modal */}
+      {publishModal.open && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
+          onClick={(e) => { if (e.target === e.currentTarget && !publishModal.loading) setPublishModal(prev => ({ ...prev, open: false })) }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Review publiceren"
+        >
+          <div className="w-full sm:max-w-2xl bg-slate-900 border border-white/15 rounded-t-2xl sm:rounded-2xl overflow-y-auto max-h-[95dvh] sm:max-h-[90dvh]">
+
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+              <div>
+                <p className="text-sm font-semibold text-white">Publiceer review van {companyName}</p>
+                <p className="text-xs text-white/50">WordPress + social media posts</p>
+              </div>
+              <button
+                onClick={() => setPublishModal(prev => ({ ...prev, open: false }))}
+                disabled={publishModal.loading}
+                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors disabled:opacity-40"
+                aria-label="Sluiten"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="px-5 py-4 space-y-4">
+              {/* Review preview */}
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-white/40">Review</p>
+                  <StarRating rating={publishModal.feedbackRating} />
+                </div>
+                <p className="text-sm text-white/80 italic">&ldquo;{publishModal.feedbackText}&rdquo;</p>
+              </div>
+
+              {/* Loading / error */}
+              {publishModal.loading && (
+                <div className="flex items-center gap-2 text-white/60 text-sm py-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-brand-orange" />
+                  Publiceren naar WordPress en social posts genereren...
+                </div>
+              )}
+
+              {publishModal.error && (
+                <p className="text-xs text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2" role="alert">
+                  {publishModal.error}
+                </p>
+              )}
+
+              {publishModal.data && (
+                <>
+                  {/* WordPress status */}
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                    <p className="text-xs font-medium text-white/60 uppercase tracking-wide mb-3">WordPress</p>
+                    {publishModal.data.wordpress.skipped ? (
+                      <p className="text-xs text-yellow-300 flex items-center gap-1.5">
+                        ⚠️ WordPress niet geconfigureerd — sla env vars in
+                      </p>
+                    ) : publishModal.data.wordpress.success ? (
+                      <div className="flex items-center gap-2 text-xs text-green-300">
+                        <CheckCircle2 size={13} />
+                        <span>Gepubliceerd op brandiscode.com</span>
+                        {publishModal.data.wordpress.url && (
+                          <a
+                            href={publishModal.data.wordpress.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-0.5 text-brand-blue hover:underline"
+                          >
+                            Bekijk <ExternalLink size={10} />
+                          </a>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-red-300">
+                        ⚠️ WordPress publicatie mislukt: {publishModal.data.wordpress.reason}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Social posts */}
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-medium text-white/60 uppercase tracking-wide">Social media posts</p>
+                      <button
+                        onClick={regenerateSocialPosts}
+                        disabled={regenerating}
+                        className="inline-flex items-center gap-1 text-xs text-white/50 hover:text-white transition-colors disabled:opacity-60"
+                        aria-label="Regenereer social posts"
+                      >
+                        <RefreshCw size={11} className={regenerating ? 'animate-spin' : ''} />
+                        Regenereer
+                      </button>
+                    </div>
+
+                    {/* Tabs */}
+                    <div className="flex gap-1 mb-3">
+                      {SOCIAL_TABS.map(tab => (
+                        <button
+                          key={tab}
+                          onClick={() => setSocialTab(tab)}
+                          className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors capitalize ${
+                            socialTab === tab
+                              ? 'bg-brand-orange text-white'
+                              : 'text-white/50 hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          {tab}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Post content */}
+                    <div className="space-y-2">
+                      <textarea
+                        readOnly
+                        rows={6}
+                        value={publishModal.data.socialPosts[socialTab]}
+                        className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-sm text-white/80 focus:outline-none resize-y select-all cursor-text"
+                        onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+                      />
+                      <button
+                        onClick={() => copyToClipboard(publishModal.data!.socialPosts[socialTab], socialTab)}
+                        className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                          copiedTab === socialTab
+                            ? 'bg-green-600/20 border border-green-500/30 text-green-300'
+                            : 'bg-white/10 border border-white/10 text-white/70 hover:text-white hover:bg-white/15'
+                        }`}
+                      >
+                        {copiedTab === socialTab
+                          ? <><CheckCircle2 size={11} /> Gekopieerd ✓</>
+                          : <><Copy size={11} /> Kopieer naar klembord</>}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Modal footer */}
+            <div className="px-5 py-4 border-t border-white/10">
+              <button
+                onClick={() => setPublishModal(prev => ({ ...prev, open: false }))}
+                disabled={publishModal.loading}
+                className="w-full sm:w-auto px-5 py-2 rounded-lg bg-white/10 text-white/80 text-sm font-medium hover:bg-white/15 transition-colors disabled:opacity-60"
+              >
+                Sluiten
+              </button>
+            </div>
+          </div>
         </div>
-      ))}
-    </div>
+      )}
+    </>
   )
 }
 
@@ -1527,10 +1849,10 @@ export default function ClientDetailPage() {
         {/* tab content */}
         <div>
           {tab === 'overzicht' && <OverzichtTab client={client} />}
-          {tab === 'offertes' && <OffertesTab offertes={offertes} clientId={client.id} />}
+          {tab === 'offertes' && <OffertesTab offertes={offertes} clientId={client.id} clientEmail={client.email} />}
           {tab === 'training' && <TrainingTab trainingen={trainingen} clientId={client.id} onSessionPlanned={loadClientDetail} />}
           {tab === 'facturen' && <FacturenTab facturen={facturen} clientId={client.id} onRefresh={loadClientDetail} />}
-          {tab === 'feedback' && <FeedbackTab clientId={client.id} />}
+          {tab === 'feedback' && <FeedbackTab clientId={client.id} companyName={client.company || client.name || 'klant'} />}
           {tab === 'ai' && <AiSettingsTab clientId={client.id} />}
         </div>
       </div>

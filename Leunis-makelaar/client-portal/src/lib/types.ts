@@ -217,6 +217,7 @@ export interface Feedback {
   message: string
   rating: number | null
   is_read: boolean
+  is_published: boolean
   created_at: string
 }
 
