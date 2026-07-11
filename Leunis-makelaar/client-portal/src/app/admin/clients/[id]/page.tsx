@@ -74,6 +74,8 @@ interface TrainingRow extends TrainingIntake {
     proposed_duration_hours: number | null
     location_or_link: string | null
     confirmed_at: string | null
+    client_proposed_datetime: string | null
+    rescheduled_reason: string | null
   }>
   training_intake_members?: TrainingIntakeMemberRow[]
 }
@@ -505,6 +507,9 @@ function TrainingTab({
   const [sessionError, setSessionError] = useState('')
   const [sessionSuccess, setSessionSuccess] = useState('')
   const [openIntakeDetails, setOpenIntakeDetails] = useState<Record<string, boolean>>({})
+  const [decisionLoading, setDecisionLoading] = useState<Record<string, boolean>>({})
+  const [counterSessionId, setCounterSessionId] = useState<string | null>(null)
+  const [counterSessionStart, setCounterSessionStart] = useState('')
 
   // Slots state
   const [slots, setSlots] = useState<Record<string, TrainingSlot[]>>({})
@@ -560,6 +565,45 @@ function TrainingTab({
     if (!confirm('Tijdslot verwijderen?')) return
     const res = await fetch(`/api/admin/training-slots?id=${slotId}`, { method: 'DELETE' })
     if (res.ok) await loadSlots(intakeId)
+  }
+
+  function fmtDatetimeLocal(value: string | null) {
+    if (!value) return ''
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  }
+
+  async function handleDecision(sessionId: string, action: 'accept' | 'reject' | 'counter_propose', intakeId?: string) {
+    setDecisionLoading(prev => ({ ...prev, [sessionId]: true }))
+    setSessionError('')
+    setSessionSuccess('')
+
+    const payload: Record<string, unknown> = { action }
+    if (action === 'counter_propose') {
+      payload.session_start = counterSessionStart
+    }
+
+    const res = await fetch(`/api/admin/training-sessions/${sessionId}/decision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setSessionError(data.error || 'Actie mislukt.')
+      setDecisionLoading(prev => ({ ...prev, [sessionId]: false }))
+      return
+    }
+
+    setSessionSuccess(action === 'accept' ? 'Klantvoorstel geaccepteerd.' : action === 'reject' ? 'Klantvoorstel geweigerd.' : 'Tegenvoorstel verstuurd.')
+    setCounterSessionId(null)
+    setCounterSessionStart('')
+    setDecisionLoading(prev => ({ ...prev, [sessionId]: false }))
+    await onSessionPlanned()
+    if (intakeId) await loadSlots(intakeId)
   }
 
   function openPlanningForm(intakeId: string, trainingDuration: string | null) {
@@ -810,6 +854,76 @@ function TrainingTab({
                         <p className="text-xs text-white/60 mt-2">Locatie: {session.location_or_link || 'Nog niet ingevuld'}</p>
                         {session.status === 'confirmed' ? (
                           <p className="text-xs text-green-200 mt-1">Bevestigd op: {fmtDateTime(session.confirmed_at)}</p>
+                        ) : null}
+                        {session.status === 'rescheduled' && session.client_proposed_datetime ? (
+                          <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 space-y-2">
+                            <p className="text-xs text-amber-200">
+                              Klant stelt voor: {fmtDateTime(session.client_proposed_datetime)}
+                            </p>
+                            {session.rescheduled_reason ? (
+                              <p className="text-xs text-white/60">Toelichting: {session.rescheduled_reason}</p>
+                            ) : null}
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              <button
+                                type="button"
+                                disabled={decisionLoading[session.id]}
+                                onClick={() => handleDecision(session.id, 'accept', t.id)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-green-500/20 hover:bg-green-500/30 text-green-300 text-xs disabled:opacity-60"
+                              >
+                                Accepteren
+                              </button>
+                              <button
+                                type="button"
+                                disabled={decisionLoading[session.id]}
+                                onClick={() => handleDecision(session.id, 'reject', t.id)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-red-500/20 hover:bg-red-500/30 text-red-300 text-xs disabled:opacity-60"
+                              >
+                                Weigeren
+                              </button>
+                              <button
+                                type="button"
+                                disabled={decisionLoading[session.id]}
+                                onClick={() => {
+                                  setCounterSessionId(session.id)
+                                  setCounterSessionStart(fmtDatetimeLocal(session.client_proposed_datetime || session.session_start))
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-xs disabled:opacity-60"
+                              >
+                                Tegenvoorstel
+                              </button>
+                            </div>
+                            {counterSessionId === session.id ? (
+                              <div className="pt-2 space-y-2">
+                                <label className="block text-xs text-white/40">Nieuwe datum/tijd</label>
+                                <input
+                                  type="datetime-local"
+                                  value={counterSessionStart}
+                                  onChange={(e) => setCounterSessionStart(e.target.value)}
+                                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500/50"
+                                />
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={decisionLoading[session.id] || !counterSessionStart}
+                                    onClick={() => handleDecision(session.id, 'counter_propose', t.id)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-blue-500 text-white text-xs disabled:opacity-60"
+                                  >
+                                    Verstuur tegenvoorstel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCounterSessionId(null)
+                                      setCounterSessionStart('')
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-white/10 text-white/70 text-xs"
+                                  >
+                                    Annuleren
+                                  </button>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
                         ) : null}
                       </div>
                     )

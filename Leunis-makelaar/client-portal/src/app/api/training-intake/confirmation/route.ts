@@ -145,19 +145,17 @@ export async function POST(req: NextRequest) {
     }, 422)
   }
 
-  const nextMetadata = {
-    ...metadata,
-    client_proposed_datetime: proposed_datetime,
-    rescheduled_reason: note?.trim() || null,
-    proposed_at: now,
-  }
-
   // propose_other_date — zet status terug op proposed zodat admin opnieuw kan beoordelen
   const { error: updateError } = await admin
     .from('training_sessions')
     .update({
-      status: 'proposed',
-      metadata: nextMetadata,
+      status: 'rescheduled',
+      client_proposed_datetime: proposedDate.toISOString(),
+      rescheduled_reason: note?.trim() || null,
+      metadata: {
+        ...metadata,
+        proposed_at: now,
+      },
     })
     .eq('id', session_id)
 

@@ -380,6 +380,11 @@ export interface TrainingSession {
   location_or_link: string | null
   agenda: string | null
   admin_notes: string | null
+  confirmed_at: string | null
+  client_proposed_datetime: string | null
+  rescheduled_reason: string | null
+  confirm_token?: string | null
+  metadata?: Record<string, unknown> | null
   created_at: string
   updated_at: string
 }
