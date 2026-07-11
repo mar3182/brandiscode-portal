@@ -178,3 +178,59 @@ export async function sendRescheduledNotificationEmail(
 
   if (error) throw new Error(`Resend fout: ${error.message}`)
 }
+
+export interface FeedbackRequestEmailData {
+  to: string
+  contactName: string
+  sprintNumber: number
+  sprintTitle: string
+  feedbackLink: string
+}
+
+export async function sendFeedbackRequestEmail(data: FeedbackRequestEmailData) {
+  const html = `<!DOCTYPE html>
+<html lang="nl">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Arial,sans-serif;color:#e2e8f0">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:40px 16px">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#1e293b;border-radius:16px;overflow:hidden;border:1px solid #334155">
+        <tr><td style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);padding:32px 40px;border-bottom:1px solid #334155">
+          <p style="margin:0;font-size:13px;color:#f97316;font-weight:600;letter-spacing:1px;text-transform:uppercase">Brand is Code</p>
+          <h1 style="margin:8px 0 0;font-size:22px;font-weight:700;color:#fff">Sprint ${data.sprintNumber} afgerond 🎉</h1>
+        </td></tr>
+        <tr><td style="padding:32px 40px">
+          <p style="margin:0 0 16px;color:#cbd5e1">Beste ${data.contactName},</p>
+          <p style="margin:0 0 24px;color:#94a3b8;line-height:1.6">
+            Sprint ${data.sprintNumber} <strong style="color:#e2e8f0">"${data.sprintTitle}"</strong> is afgerond. We horen graag wat je ervan vond.
+          </p>
+          <table cellpadding="0" cellspacing="0" style="margin-bottom:24px">
+            <tr><td>
+              <a href="${data.feedbackLink}" style="display:inline-block;background:#f97316;color:#fff;font-weight:700;font-size:15px;padding:14px 28px;border-radius:10px;text-decoration:none">
+                Geef je beoordeling
+              </a>
+            </td></tr>
+          </table>
+          <p style="margin:0;font-size:13px;color:#64748b">Het kost minder dan 2 minuten.</p>
+        </td></tr>
+        <tr><td style="border-top:1px solid #334155;padding:20px 40px">
+          <p style="margin:0;font-size:13px;color:#475569">
+            Met vriendelijke groet,<br>
+            <strong style="color:#e2e8f0">Mary García</strong> — Brand is Code
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`
+
+  const { error } = await getResend().emails.send({
+    from: FROM,
+    to: [data.to],
+    subject: `Hoe was Sprint ${data.sprintNumber} — ${data.sprintTitle}?`,
+    html,
+  })
+
+  if (error) throw new Error(`Resend fout: ${error.message}`)
+}
