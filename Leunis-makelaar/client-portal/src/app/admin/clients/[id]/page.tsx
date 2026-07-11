@@ -817,7 +817,7 @@ function TrainingTab({
             )}
           </div>
 
-          {(['submitted', 'reviewed', 'planned'].includes(t.status)) && !((t.training_sessions || []).some((session) => session.status === 'proposed')) ? (
+          {(['draft', 'submitted', 'reviewed', 'planned'].includes(t.status)) && !((t.training_sessions || []).some((session) => session.status === 'proposed')) ? (
             <div className="mt-4 border-t border-white/10 pt-4">
               <div className="flex flex-wrap gap-2">
                 <button
