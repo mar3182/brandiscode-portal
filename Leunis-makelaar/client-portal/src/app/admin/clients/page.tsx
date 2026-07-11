@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Users, Plus, Loader2, Pencil, Save, X, RefreshCw, CheckCircle2, Clock, ExternalLink, Trash2, Link as LinkIcon, ShieldCheck, AlertTriangle } from 'lucide-react'
+import { Users, Plus, Loader2, Pencil, Save, X, RefreshCw, CheckCircle2, Clock, ExternalLink, Trash2, Link as LinkIcon, Send, ShieldCheck, AlertTriangle } from 'lucide-react'
 import type { Client } from '@/lib/types'
 import {
   type ProfileFieldErrors,
@@ -70,6 +70,12 @@ function validateRequiredEmail(value: string, label: string) {
   return ''
 }
 
+type IntakeActionNotice = {
+  clientId: string
+  message: string
+  tone: 'success' | 'warning' | 'error'
+}
+
 export default function AdminClientsPage() {
   const searchParams = useSearchParams()
   const preferredTab = searchParams.get('tab')
@@ -93,8 +99,9 @@ export default function AdminClientsPage() {
   const [deletingClientId, setDeletingClientId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState('')
   const [intakeLinkLoadingId, setIntakeLinkLoadingId] = useState<string | null>(null)
+  const [intakeSendLoadingId, setIntakeSendLoadingId] = useState<string | null>(null)
   const [intakeLinkCopiedId, setIntakeLinkCopiedId] = useState<string | null>(null)
-  const [intakeInviteNotice, setIntakeInviteNotice] = useState<{ clientId: string; message: string; sent: boolean } | null>(null)
+  const [intakeActionNotice, setIntakeActionNotice] = useState<IntakeActionNotice | null>(null)
 
   useEffect(() => {
     void loadClients()
@@ -312,39 +319,121 @@ export default function AdminClientsPage() {
   async function handleCopyIntakeLink(clientId: string) {
     setIntakeLinkLoadingId(clientId)
     setActionError('')
-    setIntakeInviteNotice(null)
+    setIntakeActionNotice(null)
 
     const res = await fetch(`/api/admin/clients/${clientId}/intake-token`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ send_invitation: false }),
     })
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
       setActionError(err.error || 'Intake link aanmaken is mislukt')
+      setIntakeActionNotice({
+        clientId,
+        message: err.error || 'Intake link aanmaken is mislukt.',
+        tone: 'error',
+      })
       setIntakeLinkLoadingId(null)
       return
     }
 
     const data = await res.json()
-    const { url, invitation_sent, warnings } = data as { url: string; invitation_sent?: boolean; warnings?: string[] }
+    const { url, warnings } = data as { url: string; warnings?: string[] }
     try {
       await navigator.clipboard.writeText(url)
       setIntakeLinkCopiedId(clientId)
       setTimeout(() => setIntakeLinkCopiedId(null), 2000)
 
-      const notice = invitation_sent
-        ? 'Uitnodiging voor het hoofdaccount is verstuurd.'
-        : 'Intake-link gekopieerd, maar hoofdaccount-uitnodiging is niet verstuurd.'
-      setIntakeInviteNotice({
+      const notice = warnings?.length
+        ? `Intake-link gekopieerd. Let op: ${warnings[0]}`
+        : 'Intake-link gekopieerd. Deel deze link met de klant.'
+      setIntakeActionNotice({
         clientId,
-        message: warnings?.length ? `${notice} ${warnings[0]}` : notice,
-        sent: Boolean(invitation_sent),
+        message: notice,
+        tone: warnings?.length ? 'warning' : 'success',
       })
     } catch {
       setActionError('Kopiëren mislukt. URL: ' + url)
+      setIntakeActionNotice({
+        clientId,
+        message: 'Kopiëren mislukt. Gebruik handmatig deze URL: ' + url,
+        tone: 'error',
+      })
     }
 
     setIntakeLinkLoadingId(null)
+  }
+
+  async function handleSendIntakeInvite(clientId: string) {
+    setIntakeSendLoadingId(clientId)
+    setActionError('')
+    setIntakeActionNotice(null)
+
+    const tokenRes = await fetch(`/api/admin/clients/${clientId}/intake-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ send_invitation: false }),
+    })
+
+    if (!tokenRes.ok) {
+      const err = await tokenRes.json().catch(() => ({}))
+      setActionError(err.error || 'Intake versturen is mislukt')
+      setIntakeActionNotice({
+        clientId,
+        message: err.error || 'Intake versturen is mislukt.',
+        tone: 'error',
+      })
+      setIntakeSendLoadingId(null)
+      return
+    }
+
+    const tokenData = await tokenRes.json() as { token?: string; url?: string; warnings?: string[] }
+    if (!tokenData.token || !tokenData.url) {
+      setIntakeActionNotice({
+        clientId,
+        message: 'Intake-token aanmaken is mislukt: onvolledige response.',
+        tone: 'error',
+      })
+      setIntakeSendLoadingId(null)
+      return
+    }
+
+    const inviteRes = await fetch(`/api/admin/clients/${clientId}/intake-token/send-invitation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: tokenData.token, url: tokenData.url }),
+    })
+
+    const inviteData = await inviteRes.json().catch(() => ({})) as {
+      invitation_sent?: boolean
+      warnings?: string[]
+      error?: string
+    }
+
+    const warnings = [...(tokenData.warnings ?? []), ...(inviteData.warnings ?? []), ...(inviteData.error ? [inviteData.error] : [])]
+    const invitationSent = inviteRes.ok && Boolean(inviteData.invitation_sent)
+
+    if (invitationSent) {
+      setIntakeActionNotice({
+        clientId,
+        message: warnings?.length
+          ? `Intake-uitnodiging is verstuurd. Let op: ${warnings[0]}`
+          : 'Intake-uitnodiging is succesvol verstuurd naar het hoofdaccount.',
+        tone: warnings?.length ? 'warning' : 'success',
+      })
+    } else {
+      setIntakeActionNotice({
+        clientId,
+        message: warnings?.length
+          ? `Intake-uitnodiging kon niet worden verstuurd: ${warnings[0]}`
+          : 'Intake-uitnodiging kon niet worden verstuurd.',
+        tone: 'warning',
+      })
+    }
+
+    setIntakeSendLoadingId(null)
   }
 
   return (
@@ -582,11 +671,11 @@ export default function AdminClientsPage() {
                   <button
                     onClick={() => handleTriggerOnboarding(client.id)}
                     disabled={triggeringId === client.id}
-                    title="Onboarding opnieuw triggeren"
+                    title="Reset onboarding — klant doorloopt de wizard opnieuw bij volgende login"
                     className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-all ${
                       triggerSuccess === client.id
                         ? 'bg-green-500/20 text-green-400'
-                        : 'bg-white/5 hover:bg-white/10 text-white/60 hover:text-white'
+                        : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400/70 hover:text-amber-300'
                     }`}
                   >
                     {triggeringId === client.id
@@ -594,11 +683,11 @@ export default function AdminClientsPage() {
                       : triggerSuccess === client.id
                         ? <CheckCircle2 className="w-3.5 h-3.5" />
                         : <RefreshCw className="w-3.5 h-3.5" />}
-                    <span className="hidden sm:inline">{triggerSuccess === client.id ? 'Getriggerd!' : 'Onboarding'}</span>
+                    <span className="hidden sm:inline">{triggerSuccess === client.id ? 'Gereset!' : 'Reset onboarding'}</span>
                   </button>
                   <button
                     onClick={() => void handleCopyIntakeLink(client.id)}
-                    disabled={intakeLinkLoadingId === client.id}
+                    disabled={intakeLinkLoadingId === client.id || intakeSendLoadingId === client.id}
                     title="Intake link kopiëren"
                     className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-all ${
                       intakeLinkCopiedId === client.id
@@ -611,12 +700,31 @@ export default function AdminClientsPage() {
                       : intakeLinkCopiedId === client.id
                         ? <CheckCircle2 className="w-3.5 h-3.5" />
                         : <LinkIcon className="w-3.5 h-3.5" />}
-                    <span className="hidden sm:inline">{intakeLinkCopiedId === client.id ? 'Link gekopieerd!' : 'Intake link'}</span>
+                    <span className="hidden sm:inline">{intakeLinkCopiedId === client.id ? 'Link gekopieerd!' : 'Intake link aanmaken'}</span>
                   </button>
-                  {intakeInviteNotice?.clientId === client.id && (
-                    <div className={`mt-2 w-full rounded-xl border px-3 py-2 text-xs flex items-start gap-2 ${intakeInviteNotice.sent ? 'border-green-500/20 bg-green-500/10 text-green-200' : 'border-amber-500/20 bg-amber-500/10 text-amber-100'}`}>
-                      {intakeInviteNotice.sent ? <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0" /> : <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />}
-                      <span>{intakeInviteNotice.message}</span>
+                  <button
+                    onClick={() => void handleSendIntakeInvite(client.id)}
+                    disabled={intakeSendLoadingId === client.id || intakeLinkLoadingId === client.id}
+                    title="Intake versturen"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-all bg-brand-blue/20 hover:bg-brand-blue/30 text-brand-blue disabled:opacity-50"
+                  >
+                    {intakeSendLoadingId === client.id
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <Send className="w-3.5 h-3.5" />}
+                    <span className="hidden sm:inline">{intakeSendLoadingId === client.id ? 'Versturen...' : 'Intake versturen'}</span>
+                  </button>
+                  {intakeActionNotice?.clientId === client.id && (
+                    <div className={`mt-2 w-full rounded-xl border px-3 py-2 text-xs flex items-start gap-2 ${
+                      intakeActionNotice.tone === 'success'
+                        ? 'border-green-500/20 bg-green-500/10 text-green-200'
+                        : intakeActionNotice.tone === 'warning'
+                          ? 'border-amber-500/20 bg-amber-500/10 text-amber-100'
+                          : 'border-red-500/20 bg-red-500/10 text-red-200'
+                    }`}>
+                      {intakeActionNotice.tone === 'success'
+                        ? <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0" />
+                        : <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />}
+                      <span>{intakeActionNotice.message}</span>
                     </div>
                   )}
                   <Link

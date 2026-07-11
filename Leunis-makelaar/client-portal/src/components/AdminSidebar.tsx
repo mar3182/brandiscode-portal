@@ -46,9 +46,9 @@ export default function AdminSidebar() {
   const adminNav = useMemo(() => [
     { name: 'Overzicht', href: '/admin', icon: LayoutDashboard },
     { name: 'Klanten', href: '/admin/clients', icon: Users },
-    { name: 'Offertes & Sprints', href: '/admin/clients?tab=offertes', icon: FileText },
-    { name: 'Training Intakes', href: '/admin/clients?tab=training', icon: ClipboardList, badge: pendingTrainingCount },
-    { name: 'Facturen', href: '/admin/clients?tab=facturen', icon: Receipt, badge: openFacturenCount },
+    { name: 'Offertes & Sprints', href: '/admin/offertes', icon: FileText },
+    { name: 'Training Intakes', href: '/admin/training-intakes', icon: ClipboardList, badge: pendingTrainingCount },
+    { name: 'Facturen', href: '/admin/facturen', icon: Receipt, badge: openFacturenCount },
   ], [openFacturenCount, pendingTrainingCount])
 
   const handleSignOut = async () => {
