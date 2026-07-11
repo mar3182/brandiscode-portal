@@ -384,6 +384,19 @@ export interface TrainingSession {
   updated_at: string
 }
 
+export interface TrainingSlot {
+  id: string
+  intake_id: string
+  client_id: string
+  slot_start: string
+  slot_end: string | null
+  location_or_link: string | null
+  is_selected: boolean
+  selected_at: string | null
+  session_id: string | null
+  created_at: string
+}
+
 export function computeFactuurBedragen(factuur: Pick<Factuur, 'amount' | 'btw_percentage'>) {
   const btw_amount = Math.round(factuur.amount * factuur.btw_percentage) / 100
   const total_amount = factuur.amount + btw_amount

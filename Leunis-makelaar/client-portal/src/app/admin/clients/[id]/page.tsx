@@ -42,6 +42,7 @@ import type {
   Sprint,
   TrainingIntake,
   TrainingIntakeStatus,
+  TrainingSlot,
 } from '@/lib/types'
 
 // ── publish result ───────────────────────────────────────────────────────────
@@ -504,6 +505,62 @@ function TrainingTab({
   const [sessionSuccess, setSessionSuccess] = useState('')
   const [openIntakeDetails, setOpenIntakeDetails] = useState<Record<string, boolean>>({})
 
+  // Slots state
+  const [slots, setSlots] = useState<Record<string, TrainingSlot[]>>({})
+  const [slotsLoading, setSlotsLoading] = useState<Record<string, boolean>>({})
+  const [showSlotsForm, setShowSlotsForm] = useState<string | null>(null)
+  const [newSlotStart, setNewSlotStart] = useState('')
+  const [newSlotLocation, setNewSlotLocation] = useState('')
+  const [slotSaving, setSlotSaving] = useState(false)
+  const [slotError, setSlotError] = useState('')
+
+  async function loadSlots(intakeId: string) {
+    setSlotsLoading(prev => ({ ...prev, [intakeId]: true }))
+    try {
+      const res = await fetch(`/api/admin/training-slots?intake_id=${intakeId}`, { cache: 'no-store' })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) setSlots(prev => ({ ...prev, [intakeId]: data.slots ?? [] }))
+    } finally {
+      setSlotsLoading(prev => ({ ...prev, [intakeId]: false }))
+    }
+  }
+
+  function openSlotsForm(intakeId: string) {
+    setShowSlotsForm(intakeId)
+    setNewSlotStart('')
+    setNewSlotLocation('')
+    setSlotError('')
+    if (!slots[intakeId]) loadSlots(intakeId)
+  }
+
+  async function handleAddSlot(e: React.FormEvent, intakeId: string) {
+    e.preventDefault()
+    if (!newSlotStart) { setSlotError('Kies een datum en tijd'); return }
+    setSlotSaving(true)
+    setSlotError('')
+    const res = await fetch('/api/admin/training-slots', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        intake_id: intakeId,
+        slot_start: new Date(newSlotStart).toISOString(),
+        location_or_link: newSlotLocation || undefined,
+      }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) { setSlotError(data.error || 'Slot toevoegen mislukt'); setSlotSaving(false); return }
+    setNewSlotStart('')
+    setNewSlotLocation('')
+    await loadSlots(intakeId)
+    setSlotSaving(false)
+  }
+
+  async function handleDeleteSlot(slotId: string, intakeId: string) {
+    if (!confirm('Tijdslot verwijderen?')) return
+    const res = await fetch(`/api/admin/training-slots?id=${slotId}`, { method: 'DELETE' })
+    if (res.ok) await loadSlots(intakeId)
+  }
+
   function openPlanningForm(intakeId: string, trainingDuration: string | null) {
     setPlanningIntakeId(intakeId)
     setSessionStart('')
@@ -729,14 +786,102 @@ function TrainingTab({
 
           {t.status === 'reviewed' && !((t.training_sessions || []).some((session) => session.status === 'proposed')) ? (
             <div className="mt-4 border-t border-white/10 pt-4">
-              <button
-                onClick={() => openPlanningForm(t.id, t.training_duration)}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-orange/20 hover:bg-brand-orange/30 text-brand-orange text-sm"
-              >
-                <CalendarPlus className="w-4 h-4" /> Sessie inplannen
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => openPlanningForm(t.id, t.training_duration)}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-orange/20 hover:bg-brand-orange/30 text-brand-orange text-sm"
+                >
+                  <CalendarPlus className="w-4 h-4" /> Sessie inplannen
+                </button>
+                <button
+                  onClick={() => openSlotsForm(t.id)}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-sm"
+                >
+                  <Clock className="w-4 h-4" /> Bied slots aan
+                </button>
+              </div>
             </div>
           ) : null}
+
+          {/* Slots beheer sectie */}
+          {showSlotsForm === t.id && (
+            <div className="mt-4 border-t border-white/10 pt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-white/70">Tijdsloten voor klant</p>
+                <button onClick={() => setShowSlotsForm(null)} className="text-white/40 hover:text-white/70">
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* Bestaande slots */}
+              {slotsLoading[t.id] ? (
+                <div className="flex items-center gap-2 text-xs text-white/40">
+                  <Loader2 size={12} className="animate-spin" /> Laden…
+                </div>
+              ) : (slots[t.id] ?? []).length === 0 ? (
+                <p className="text-xs text-white/40">Nog geen tijdsloten. Voeg er hieronder toe.</p>
+              ) : (
+                <div className="space-y-2">
+                  {(slots[t.id] ?? []).map(slot => (
+                    <div key={slot.id} className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs ${slot.is_selected ? 'bg-green-500/10 border border-green-500/30' : 'bg-white/5 border border-white/10'}`}>
+                      <div>
+                        <span className={slot.is_selected ? 'text-green-300 font-medium' : 'text-white'}>
+                          {new Intl.DateTimeFormat('nl-NL', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' }).format(new Date(slot.slot_start))}
+                        </span>
+                        {slot.location_or_link && <span className="text-white/40 ml-2">· {slot.location_or_link}</span>}
+                        {slot.is_selected && <span className="ml-2 text-green-400">✓ Gekozen</span>}
+                      </div>
+                      {!slot.is_selected && (
+                        <button
+                          onClick={() => handleDeleteSlot(slot.id, t.id)}
+                          className="text-white/30 hover:text-red-400 ml-2"
+                          aria-label="Verwijder slot"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Nieuw slot toevoegen */}
+              {(slots[t.id] ?? []).filter(s => !s.is_selected).length < 5 && (
+                <form onSubmit={(e) => handleAddSlot(e, t.id)} className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-white/50 mb-1">Datum en tijd *</label>
+                    <input
+                      type="datetime-local"
+                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500/50"
+                      value={newSlotStart}
+                      onChange={(e) => setNewSlotStart(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-white/50 mb-1">Locatie / link</label>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500/50"
+                      value={newSlotLocation}
+                      onChange={(e) => setNewSlotLocation(e.target.value)}
+                      placeholder="Teams-link of kantoor"
+                    />
+                  </div>
+                  {slotError && <p className="sm:col-span-2 text-xs text-red-300">{slotError}</p>}
+                  <div className="sm:col-span-2">
+                    <button
+                      type="submit"
+                      disabled={slotSaving}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-sm disabled:opacity-60"
+                    >
+                      {slotSaving ? <Loader2 size={14} className="animate-spin" /> : <CalendarPlus size={14} />}
+                      Slot toevoegen
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
 
           {planningIntakeId === t.id ? (
             <form onSubmit={handleScheduleSession} className="mt-4 space-y-3 border-t border-white/10 pt-4">
