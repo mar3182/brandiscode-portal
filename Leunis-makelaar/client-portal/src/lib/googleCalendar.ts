@@ -80,6 +80,16 @@ export type TrainingCalendarEventInput = {
   attendeeEmail?: string | null
 }
 
+export type TrainingBusyInterval = {
+  start: string
+  end: string
+}
+
+export type SuggestedTrainingSlot = {
+  start: string
+  end: string
+}
+
 export async function createTrainingCalendarEvent(input: TrainingCalendarEventInput) {
   const calendarId = process.env.GOOGLE_CALENDAR_TRAINING_ID
   if (!calendarId) {
@@ -140,4 +150,96 @@ export async function createTrainingCalendarEvent(input: TrainingCalendarEventIn
     eventId: eventData.id ?? null,
     eventUrl: eventData.htmlLink ?? null,
   }
+}
+
+export async function getTrainingCalendarBusyIntervals(timeMinIso: string, timeMaxIso: string) {
+  const calendarId = process.env.GOOGLE_CALENDAR_TRAINING_ID
+  if (!calendarId) {
+    return { skipped: true as const, reason: 'GOOGLE_CALENDAR_TRAINING_ID ontbreekt', busy: [] as TrainingBusyInterval[] }
+  }
+
+  const accessToken = await getGoogleAccessToken()
+  if (!accessToken) {
+    return { skipped: true as const, reason: 'Google service account credentials ontbreken', busy: [] as TrainingBusyInterval[] }
+  }
+
+  const response = await fetch(`${GOOGLE_CALENDAR_API_BASE}/freeBusy`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      timeMin: timeMinIso,
+      timeMax: timeMaxIso,
+      timeZone: TRAINING_TIMEZONE,
+      items: [{ id: calendarId }],
+    }),
+  })
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '')
+    throw new Error(`Google freeBusy mislukt: ${response.status} ${body}`)
+  }
+
+  const payload = (await response.json()) as {
+    calendars?: Record<string, { busy?: Array<{ start: string; end: string }> }>
+  }
+
+  const busy = payload.calendars?.[calendarId]?.busy ?? []
+  return { skipped: false as const, busy }
+}
+
+function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number) {
+  return aStart < bEnd && aEnd > bStart
+}
+
+export async function suggestTrainingSlots(params: {
+  timeMinIso: string
+  timeMaxIso: string
+  slotMinutes: number
+  stepMinutes?: number
+  maxResults?: number
+}) {
+  const { timeMinIso, timeMaxIso, slotMinutes } = params
+  const stepMinutes = params.stepMinutes ?? 30
+  const maxResults = params.maxResults ?? 8
+
+  const busyResult = await getTrainingCalendarBusyIntervals(timeMinIso, timeMaxIso)
+  if (busyResult.skipped) {
+    return { skipped: true as const, reason: busyResult.reason, slots: [] as SuggestedTrainingSlot[] }
+  }
+
+  const minMs = Date.parse(timeMinIso)
+  const maxMs = Date.parse(timeMaxIso)
+  if (Number.isNaN(minMs) || Number.isNaN(maxMs) || minMs >= maxMs) {
+    return { skipped: false as const, slots: [] as SuggestedTrainingSlot[] }
+  }
+
+  const slotMs = slotMinutes * 60 * 1000
+  const stepMs = Math.max(15, stepMinutes) * 60 * 1000
+  const busyRanges = busyResult.busy
+    .map((b) => ({ start: Date.parse(b.start), end: Date.parse(b.end) }))
+    .filter((b) => !Number.isNaN(b.start) && !Number.isNaN(b.end) && b.start < b.end)
+
+  const found: SuggestedTrainingSlot[] = []
+  for (let start = minMs; start + slotMs <= maxMs; start += stepMs) {
+    const end = start + slotMs
+
+    const hour = new Date(start).getHours()
+    // Soft business-hours filter
+    if (hour < 8 || hour > 18) continue
+
+    const hasConflict = busyRanges.some((b) => overlaps(start, end, b.start, b.end))
+    if (hasConflict) continue
+
+    found.push({
+      start: new Date(start).toISOString(),
+      end: new Date(end).toISOString(),
+    })
+
+    if (found.length >= maxResults) break
+  }
+
+  return { skipped: false as const, slots: found }
 }

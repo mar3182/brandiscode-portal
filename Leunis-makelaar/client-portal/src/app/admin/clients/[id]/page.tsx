@@ -519,6 +519,11 @@ function TrainingTab({
   const [newSlotLocation, setNewSlotLocation] = useState('')
   const [slotSaving, setSlotSaving] = useState(false)
   const [slotError, setSlotError] = useState('')
+  const [suggesting, setSuggesting] = useState<Record<string, boolean>>({})
+  const [suggestedSlots, setSuggestedSlots] = useState<Record<string, Array<{ start: string; end: string }>>>({})
+  const [suggestRangeFrom, setSuggestRangeFrom] = useState('')
+  const [suggestRangeTo, setSuggestRangeTo] = useState('')
+  const [suggestDurationMinutes, setSuggestDurationMinutes] = useState(120)
 
   async function loadSlots(intakeId: string) {
     setSlotsLoading(prev => ({ ...prev, [intakeId]: true }))
@@ -536,6 +541,10 @@ function TrainingTab({
     setNewSlotStart('')
     setNewSlotLocation('')
     setSlotError('')
+    const now = new Date()
+    const inTwoWeeks = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000)
+    setSuggestRangeFrom(fmtDatetimeLocal(now.toISOString()))
+    setSuggestRangeTo(fmtDatetimeLocal(inTwoWeeks.toISOString()))
     if (!slots[intakeId]) loadSlots(intakeId)
   }
 
@@ -565,6 +574,76 @@ function TrainingTab({
     if (!confirm('Tijdslot verwijderen?')) return
     const res = await fetch(`/api/admin/training-slots?id=${slotId}`, { method: 'DELETE' })
     if (res.ok) await loadSlots(intakeId)
+  }
+
+  async function handleSuggestSlots(intakeId: string) {
+    if (!suggestRangeFrom || !suggestRangeTo) {
+      setSlotError('Vul een geldige van/tot periode in voor suggesties.')
+      return
+    }
+
+    setSlotError('')
+    setSuggesting(prev => ({ ...prev, [intakeId]: true }))
+
+    const params = new URLSearchParams({
+      time_min: new Date(suggestRangeFrom).toISOString(),
+      time_max: new Date(suggestRangeTo).toISOString(),
+      slot_minutes: String(suggestDurationMinutes),
+      max_results: '8',
+    })
+
+    const res = await fetch(`/api/admin/training-calendar/availability?${params.toString()}`, {
+      cache: 'no-store',
+    })
+    const data = await res.json().catch(() => ({}))
+
+    if (!res.ok) {
+      setSlotError(data.error || 'Vrije momenten ophalen mislukt.')
+      setSuggesting(prev => ({ ...prev, [intakeId]: false }))
+      return
+    }
+
+    if (data?.skipped) {
+      setSlotError(data.reason || 'Kalenderkoppeling is nog niet geconfigureerd.')
+      setSuggesting(prev => ({ ...prev, [intakeId]: false }))
+      return
+    }
+
+    setSuggestedSlots(prev => ({
+      ...prev,
+      [intakeId]: Array.isArray(data?.slots) ? data.slots : [],
+    }))
+    setSuggesting(prev => ({ ...prev, [intakeId]: false }))
+  }
+
+  async function handleAddSuggestedSlot(intakeId: string, startIso: string, endIso: string | null) {
+    setSlotSaving(true)
+    setSlotError('')
+
+    const res = await fetch('/api/admin/training-slots', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        intake_id: intakeId,
+        slot_start: startIso,
+        slot_end: endIso || undefined,
+        location_or_link: newSlotLocation || undefined,
+      }),
+    })
+
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setSlotError(data.error || 'Slot toevoegen mislukt.')
+      setSlotSaving(false)
+      return
+    }
+
+    await loadSlots(intakeId)
+    setSuggestedSlots(prev => ({
+      ...prev,
+      [intakeId]: (prev[intakeId] ?? []).filter((s) => s.start !== startIso),
+    }))
+    setSlotSaving(false)
   }
 
   function fmtDatetimeLocal(value: string | null) {
@@ -994,6 +1073,80 @@ function TrainingTab({
                   ))}
                 </div>
               )}
+
+              <div className="rounded-lg border border-white/10 bg-white/5 p-3 space-y-3">
+                <p className="text-xs font-medium text-white/70">Zoek vrije momenten (Google trainingskalender)</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-xs text-white/50 mb-1">Van</label>
+                    <input
+                      type="datetime-local"
+                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500/50"
+                      value={suggestRangeFrom}
+                      onChange={(e) => setSuggestRangeFrom(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-white/50 mb-1">Tot</label>
+                    <input
+                      type="datetime-local"
+                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500/50"
+                      value={suggestRangeTo}
+                      onChange={(e) => setSuggestRangeTo(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-white/50 mb-1">Duur (min)</label>
+                    <select
+                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500/50"
+                      value={suggestDurationMinutes}
+                      onChange={(e) => setSuggestDurationMinutes(Number(e.target.value))}
+                    >
+                      <option value={60}>60 min</option>
+                      <option value={90}>90 min</option>
+                      <option value={120}>120 min</option>
+                      <option value={180}>180 min</option>
+                    </select>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleSuggestSlots(t.id)}
+                  disabled={!!suggesting[t.id]}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-sm disabled:opacity-60"
+                >
+                  {suggesting[t.id] ? <Loader2 size={14} className="animate-spin" /> : <Clock size={14} />}
+                  Zoek vrije momenten
+                </button>
+
+                {(suggestedSlots[t.id] ?? []).length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-white/50">Voorgestelde vrije momenten</p>
+                    {(suggestedSlots[t.id] ?? []).map((s) => (
+                      <div key={s.start} className="flex items-center justify-between rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs">
+                        <span className="text-white">
+                          {new Intl.DateTimeFormat('nl-NL', {
+                            weekday: 'short',
+                            day: 'numeric',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            timeZone: 'Europe/Amsterdam',
+                          }).format(new Date(s.start))}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={slotSaving}
+                          onClick={() => handleAddSuggestedSlot(t.id, s.start, s.end ?? null)}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-500/20 hover:bg-blue-500/30 text-blue-300"
+                        >
+                          Als slot toevoegen
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* Nieuw slot toevoegen */}
               {(slots[t.id] ?? []).filter(s => !s.is_selected).length < 5 && (
