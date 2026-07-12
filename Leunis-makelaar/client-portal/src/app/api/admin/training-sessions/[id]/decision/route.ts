@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { sendTrainingConfirmedEmail, sendTrainingProposalEmail } from '@/lib/email'
+import { createTrainingCalendarEvent } from '@/lib/googleCalendar'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -57,7 +58,7 @@ export async function POST(
 
   const { data: session, error: sessionError } = await admin
     .from('training_sessions')
-    .select('id, status, session_start, client_proposed_datetime, intake_id, confirm_token, proposed_duration_hours, location_or_link, agenda, training_intakes(contact_person, communication_channel, communication_email, clients(name, company, email))')
+    .select('id, status, session_start, client_proposed_datetime, intake_id, confirm_token, proposed_duration_hours, location_or_link, agenda, metadata, training_intakes(contact_person, communication_channel, communication_email, clients(name, company, email))')
     .eq('id', params.id)
     .single()
 
@@ -91,6 +92,38 @@ export async function POST(
 
     if (clientEmail) {
       await sendTrainingConfirmedEmail(clientEmail, contactName, chosenStart).catch(() => {})
+    }
+
+    try {
+      if (chosenStart) {
+        const event = await createTrainingCalendarEvent({
+          sessionId: session.id,
+          sessionStart: chosenStart,
+          summary: `Training - ${String(clientData?.company ?? clientData?.name ?? 'Klant')}`,
+          description: `Training sessie bevestigd door admin (${session.id})`,
+          location: (session.location_or_link as string | null) ?? null,
+          attendeeEmail: clientEmail || null,
+        })
+
+        if (!event.skipped) {
+          const metadata = session.metadata && typeof session.metadata === 'object'
+            ? (session.metadata as Record<string, unknown>)
+            : {}
+
+          await admin
+            .from('training_sessions')
+            .update({
+              metadata: {
+                ...metadata,
+                google_calendar_event_id: event.eventId,
+                google_calendar_event_url: event.eventUrl,
+              },
+            })
+            .eq('id', session.id)
+        }
+      }
+    } catch (err) {
+      console.error('Training calendar sync failed:', err)
     }
 
     return noStore({ ok: true, action: 'accepted', session_start: chosenStart })

@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendTrainingConfirmedEmail, sendRescheduledNotificationEmail } from '@/lib/email'
+import { createTrainingCalendarEvent } from '@/lib/googleCalendar'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -51,7 +52,7 @@ export async function POST(
 
   const { data: session, error } = await admin
     .from('training_sessions')
-    .select('id, status, session_start, intake_id, training_intakes(contact_person, communication_channel, communication_email, clients(name, company, email))')
+    .select('id, status, session_start, intake_id, metadata, training_intakes(contact_person, communication_channel, communication_email, clients(name, company, email))')
     .eq('confirm_token', params.token)
     .single()
 
@@ -101,6 +102,37 @@ export async function POST(
         String(intake?.contact_person ?? clientData?.name ?? 'Klant'),
         session.session_start as string | null
       ).catch(() => {})
+    }
+
+    try {
+      if (session.session_start) {
+        const event = await createTrainingCalendarEvent({
+          sessionId: String(session.id),
+          sessionStart: String(session.session_start),
+          summary: `Training - ${String(clientData?.company ?? clientData?.name ?? 'Klant')}`,
+          description: `Training sessie bevestigd via token-link (${String(session.id)})`,
+          attendeeEmail: clientEmail || null,
+        })
+
+        if (!event.skipped) {
+          const metadata = session.metadata && typeof session.metadata === 'object'
+            ? (session.metadata as Record<string, unknown>)
+            : {}
+
+          await admin
+            .from('training_sessions')
+            .update({
+              metadata: {
+                ...metadata,
+                google_calendar_event_id: event.eventId,
+                google_calendar_event_url: event.eventUrl,
+              },
+            })
+            .eq('id', session.id)
+        }
+      }
+    } catch (err) {
+      console.error('Training calendar sync failed:', err)
     }
 
     return noStore({ success: true, action: 'confirmed' })

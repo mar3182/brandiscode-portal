@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendTrainingConfirmedEmail, sendRescheduledNotificationEmail } from '@/lib/email'
+import { createTrainingCalendarEvent } from '@/lib/googleCalendar'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -110,6 +111,34 @@ export async function POST(req: NextRequest) {
       )
     } catch {
       // Mail-fout mag de response niet blokkeren
+    }
+
+    // Sync met aparte trainingskalender (best effort)
+    try {
+      if (session.session_start) {
+        const event = await createTrainingCalendarEvent({
+          sessionId: session_id,
+          sessionStart: session.session_start,
+          summary: `Training - ${String(clientInfo?.company ?? clientInfo?.name ?? 'Klant')}`,
+          description: `Training sessie bevestigd via portal (${session_id})`,
+          attendeeEmail: user.email,
+        })
+
+        if (!event.skipped) {
+          await admin
+            .from('training_sessions')
+            .update({
+              metadata: {
+                ...(asRecord(session.metadata)),
+                google_calendar_event_id: event.eventId,
+                google_calendar_event_url: event.eventUrl,
+              },
+            })
+            .eq('id', session_id)
+        }
+      }
+    } catch (err) {
+      console.error('Training calendar sync failed:', err)
     }
 
     return noStore({ ok: true, status: 'confirmed' })
