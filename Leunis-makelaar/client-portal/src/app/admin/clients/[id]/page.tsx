@@ -59,6 +59,10 @@ interface TrainingIntakeMemberRow {
   top_tasks: string[]
   digital_skill: number | null
   ai_experience: string | null
+  bottleneck: string | null
+  kpi_goal: string | null
+  prompt_data_boundary: string | null
+  training_day_availability: string | null
   sort_order: number
 }
 
@@ -738,6 +742,17 @@ function TrainingTab({
   const [creatingIntake, setCreatingIntake] = useState(false)
   const [createIntakeError, setCreateIntakeError] = useState('')
 
+  function textOrDash(value: string | null | undefined) {
+    const normalized = typeof value === 'string' ? value.trim() : ''
+    return normalized || '—'
+  }
+
+  function yesNo(value: boolean | null | undefined) {
+    if (value === true) return 'Ja'
+    if (value === false) return 'Nee'
+    return '—'
+  }
+
   async function handleCreateIntake() {
     setCreatingIntake(true)
     setCreateIntakeError('')
@@ -833,42 +848,78 @@ function TrainingTab({
             {openIntakeDetails[t.id] && (
               <div className="mt-3 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {t.focus_area ? (
-                    <div className="bg-white/5 rounded-lg p-2">
-                      <p className="text-xs text-white/40">Focusgebied</p>
-                      <p className="text-xs text-white mt-0.5">{t.focus_area}</p>
-                    </div>
-                  ) : null}
-                  {t.preferred_datetime ? (
-                    <div className="bg-white/5 rounded-lg p-2">
-                      <p className="text-xs text-white/40">Voorkeursdatum</p>
-                      <p className="text-xs text-white mt-0.5">{fmtDate(t.preferred_datetime)}</p>
-                    </div>
-                  ) : null}
-                  {t.contact_person ? (
-                    <div className="bg-white/5 rounded-lg p-2">
-                      <p className="text-xs text-white/40">Contactpersoon</p>
-                      <p className="text-xs text-white mt-0.5">{t.contact_person}</p>
-                    </div>
-                  ) : null}
-                  {t.contact_email ? (
-                    <div className="bg-white/5 rounded-lg p-2">
-                      <p className="text-xs text-white/40">Contact e-mail</p>
-                      <p className="text-xs text-white mt-0.5">{t.contact_email}</p>
-                    </div>
-                  ) : null}
-                  {t.communication_channel ? (
-                    <div className="bg-white/5 rounded-lg p-2">
-                      <p className="text-xs text-white/40">Communicatiekanaal</p>
-                      <p className="text-xs text-white mt-0.5 capitalize">{t.communication_channel}</p>
-                    </div>
-                  ) : null}
-                  {t.privacy_constraints ? (
-                    <div className="bg-white/5 rounded-lg p-2 sm:col-span-2">
-                      <p className="text-xs text-white/40">Privacy beperkingen</p>
-                      <p className="text-xs text-white mt-0.5">{t.privacy_constraints}</p>
-                    </div>
-                  ) : null}
+                  <div className="bg-white/5 rounded-lg p-2">
+                    <p className="text-xs text-white/40">Focusgebied</p>
+                    <p className="text-xs text-white mt-0.5">{textOrDash(t.focus_area)}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-2">
+                    <p className="text-xs text-white/40">Training duur</p>
+                    <p className="text-xs text-white mt-0.5">{textOrDash(t.training_duration)}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-2">
+                    <p className="text-xs text-white/40">Voorkeursdatum</p>
+                    <p className="text-xs text-white mt-0.5">{t.preferred_datetime ? fmtDate(t.preferred_datetime) : '—'}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-2">
+                    <p className="text-xs text-white/40">Voorkeur tijd opmerking</p>
+                    <p className="text-xs text-white mt-0.5">{textOrDash(t.preferred_time_note)}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-2">
+                    <p className="text-xs text-white/40">Contactpersoon</p>
+                    <p className="text-xs text-white mt-0.5">{textOrDash(t.contact_person)}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-2">
+                    <p className="text-xs text-white/40">Contact e-mail</p>
+                    <p className="text-xs text-white mt-0.5">{textOrDash(t.contact_email)}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-2">
+                    <p className="text-xs text-white/40">Communicatiekanaal</p>
+                    <p className="text-xs text-white mt-0.5 capitalize">{textOrDash(t.communication_channel)}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-2">
+                    <p className="text-xs text-white/40">Communicatie e-mail</p>
+                    <p className="text-xs text-white mt-0.5">{textOrDash(t.communication_email)}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-2">
+                    <p className="text-xs text-white/40">Communicatie WhatsApp</p>
+                    <p className="text-xs text-white mt-0.5">{textOrDash(t.communication_whatsapp)}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-2">
+                    <p className="text-xs text-white/40">Communicatie toestemming</p>
+                    <p className="text-xs text-white mt-0.5">{yesNo(t.communication_consent)}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-2">
+                    <p className="text-xs text-white/40">Portal notificaties</p>
+                    <p className="text-xs text-white mt-0.5">{yesNo(t.portal_notifications_enabled)}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-2 sm:col-span-2">
+                    <p className="text-xs text-white/40">Privacy beperkingen</p>
+                    <p className="text-xs text-white mt-0.5">{textOrDash(t.privacy_constraints)}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-2 sm:col-span-2">
+                    <p className="text-xs text-white/40">Communicatie notities</p>
+                    <p className="text-xs text-white mt-0.5">{textOrDash(t.communication_notes)}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-2 sm:col-span-2">
+                    <p className="text-xs text-white/40">Trainer notities</p>
+                    <p className="text-xs text-white mt-0.5">{textOrDash(t.trainer_notes)}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-2">
+                    <p className="text-xs text-white/40">Data usage consent</p>
+                    <p className="text-xs text-white mt-0.5">{yesNo(t.data_usage_consent)}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-2">
+                    <p className="text-xs text-white/40">Ingediend op</p>
+                    <p className="text-xs text-white mt-0.5">{t.submitted_at ? fmtDateTime(t.submitted_at) : '—'}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-2">
+                    <p className="text-xs text-white/40">Beoordeeld op</p>
+                    <p className="text-xs text-white mt-0.5">{t.reviewed_at ? fmtDateTime(t.reviewed_at) : '—'}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-2">
+                    <p className="text-xs text-white/40">Gepland op</p>
+                    <p className="text-xs text-white mt-0.5">{t.planned_at ? fmtDateTime(t.planned_at) : '—'}</p>
+                  </div>
                 </div>
                 {Array.isArray(t.training_intake_members) && t.training_intake_members.length > 0 && (
                   <div>
@@ -889,6 +940,10 @@ function TrainingTab({
                             {member.ai_experience ? (
                               <p className="text-xs text-white/60 mt-1">AI ervaring: {member.ai_experience}</p>
                             ) : null}
+                            <p className="text-xs text-white/60 mt-1">Knelpunt: {textOrDash(member.bottleneck)}</p>
+                            <p className="text-xs text-white/60 mt-1">KPI doel: {textOrDash(member.kpi_goal)}</p>
+                            <p className="text-xs text-white/60 mt-1">Prompt data grens: {textOrDash(member.prompt_data_boundary)}</p>
+                            <p className="text-xs text-white/60 mt-1">Beschikbare dag: {textOrDash(member.training_day_availability)}</p>
                             {Array.isArray(member.top_tasks) && member.top_tasks.length > 0 ? (
                               <div className="mt-1">
                                 <p className="text-xs text-white/40">Taken:</p>
