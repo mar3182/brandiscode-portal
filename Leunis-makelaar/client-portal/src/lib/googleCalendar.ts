@@ -3,6 +3,9 @@ import crypto from 'crypto'
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const GOOGLE_CALENDAR_API_BASE = 'https://www.googleapis.com/calendar/v3'
 const TRAINING_TIMEZONE = process.env.TRAINING_CALENDAR_TIMEZONE ?? 'Europe/Amsterdam'
+const DEFAULT_ALLOWED_WEEKDAYS = '5,6' // vrijdag (5), zaterdag (6)
+const DEFAULT_ALLOWED_START_HOUR = 8
+const DEFAULT_ALLOWED_END_HOUR = 12
 
 function base64UrlEncode(input: string | Buffer) {
   return Buffer.from(input)
@@ -90,6 +93,85 @@ export type SuggestedTrainingSlot = {
   end: string
 }
 
+function parseCalendarIdsFromEnv(value: string | undefined) {
+  if (!value) return []
+  return value
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean)
+}
+
+function getBlockingCalendarIds() {
+  const trainingId = process.env.GOOGLE_CALENDAR_TRAINING_ID?.trim()
+  const extraIds = parseCalendarIdsFromEnv(process.env.GOOGLE_CALENDAR_BLOCKING_IDS)
+  const ids = [trainingId, ...extraIds].filter((id): id is string => Boolean(id))
+  return Array.from(new Set(ids))
+}
+
+function getAllowedWeekdays() {
+  const source = process.env.TRAINING_ALLOWED_WEEKDAYS?.trim() || DEFAULT_ALLOWED_WEEKDAYS
+  const values = source
+    .split(',')
+    .map((v) => Number(v.trim()))
+    .filter((v) => Number.isInteger(v) && v >= 0 && v <= 6)
+  return new Set(values.length > 0 ? values : [5, 6])
+}
+
+function getAllowedHours() {
+  const startHour = Number(process.env.TRAINING_ALLOWED_START_HOUR ?? DEFAULT_ALLOWED_START_HOUR)
+  const endHour = Number(process.env.TRAINING_ALLOWED_END_HOUR ?? DEFAULT_ALLOWED_END_HOUR)
+  return {
+    startHour: Number.isFinite(startHour) ? startHour : DEFAULT_ALLOWED_START_HOUR,
+    endHour: Number.isFinite(endHour) ? endHour : DEFAULT_ALLOWED_END_HOUR,
+  }
+}
+
+function getAvailabilityUntilIso() {
+  const raw = process.env.TRAINING_AVAILABILITY_UNTIL?.trim()
+  if (!raw) return null
+  const parsed = Date.parse(raw)
+  if (Number.isNaN(parsed)) return null
+  return new Date(parsed).toISOString()
+}
+
+function getZonedParts(date: Date, timeZone: string) {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    weekday: 'short',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+
+  const parts = fmt.formatToParts(date)
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? ''
+  const weekdayMap: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  }
+
+  return {
+    weekday: weekdayMap[get('weekday')] ?? -1,
+    year: Number(get('year')),
+    month: Number(get('month')),
+    day: Number(get('day')),
+    hour: Number(get('hour')),
+    minute: Number(get('minute')),
+  }
+}
+
+function sameZonedDay(a: ReturnType<typeof getZonedParts>, b: ReturnType<typeof getZonedParts>) {
+  return a.year === b.year && a.month === b.month && a.day === b.day
+}
+
 export async function createTrainingCalendarEvent(input: TrainingCalendarEventInput) {
   const calendarId = process.env.GOOGLE_CALENDAR_TRAINING_ID
   if (!calendarId) {
@@ -153,9 +235,13 @@ export async function createTrainingCalendarEvent(input: TrainingCalendarEventIn
 }
 
 export async function getTrainingCalendarBusyIntervals(timeMinIso: string, timeMaxIso: string) {
-  const calendarId = process.env.GOOGLE_CALENDAR_TRAINING_ID
-  if (!calendarId) {
-    return { skipped: true as const, reason: 'GOOGLE_CALENDAR_TRAINING_ID ontbreekt', busy: [] as TrainingBusyInterval[] }
+  const calendarIds = getBlockingCalendarIds()
+  if (calendarIds.length === 0) {
+    return {
+      skipped: true as const,
+      reason: 'GOOGLE_CALENDAR_TRAINING_ID (of GOOGLE_CALENDAR_BLOCKING_IDS) ontbreekt',
+      busy: [] as TrainingBusyInterval[],
+    }
   }
 
   const accessToken = await getGoogleAccessToken()
@@ -173,7 +259,7 @@ export async function getTrainingCalendarBusyIntervals(timeMinIso: string, timeM
       timeMin: timeMinIso,
       timeMax: timeMaxIso,
       timeZone: TRAINING_TIMEZONE,
-      items: [{ id: calendarId }],
+      items: calendarIds.map((id) => ({ id })),
     }),
   })
 
@@ -186,7 +272,7 @@ export async function getTrainingCalendarBusyIntervals(timeMinIso: string, timeM
     calendars?: Record<string, { busy?: Array<{ start: string; end: string }> }>
   }
 
-  const busy = payload.calendars?.[calendarId]?.busy ?? []
+  const busy = Object.values(payload.calendars ?? {}).flatMap((entry) => entry.busy ?? [])
   return { skipped: false as const, busy }
 }
 
@@ -211,13 +297,27 @@ export async function suggestTrainingSlots(params: {
   }
 
   const minMs = Date.parse(timeMinIso)
-  const maxMs = Date.parse(timeMaxIso)
+  let maxMs = Date.parse(timeMaxIso)
   if (Number.isNaN(minMs) || Number.isNaN(maxMs) || minMs >= maxMs) {
+    return { skipped: false as const, slots: [] as SuggestedTrainingSlot[] }
+  }
+
+  const untilIso = getAvailabilityUntilIso()
+  if (untilIso) {
+    const untilMs = Date.parse(untilIso)
+    if (!Number.isNaN(untilMs)) {
+      maxMs = Math.min(maxMs, untilMs)
+    }
+  }
+
+  if (minMs >= maxMs) {
     return { skipped: false as const, slots: [] as SuggestedTrainingSlot[] }
   }
 
   const slotMs = slotMinutes * 60 * 1000
   const stepMs = Math.max(15, stepMinutes) * 60 * 1000
+  const allowedWeekdays = getAllowedWeekdays()
+  const { startHour, endHour } = getAllowedHours()
   const busyRanges = busyResult.busy
     .map((b) => ({ start: Date.parse(b.start), end: Date.parse(b.end) }))
     .filter((b) => !Number.isNaN(b.start) && !Number.isNaN(b.end) && b.start < b.end)
@@ -226,9 +326,16 @@ export async function suggestTrainingSlots(params: {
   for (let start = minMs; start + slotMs <= maxMs; start += stepMs) {
     const end = start + slotMs
 
-    const hour = new Date(start).getHours()
-    // Soft business-hours filter
-    if (hour < 8 || hour > 18) continue
+    const startParts = getZonedParts(new Date(start), TRAINING_TIMEZONE)
+    const endParts = getZonedParts(new Date(end), TRAINING_TIMEZONE)
+
+    if (!allowedWeekdays.has(startParts.weekday)) continue
+    if (!sameZonedDay(startParts, endParts)) continue
+
+    const startMinutes = startParts.hour * 60 + startParts.minute
+    const endMinutes = endParts.hour * 60 + endParts.minute
+    if (startMinutes < startHour * 60) continue
+    if (endMinutes > endHour * 60) continue
 
     const hasConflict = busyRanges.some((b) => overlaps(start, end, b.start, b.end))
     if (hasConflict) continue
