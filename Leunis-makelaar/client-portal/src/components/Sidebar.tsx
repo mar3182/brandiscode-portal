@@ -11,6 +11,7 @@ export default function Sidebar() {
   const pathname = usePathname()
   const supabase = createClient()
   const [openOnboardingCount, setOpenOnboardingCount] = useState(0)
+  const [trainingEnabled, setTrainingEnabled] = useState(false)
   const [openFacturenCount, setOpenFacturenCount] = useState(0)
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -19,6 +20,13 @@ export default function Sidebar() {
       const res = await fetch('/api/training-intake')
       if (!res.ok) return
       const data = await res.json()
+
+      const enabled = data?.enabled === true
+      setTrainingEnabled(enabled)
+      if (!enabled) {
+        setOpenOnboardingCount(0)
+        return
+      }
 
       if (data?.completeness?.readyForTraining === true) {
         setOpenOnboardingCount(0)
@@ -52,18 +60,25 @@ export default function Sidebar() {
     loadFacturenCount()
   }, [])
 
-  const navigation = useMemo(() => [
+  const navigation = useMemo(() => {
+    const items = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Offertes', href: '/dashboard/offertes', icon: FileText },
     { name: 'Projectstatus', href: '/dashboard/projecten', icon: BarChart3 },
-    { name: 'Training Intake', href: '/dashboard/onboarding', icon: ClipboardList, badge: openOnboardingCount },
     { name: 'Bedrijfsgegevens', href: '/dashboard/bedrijfsgegevens', icon: Building2 },
     { name: 'Facturen', href: '/dashboard/facturen', icon: Receipt, badge: openFacturenCount, badgeClass: 'bg-red-500/20 text-red-300' },
     { name: 'Funda-teksten', href: '/dashboard/funda-tekst', icon: Sparkles },
     { name: 'Feedback', href: '/dashboard/feedback', icon: MessageSquare },
     { name: 'Team', href: '/dashboard/team', icon: Users },
     { name: 'Wachtwoord', href: '/dashboard/wachtwoord-wijzigen', icon: ShieldCheck },
-  ], [openFacturenCount, openOnboardingCount])
+    ] as Array<{ name: string; href: string; icon: React.ComponentType<{ className?: string }>; badge?: number; badgeClass?: string }>
+
+    if (trainingEnabled) {
+      items.splice(3, 0, { name: 'Training Intake', href: '/dashboard/onboarding', icon: ClipboardList, badge: openOnboardingCount })
+    }
+
+    return items
+  }, [openFacturenCount, openOnboardingCount, trainingEnabled])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()

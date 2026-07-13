@@ -37,6 +37,7 @@ function toDatetimeLocal(iso: string | null): string | undefined {
 
 export default function TrainingBevestigingPage() {
   const [loading, setLoading] = useState(true)
+  const [trainingEnabled, setTrainingEnabled] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [selectingSlot, setSelectingSlot] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -62,6 +63,14 @@ export default function TrainingBevestigingPage() {
 
       if (!intakeRes.ok) {
         setError(intakeData.error || 'Kon trainingsinformatie niet laden.')
+        setLoading(false)
+        return
+      }
+
+      if (intakeData?.enabled === false) {
+        setTrainingEnabled(false)
+        setSlots([])
+        setSession(null)
         setLoading(false)
         return
       }
@@ -177,6 +186,26 @@ export default function TrainingBevestigingPage() {
         <div className="glass-card p-10 text-center">
           <Loader2 className="w-8 h-8 animate-spin text-brand-gold mx-auto" />
           <p className="text-white/50 text-sm mt-3">Trainingsvoorstel laden...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!trainingEnabled) {
+    return (
+      <div className="max-w-3xl space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Training bevestigen</h1>
+          <p className="text-white/50 mt-1">Training is niet geactiveerd voor dit account.</p>
+        </div>
+
+        <div className="glass-card p-6 border border-white/10 bg-white/5">
+          <p className="text-white/80 text-sm">
+            Deze klantflow gebruikt momenteel alleen de algemene intake. Zodra training wordt geactiveerd, verschijnen hier de trainingsmomenten.
+          </p>
+          <Link href="/dashboard" className="inline-block mt-4 text-sm text-brand-gold hover:underline">
+            Terug naar dashboard →
+          </Link>
         </div>
       </div>
     )

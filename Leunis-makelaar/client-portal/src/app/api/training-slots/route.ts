@@ -31,6 +31,20 @@ export async function GET() {
 
   if (!clientUser) return noStore({ slots: [] })
 
+  const { data: clientRow } = await admin
+    .from('clients')
+    .select('intake_profile')
+    .eq('id', clientUser.client_id)
+    .maybeSingle()
+
+  const profile = (clientRow?.intake_profile && typeof clientRow.intake_profile === 'object')
+    ? (clientRow.intake_profile as Record<string, unknown>)
+    : {}
+
+  if (profile.training_enabled !== true) {
+    return noStore({ slots: [] })
+  }
+
   const { data: slots, error } = await admin
     .from('training_slots')
     .select('*')

@@ -50,9 +50,25 @@ export async function POST(
     return noStore({ error: 'Niet gemachtigd' }, 403)
   }
 
+  const { data: clientRow } = await admin
+    .from('clients')
+    .select('intake_profile')
+    .eq('id', clientUser.client_id)
+    .maybeSingle()
+
+  const profile = (clientRow?.intake_profile && typeof clientRow.intake_profile === 'object')
+    ? (clientRow.intake_profile as Record<string, unknown>)
+    : {}
+
+  if (profile.training_enabled !== true) {
+    return noStore({ error: 'Trainingplanning is niet geactiveerd voor dit account.' }, 403)
+  }
+
   if (slot.is_selected) {
     return noStore({ error: 'Dit tijdslot is al gekozen' }, 422)
   }
+
+  const defaultWindowHours = Number(process.env.TRAINING_RESCHEDULE_DEFAULT_HOURS ?? 24)
 
   // Maak een training_session aan — status 'proposed' want klant heeft gekozen, admin bevestigt definitief
   const { data: session, error: sessionError } = await admin
@@ -65,7 +81,10 @@ export async function POST(
       session_end: slot.slot_end,
       proposed_duration_hours: null,
       location_or_link: slot.location_or_link,
-      metadata: { chosen_by_client: true },
+      metadata: {
+        chosen_by_client: true,
+        reschedule_window_hours: Number.isFinite(defaultWindowHours) ? defaultWindowHours : 24,
+      },
     })
     .select('id')
     .single()

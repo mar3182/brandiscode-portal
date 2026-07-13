@@ -46,6 +46,33 @@ async function getCallerInfo() {
   return { userId: user.id, clientId }
 }
 
+async function isTrainingEnabledForClient(clientId: string) {
+  const admin = createAdminClient()
+
+  const { data: client } = await admin
+    .from('clients')
+    .select('intake_profile')
+    .eq('id', clientId)
+    .maybeSingle()
+
+  const profile = (client?.intake_profile && typeof client.intake_profile === 'object')
+    ? (client.intake_profile as Record<string, unknown>)
+    : {}
+
+  const explicitFlag = profile.training_enabled === true
+  if (explicitFlag) return true
+
+  // Backward-compatible: existing training intake rows also count as enabled.
+  const { data: existingIntake } = await admin
+    .from('training_intakes')
+    .select('id')
+    .eq('client_id', clientId)
+    .limit(1)
+    .maybeSingle()
+
+  return Boolean(existingIntake?.id)
+}
+
 function mapIntakePayload(payload: Record<string, unknown>): TrainingIntakeInput {
   const members = Array.isArray(payload.members) ? payload.members : []
   return {
@@ -229,9 +256,26 @@ export async function GET() {
   const caller = await getCallerInfo()
   if (!caller) return noStore({ error: 'Niet ingelogd' }, 401)
 
+  const enabled = await isTrainingEnabledForClient(caller.clientId)
+  if (!enabled) {
+    return noStore({
+      enabled: false,
+      intake: null,
+      members: [],
+      sessions: [],
+      completeness: {
+        readyForTraining: false,
+        intakeFieldsComplete: false,
+        membersComplete: false,
+        memberCount: 0,
+        missingRequiredFields: [],
+      },
+    })
+  }
+
   try {
     const result = await getIntakeForClient(caller.clientId)
-    return noStore(result)
+    return noStore({ enabled: true, ...result })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Onbekende fout'
     return noStore({ error: message }, 500)
@@ -241,6 +285,11 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   const caller = await getCallerInfo()
   if (!caller) return noStore({ error: 'Niet ingelogd' }, 401)
+
+  const enabled = await isTrainingEnabledForClient(caller.clientId)
+  if (!enabled) {
+    return noStore({ error: 'Training intake is niet geactiveerd voor dit account.' }, 403)
+  }
 
   const body = (await req.json()) as Record<string, unknown>
   const input = mapIntakePayload(body)

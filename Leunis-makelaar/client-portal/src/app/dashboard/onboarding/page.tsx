@@ -88,6 +88,7 @@ function createEmptyMember(index: number): TrainingIntakeMemberInput {
 export default function OnboardingPage() {
   const router = useRouter()
   const [step, setStep] = useState(1)
+  const [trainingEnabled, setTrainingEnabled] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -158,6 +159,14 @@ export default function OnboardingPage() {
 
       if (intakeRes.ok) {
         const intakeData = await intakeRes.json()
+        const enabled = intakeData?.enabled === true
+        setTrainingEnabled(enabled)
+
+        if (!enabled) {
+          setLoading(false)
+          return
+        }
+
         if (intakeData.intake) {
           const intakeContactPerson = intakeData.intake.contact_person ?? ''
           const intakeContactEmail = intakeData.intake.contact_email ?? ''
@@ -216,6 +225,10 @@ export default function OnboardingPage() {
 
   const completeness = useMemo(() => computeTrainingCompleteness(training), [training])
   const communicationErrors = useMemo(() => validateCommunicationPreference(training), [training])
+  const flowSteps = useMemo(
+    () => (trainingEnabled ? STEPS.filter((s) => s.id < 5) : [STEPS[0]]),
+    [trainingEnabled]
+  )
 
   async function saveBilling() {
     const res = await fetch('/api/onboarding/wizard', {
@@ -260,11 +273,22 @@ export default function OnboardingPage() {
     setSaving(true)
     setError('')
     const ok = await saveBilling()
+    if (ok && !trainingEnabled) {
+      await fetch('/api/onboarding/wizard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step: 'complete' }),
+      })
+      setSaving(false)
+      setStep(5)
+      return
+    }
     setSaving(false)
     if (ok) setStep(2)
   }
 
   async function handleDraftSave() {
+    if (!trainingEnabled) return
     setSaving(true)
     setError('')
     await saveTrainingDraft(false)
@@ -272,6 +296,7 @@ export default function OnboardingPage() {
   }
 
   async function handleSubmitIntake() {
+    if (!trainingEnabled) return
     setSaving(true)
     setError('')
     setChannelTouched(true)
@@ -338,7 +363,7 @@ export default function OnboardingPage() {
       {step < 5 && (
         <div className="glass-card p-4">
           <div className="flex items-center justify-between overflow-x-auto">
-            {STEPS.filter((s) => s.id < 5).map((item, idx) => (
+            {flowSteps.map((item, idx) => (
               <div key={item.id} className="flex items-center gap-2">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
                   step > item.id ? 'bg-green-500 text-white' : step === item.id ? 'bg-brand-gold text-black' : 'bg-white/10 text-white/50'
@@ -348,7 +373,7 @@ export default function OnboardingPage() {
                 <span className={`text-xs sm:text-sm ${step === item.id ? 'text-white font-semibold' : 'text-white/50'}`}>
                   {item.label}
                 </span>
-                {idx < 3 ? <ChevronRight className="w-4 h-4 text-white/20" /> : null}
+                {idx < flowSteps.length - 1 ? <ChevronRight className="w-4 h-4 text-white/20" /> : null}
               </div>
             ))}
           </div>
@@ -414,7 +439,7 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      {step === 2 && (
+      {trainingEnabled && step === 2 && (
         <div className="glass-card p-6 sm:p-8 space-y-4">
           <div className="flex items-center gap-3">
             <ClipboardList className="w-5 h-5 text-brand-gold" />
@@ -603,7 +628,7 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      {step === 3 && (
+      {trainingEnabled && step === 3 && (
         <div className="glass-card p-6 sm:p-8 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -659,7 +684,7 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      {step === 4 && (
+      {trainingEnabled && step === 4 && (
         <div className="glass-card p-6 sm:p-8 space-y-5">
           <h2 className="text-xl font-bold text-white">Controleer en verzend</h2>
 
@@ -713,8 +738,12 @@ export default function OnboardingPage() {
           <div className="w-14 h-14 rounded-full bg-green-500/20 mx-auto flex items-center justify-center">
             <CheckCircle2 className="w-7 h-7 text-green-400" />
           </div>
-          <h2 className="text-2xl font-bold text-white">Intake ingediend</h2>
-          <p className="text-white/60">Bedankt. De status staat nu op <span className="text-white font-medium">Ingediend</span>. Ons team beoordeelt jullie intake en plant daarna de trainingssessie. Je ontvangt hiervan een update.</p>
+          <h2 className="text-2xl font-bold text-white">Onboarding afgerond</h2>
+          <p className="text-white/60">
+            {trainingEnabled
+              ? <>Bedankt. De status staat nu op <span className="text-white font-medium">Ingediend</span>. Ons team beoordeelt jullie intake en plant daarna de trainingssessie. Je ontvangt hiervan een update.</>
+              : <>Bedankt. Je bedrijfsgegevens zijn opgeslagen en je onboarding is afgerond.</>}
+          </p>
           <button onClick={() => router.push('/dashboard')} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-brand-gold text-black font-semibold">
             Naar dashboard <ArrowRight className="w-4 h-4" />
           </button>

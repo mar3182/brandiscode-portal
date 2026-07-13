@@ -54,6 +54,31 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
+  // Hard gate: training confirmation only when explicitly enabled for this client.
+  const { data: clientRow } = await admin
+    .from('client_users')
+    .select('client_id')
+    .eq('email', user.email!)
+    .single()
+
+  if (!clientRow?.client_id) {
+    return noStore({ error: 'Geen gekoppelde klant gevonden' }, 403)
+  }
+
+  const { data: clientConfig } = await admin
+    .from('clients')
+    .select('intake_profile')
+    .eq('id', clientRow.client_id)
+    .maybeSingle()
+
+  const profile = (clientConfig?.intake_profile && typeof clientConfig.intake_profile === 'object')
+    ? (clientConfig.intake_profile as Record<string, unknown>)
+    : {}
+
+  if (profile.training_enabled !== true) {
+    return noStore({ error: 'Trainingplanning is niet geactiveerd voor dit account.' }, 403)
+  }
+
   // Haal sessie op en verifieer dat die bij deze klant hoort
   const { data: session, error: sessionError } = await admin
     .from('training_sessions')
