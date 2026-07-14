@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Receipt, ExternalLink, Loader2 } from 'lucide-react'
 import { computeFactuurBedragen } from '@/lib/types'
 
@@ -21,12 +21,18 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default function AdminFacturenPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const clientId = searchParams.get('client_id') || searchParams.get('client')
   const [facturen, setFacturen] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    fetch('/api/admin/facturen')
+    const url = clientId
+      ? `/api/admin/facturen?client_id=${encodeURIComponent(clientId)}`
+      : '/api/admin/facturen'
+
+    fetch(url)
       .then((r) => r.json())
       .then((d) => {
         if (Array.isArray(d)) setFacturen(d)
@@ -34,7 +40,7 @@ export default function AdminFacturenPage() {
       })
       .catch(() => setError('Verbinding mislukt'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [clientId])
 
   const totaalOpenstaand = facturen
     .filter((f) => f.status === 'verstuurd' || f.status === 'herinnering')
@@ -48,6 +54,9 @@ export default function AdminFacturenPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-white">Facturen</h1>
+          {clientId && !loading && (
+            <p className="text-xs text-white/40 mt-0.5">Gefilterd op geselecteerde klant</p>
+          )}
           {!loading && totaalOpenstaand > 0 && (
             <p className="text-sm text-amber-300 mt-0.5">
               €{totaalOpenstaand.toFixed(2).replace('.', ',')} openstaand

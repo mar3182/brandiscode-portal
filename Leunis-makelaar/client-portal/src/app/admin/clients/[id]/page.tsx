@@ -1391,7 +1391,7 @@ function FacturenTab({
             </p>
           )}
           <Link
-            href={`/admin/facturen?client=${clientId}`}
+            href={`/admin/facturen?client_id=${clientId}`}
             className="text-xs text-brand-orange hover:text-brand-orange/80 flex items-center gap-1 ml-auto"
           >
             Nieuwe factuur <ChevronRight size={12} />

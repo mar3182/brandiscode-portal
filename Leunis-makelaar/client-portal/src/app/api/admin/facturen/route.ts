@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const user = await checkAdmin()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const clientId = req.nextUrl.searchParams.get('client_id')
+  const clientId = req.nextUrl.searchParams.get('client_id') || req.nextUrl.searchParams.get('client')
   const admin = createAdminClient()
 
   let query = admin
