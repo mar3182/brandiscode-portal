@@ -19,6 +19,18 @@ const STATUS_LABEL: Record<string, string> = {
   betaald:     'Betaald',
 }
 
+type RecurringPlan = {
+  enabled: boolean
+  title: string
+  description: string
+  amount: number | null
+  btw_percentage: number
+  due_days: number
+  send_to: string
+  last_generated_month: string | null
+  last_generated_at: string | null
+}
+
 export default function AdminFacturenPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -35,6 +47,12 @@ export default function AdminFacturenPage() {
   const [btwPercentage, setBtwPercentage] = useState('21')
   const [description, setDescription] = useState('')
   const [dueDate, setDueDate] = useState('')
+  const [recurringPlan, setRecurringPlan] = useState<RecurringPlan | null>(null)
+  const [recurringLoading, setRecurringLoading] = useState(false)
+  const [recurringSaving, setRecurringSaving] = useState(false)
+  const [recurringRunning, setRecurringRunning] = useState(false)
+  const [recurringError, setRecurringError] = useState('')
+  const [recurringSuccess, setRecurringSuccess] = useState('')
 
   useEffect(() => {
     const url = clientId
@@ -54,6 +72,38 @@ export default function AdminFacturenPage() {
   const totaalOpenstaand = facturen
     .filter((f) => f.status === 'verstuurd' || f.status === 'herinnering')
     .reduce((sum, f) => sum + computeFactuurBedragen(f).total_amount, 0)
+
+  useEffect(() => {
+    if (!clientId) {
+      setRecurringPlan(null)
+      return
+    }
+
+    setRecurringLoading(true)
+    setRecurringError('')
+
+    fetch(`/api/admin/clients/${clientId}/recurring-invoice`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.plan) {
+          setRecurringPlan({
+            enabled: Boolean(d.plan.enabled),
+            title: d.plan.title ?? 'Website onderhoud - maandfactuur',
+            description: d.plan.description ?? 'Onderhoud website',
+            amount: typeof d.plan.amount === 'number' ? d.plan.amount : (d.plan.amount ? Number(d.plan.amount) : null),
+            btw_percentage: Number(d.plan.btw_percentage ?? 21),
+            due_days: Number(d.plan.due_days ?? 14),
+            send_to: d.plan.send_to ?? '',
+            last_generated_month: d.plan.last_generated_month ?? null,
+            last_generated_at: d.plan.last_generated_at ?? null,
+          })
+        } else {
+          setRecurringError(d?.error || 'Abonnement laden mislukt.')
+        }
+      })
+      .catch(() => setRecurringError('Abonnement laden mislukt.'))
+      .finally(() => setRecurringLoading(false))
+  }, [clientId])
 
   async function handleCreateFactuur(e: React.FormEvent) {
     e.preventDefault()
@@ -99,6 +149,67 @@ export default function AdminFacturenPage() {
     setShowCreateForm(false)
     setDescription('')
     setDueDate('')
+  }
+
+  async function handleSaveRecurringPlan(e: React.FormEvent) {
+    e.preventDefault()
+    if (!clientId || !recurringPlan) return
+
+    setRecurringSaving(true)
+    setRecurringError('')
+    setRecurringSuccess('')
+
+    const res = await fetch(`/api/admin/clients/${clientId}/recurring-invoice`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        enabled: recurringPlan.enabled,
+        title: recurringPlan.title,
+        description: recurringPlan.description,
+        amount: recurringPlan.amount,
+        btw_percentage: recurringPlan.btw_percentage,
+        due_days: recurringPlan.due_days,
+        send_to: recurringPlan.send_to,
+      }),
+    })
+
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setRecurringError(data.error || 'Opslaan abonnement mislukt.')
+      setRecurringSaving(false)
+      return
+    }
+
+    setRecurringSuccess('Maandelijks abonnement opgeslagen.')
+    setRecurringSaving(false)
+  }
+
+  async function handleRunRecurringNow() {
+    if (!clientId) return
+
+    setRecurringRunning(true)
+    setRecurringError('')
+    setRecurringSuccess('')
+
+    const res = await fetch('/api/admin/recurring-invoices/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: clientId }),
+    })
+
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setRecurringError(data.error || 'Handmatig uitvoeren mislukt.')
+      setRecurringRunning(false)
+      return
+    }
+
+    const url = `/api/admin/facturen?client_id=${encodeURIComponent(clientId)}`
+    const refreshed = await fetch(url).then((r) => r.json()).catch(() => null)
+    if (Array.isArray(refreshed)) setFacturen(refreshed)
+
+    setRecurringSuccess(`Run uitgevoerd: ${data.created ?? 0} factuur(en) aangemaakt, ${data.emailed ?? 0} verzonden.`)
+    setRecurringRunning(false)
   }
 
   return (
@@ -213,6 +324,122 @@ export default function AdminFacturenPage() {
             </button>
           </div>
         </form>
+      )}
+
+      {clientId && (
+        <div className="glass-card rounded-2xl p-5 mb-6 space-y-4 border border-white/10">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-white font-semibold">Maandelijks abonnement</h2>
+              <p className="text-xs text-white/50 mt-1">Factuur wordt op de laatste dag van de maand automatisch aangemaakt en verzonden.</p>
+            </div>
+            <button
+              onClick={handleRunRecurringNow}
+              disabled={recurringRunning || recurringLoading || !recurringPlan?.enabled}
+              className="px-3 py-2 rounded-lg bg-brand-blue text-white text-xs hover:bg-brand-blue/80 disabled:opacity-60"
+              title="Handmatig runnen voor test"
+            >
+              {recurringRunning ? 'Bezig...' : 'Nu uitvoeren (test)'}
+            </button>
+          </div>
+
+          {recurringLoading ? (
+            <p className="text-xs text-white/50 inline-flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" />Abonnement laden...</p>
+          ) : recurringPlan ? (
+            <form onSubmit={handleSaveRecurringPlan} className="space-y-4">
+              <label className="inline-flex items-center gap-2 text-sm text-white">
+                <input
+                  type="checkbox"
+                  checked={recurringPlan.enabled}
+                  onChange={(e) => setRecurringPlan((prev) => prev ? ({ ...prev, enabled: e.target.checked }) : prev)}
+                />
+                Automatisch maandfactuur actief
+              </label>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-white/50 mb-1">Titel *</label>
+                  <input
+                    value={recurringPlan.title}
+                    onChange={(e) => setRecurringPlan((prev) => prev ? ({ ...prev, title: e.target.value }) : prev)}
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-white/50 mb-1">Bedrag excl. BTW *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={recurringPlan.amount ?? ''}
+                    onChange={(e) => setRecurringPlan((prev) => prev ? ({ ...prev, amount: e.target.value ? Number(e.target.value) : null }) : prev)}
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-white/50 mb-1">BTW %</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={recurringPlan.btw_percentage}
+                    onChange={(e) => setRecurringPlan((prev) => prev ? ({ ...prev, btw_percentage: Number(e.target.value) }) : prev)}
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-white/50 mb-1">Betaaltermijn (dagen)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="90"
+                    value={recurringPlan.due_days}
+                    onChange={(e) => setRecurringPlan((prev) => prev ? ({ ...prev, due_days: Number(e.target.value) }) : prev)}
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs text-white/50 mb-1">Verzenden naar e-mail *</label>
+                  <input
+                    type="email"
+                    value={recurringPlan.send_to}
+                    onChange={(e) => setRecurringPlan((prev) => prev ? ({ ...prev, send_to: e.target.value }) : prev)}
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm"
+                    required
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs text-white/50 mb-1">Omschrijving</label>
+                  <textarea
+                    value={recurringPlan.description}
+                    onChange={(e) => setRecurringPlan((prev) => prev ? ({ ...prev, description: e.target.value }) : prev)}
+                    className="w-full px-3 py-2 min-h-20 bg-white/5 border border-white/10 rounded-lg text-white text-sm"
+                  />
+                </div>
+              </div>
+
+              <p className="text-xs text-white/40">
+                Laatste run: {recurringPlan.last_generated_at ? new Date(recurringPlan.last_generated_at).toLocaleString('nl-NL') : 'nog niet uitgevoerd'}
+                {recurringPlan.last_generated_month ? ` (maand ${recurringPlan.last_generated_month})` : ''}
+              </p>
+
+              {recurringError ? <p className="text-red-300 text-sm">{recurringError}</p> : null}
+              {recurringSuccess ? <p className="text-green-300 text-sm">{recurringSuccess}</p> : null}
+
+              <button
+                type="submit"
+                disabled={recurringSaving}
+                className="px-3 py-2 rounded-lg bg-brand-orange text-white text-sm hover:bg-brand-orange/80 disabled:opacity-60"
+              >
+                {recurringSaving ? 'Opslaan...' : 'Abonnement opslaan'}
+              </button>
+            </form>
+          ) : (
+            <p className="text-red-300 text-sm">{recurringError || 'Abonnement laden mislukt.'}</p>
+          )}
+        </div>
       )}
 
       {loading && (

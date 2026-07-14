@@ -244,3 +244,67 @@ export async function sendFeedbackRequestEmail(data: FeedbackRequestEmailData) {
 
   if (error) throw new Error(`Resend fout: ${error.message}`)
 }
+
+export interface RecurringInvoiceEmailData {
+  to: string
+  contactName: string
+  companyName: string
+  factuurNummer: string
+  title: string
+  issueDate: string
+  dueDate: string
+  totalAmount: number
+}
+
+export async function sendRecurringInvoiceEmail(data: RecurringInvoiceEmailData) {
+  const amountText = data.totalAmount.toLocaleString('nl-NL', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+
+  const html = `<!DOCTYPE html>
+<html lang="nl">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Arial,sans-serif;color:#e2e8f0">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:40px 16px">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#1e293b;border-radius:16px;overflow:hidden;border:1px solid #334155">
+        <tr><td style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);padding:32px 40px;border-bottom:1px solid #334155">
+          <p style="margin:0;font-size:13px;color:#f97316;font-weight:600;letter-spacing:1px;text-transform:uppercase">Brand is Code</p>
+          <h1 style="margin:8px 0 0;font-size:22px;font-weight:700;color:#fff">Nieuwe maandfactuur</h1>
+        </td></tr>
+        <tr><td style="padding:32px 40px">
+          <p style="margin:0 0 12px;color:#cbd5e1">Hoi ${data.contactName},</p>
+          <p style="margin:0 0 20px;color:#94a3b8;line-height:1.6">
+            Voor <strong style="color:#e2e8f0">${data.companyName}</strong> is de maandfactuur aangemaakt.
+          </p>
+
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;border:1px solid #334155;border-radius:12px;margin-bottom:20px">
+            <tr><td style="padding:18px 20px">
+              <p style="margin:0 0 6px;font-size:13px;color:#94a3b8">Factuurnummer: <strong style="color:#fff">${data.factuurNummer}</strong></p>
+              <p style="margin:0 0 6px;font-size:13px;color:#94a3b8">Omschrijving: <strong style="color:#fff">${data.title}</strong></p>
+              <p style="margin:0 0 6px;font-size:13px;color:#94a3b8">Factuurdatum: <strong style="color:#fff">${data.issueDate}</strong></p>
+              <p style="margin:0 0 6px;font-size:13px;color:#94a3b8">Vervaldatum: <strong style="color:#fff">${data.dueDate}</strong></p>
+              <p style="margin:10px 0 0;font-size:16px;color:#f97316;font-weight:700">Totaal incl. BTW: EUR ${amountText}</p>
+            </td></tr>
+          </table>
+
+          <p style="margin:0;color:#64748b;font-size:12px">
+            Je kunt de factuur ook bekijken in het portal: <a href="${BASE_URL}/dashboard/facturen" style="color:#f97316">${BASE_URL}/dashboard/facturen</a>
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`
+
+  const { error } = await getResend().emails.send({
+    from: FROM,
+    to: [resolveRecipient(data.to)],
+    subject: `Factuur ${data.factuurNummer} — Brand is Code`,
+    html,
+  })
+
+  if (error) throw new Error(`Resend fout: ${error.message}`)
+}
