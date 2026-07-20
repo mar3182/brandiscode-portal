@@ -6,11 +6,11 @@ Leest een BLOG-XX-*.md bestand uit docs/, genereert een featured image
 en plaatst alles als concept (draft) in WordPress via de REST API.
 
 GEBRUIK:
-    python3 publish_blog_to_wordpress.py docs/BLOG-01-CRM-DATA-DRAFT.md
-    python3 publish_blog_to_wordpress.py docs/BLOG-01-CRM-DATA-DRAFT.md --image pexels
-    python3 publish_blog_to_wordpress.py docs/BLOG-01-CRM-DATA-DRAFT.md --image dalle
-    python3 publish_blog_to_wordpress.py docs/BLOG-01-CRM-DATA-DRAFT.md --photo-advice
-    python3 publish_blog_to_wordpress.py docs/BLOG-01-CRM-DATA-DRAFT.md --dry-run
+    python3 publish_blog_to_wordpress.py docs/archive/2026-07/BLOG-01-CRM-DATA-DRAFT.md
+    python3 publish_blog_to_wordpress.py docs/archive/2026-07/BLOG-01-CRM-DATA-DRAFT.md --image pexels
+    python3 publish_blog_to_wordpress.py docs/archive/2026-07/BLOG-01-CRM-DATA-DRAFT.md --image dalle
+    python3 publish_blog_to_wordpress.py docs/archive/2026-07/BLOG-01-CRM-DATA-DRAFT.md --photo-advice
+    python3 publish_blog_to_wordpress.py docs/archive/2026-07/BLOG-01-CRM-DATA-DRAFT.md --dry-run
 
 AFBEELDINGSBRONNEN:
     --image pexels    Gratis Pexels stockfoto. Vereist PEXELS_API_KEY in .env

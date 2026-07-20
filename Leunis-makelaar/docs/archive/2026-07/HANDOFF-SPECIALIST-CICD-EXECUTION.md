@@ -9,7 +9,7 @@ Maak de bestaande CI/CD-opzet daadwerkelijk production-grade en uitvoerbaar voor
   - `d173d805` — client profile module + migration + validatie
   - `6d5dc624` — CI/CD docs + workflows + handoff package
 - Bestaande basisdocumentatie aanwezig:
-  - `docs/HANDOFF-HARDENING.md`
+   - `docs/archive/2026-07/HANDOFF-HARDENING.md`
   - `docs/CI-CD-ARCHITECTURE.md`
   - `docs/CI-CD-README.md`
   - `docs/PRODUCTION-RELEASE-CHECKLIST.md`
@@ -31,7 +31,7 @@ Je werkt minimaal in deze bestanden:
 - `.github/workflows/01-pr-checks.yml`
 - `.github/workflows/02-staging-cd.yml`
 - `.github/workflows/03-production-cd.yml`
-- `docs/HANDOFF-HARDENING.md` (alleen actualiseren als fixes afwijken)
+- `docs/archive/2026-07/HANDOFF-HARDENING.md` (alleen actualiseren als fixes afwijken)
 - `docs/CI-CD-README.md` (setup/secrets/required env vars finaliseren)
 
 ## 5) Must-have uitkomsten

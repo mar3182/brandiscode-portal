@@ -121,7 +121,7 @@ AI implementeren hoeft niet chaotisch of eng te zijn. Brand is Code doet het in 
 
 Mary geeft een praktische workshop over het bouwen en gebruiken van agents in Microsoft 365 Copilot.
 
-**Kennisbron:** Het volledige transcript van de referentievideo staat in `docs/m365-copilot-agents-workshop-transcript.txt` — gebruik dit als primaire bron voor alle workshopinhoud.
+**Kennisbron:** Het volledige transcript van de referentievideo staat in `docs/archive/2026-07/m365-copilot-agents-workshop-transcript.txt` — gebruik dit als primaire bron voor alle workshopinhoud.
 
 ### Kerninhoud van de workshop (uit transcript):
 
