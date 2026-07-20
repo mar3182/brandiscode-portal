@@ -321,27 +321,25 @@ export default function AdminClientsPage() {
     setActionError('')
     setIntakeActionNotice(null)
 
-    const res = await fetch(`/api/admin/clients/${clientId}/intake-token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ send_invitation: false }),
-    })
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      setActionError(err.error || 'Intake link aanmaken is mislukt')
-      setIntakeActionNotice({
-        clientId,
-        message: err.error || 'Intake link aanmaken is mislukt.',
-        tone: 'error',
-      })
-      setIntakeLinkLoadingId(null)
-      return
-    }
-
-    const data = await res.json()
-    const { url, warnings } = data as { url: string; warnings?: string[] }
     try {
+      const res = await fetch(`/api/admin/clients/${clientId}/intake-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        setActionError(err.error || 'Intake link aanmaken is mislukt')
+        setIntakeActionNotice({
+          clientId,
+          message: err.error || 'Intake link aanmaken is mislukt.',
+          tone: 'error',
+        })
+        return
+      }
+
+      const data = await res.json()
+      const { url, warnings } = data as { url: string; warnings?: string[] }
       await navigator.clipboard.writeText(url)
       setIntakeLinkCopiedId(clientId)
       setTimeout(() => setIntakeLinkCopiedId(null), 2000)
@@ -361,9 +359,9 @@ export default function AdminClientsPage() {
         message: 'Kopiëren mislukt. Gebruik handmatig deze URL: ' + url,
         tone: 'error',
       })
+    } finally {
+      setIntakeLinkLoadingId(null)
     }
-
-    setIntakeLinkLoadingId(null)
   }
 
   async function handleSendIntakeInvite(clientId: string) {
@@ -371,69 +369,68 @@ export default function AdminClientsPage() {
     setActionError('')
     setIntakeActionNotice(null)
 
-    const tokenRes = await fetch(`/api/admin/clients/${clientId}/intake-token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ send_invitation: false }),
-    })
-
-    if (!tokenRes.ok) {
-      const err = await tokenRes.json().catch(() => ({}))
-      setActionError(err.error || 'Intake versturen is mislukt')
-      setIntakeActionNotice({
-        clientId,
-        message: err.error || 'Intake versturen is mislukt.',
-        tone: 'error',
+    try {
+      const tokenRes = await fetch(`/api/admin/clients/${clientId}/intake-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
       })
+
+      if (!tokenRes.ok) {
+        const err = await tokenRes.json().catch(() => ({}))
+        setActionError(err.error || 'Intake versturen is mislukt')
+        setIntakeActionNotice({
+          clientId,
+          message: err.error || 'Intake versturen is mislukt.',
+          tone: 'error',
+        })
+        return
+      }
+
+      const tokenData = await tokenRes.json() as { token?: string; url?: string; warnings?: string[] }
+      if (!tokenData.token || !tokenData.url) {
+        setIntakeActionNotice({
+          clientId,
+          message: 'Intake-token aanmaken is mislukt: onvolledige response.',
+          tone: 'error',
+        })
+        return
+      }
+
+      const inviteRes = await fetch(`/api/admin/clients/${clientId}/intake-token/send-invitation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: tokenData.token, url: tokenData.url }),
+      })
+
+      const inviteData = await inviteRes.json().catch(() => ({})) as {
+        invitation_sent?: boolean
+        warnings?: string[]
+        error?: string
+      }
+
+      const warnings = [...(tokenData.warnings ?? []), ...(inviteData.warnings ?? []), ...(inviteData.error ? [inviteData.error] : [])]
+      const invitationSent = inviteRes.ok && Boolean(inviteData.invitation_sent)
+
+      if (invitationSent) {
+        setIntakeActionNotice({
+          clientId,
+          message: warnings?.length
+            ? `Intake-uitnodiging is verstuurd. Let op: ${warnings[0]}`
+            : 'Intake-uitnodiging is succesvol verstuurd naar het hoofdaccount.',
+          tone: warnings?.length ? 'warning' : 'success',
+        })
+      } else {
+        setIntakeActionNotice({
+          clientId,
+          message: warnings?.length
+            ? `Intake-uitnodiging kon niet worden verstuurd: ${warnings[0]}`
+            : 'Intake-uitnodiging kon niet worden verstuurd. Probeer het opnieuw of kopieer de link handmatig.',
+          tone: 'warning',
+        })
+      }
+    } finally {
       setIntakeSendLoadingId(null)
-      return
     }
-
-    const tokenData = await tokenRes.json() as { token?: string; url?: string; warnings?: string[] }
-    if (!tokenData.token || !tokenData.url) {
-      setIntakeActionNotice({
-        clientId,
-        message: 'Intake-token aanmaken is mislukt: onvolledige response.',
-        tone: 'error',
-      })
-      setIntakeSendLoadingId(null)
-      return
-    }
-
-    const inviteRes = await fetch(`/api/admin/clients/${clientId}/intake-token/send-invitation`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: tokenData.token, url: tokenData.url }),
-    })
-
-    const inviteData = await inviteRes.json().catch(() => ({})) as {
-      invitation_sent?: boolean
-      warnings?: string[]
-      error?: string
-    }
-
-    const warnings = [...(tokenData.warnings ?? []), ...(inviteData.warnings ?? []), ...(inviteData.error ? [inviteData.error] : [])]
-    const invitationSent = inviteRes.ok && Boolean(inviteData.invitation_sent)
-
-    if (invitationSent) {
-      setIntakeActionNotice({
-        clientId,
-        message: warnings?.length
-          ? `Intake-uitnodiging is verstuurd. Let op: ${warnings[0]}`
-          : 'Intake-uitnodiging is succesvol verstuurd naar het hoofdaccount.',
-        tone: warnings?.length ? 'warning' : 'success',
-      })
-    } else {
-      setIntakeActionNotice({
-        clientId,
-        message: warnings?.length
-          ? `Intake-uitnodiging kon niet worden verstuurd: ${warnings[0]}`
-          : 'Intake-uitnodiging kon niet worden verstuurd.',
-        tone: 'warning',
-      })
-    }
-
-    setIntakeSendLoadingId(null)
   }
 
   return (
