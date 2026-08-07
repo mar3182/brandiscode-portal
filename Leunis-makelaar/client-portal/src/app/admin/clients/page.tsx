@@ -10,65 +10,21 @@ import {
   formatBtwInput,
   formatIbanInput,
   formatKvkInput,
-  validateCompanyProfileFields,
 } from '@/lib/companyProfileValidation'
-
-type ClientForm = {
-  id?: string
-  owner_name: string
-  name: string
-  email: string
-  company: string
-  phone: string
-  contact_person: string
-  kvk_number: string
-  btw_number: string
-  iban: string
-  billing_email: string
-  billing_address_line1: string
-  billing_address_line2: string
-  billing_postal_code: string
-  billing_city: string
-  billing_country: string
-  sector_raw: string
-  mark_completed: boolean
-}
-
-const initialForm: ClientForm = {
-  owner_name: '',
-  name: '',
-  email: '',
-  company: '',
-  phone: '',
-  contact_person: '',
-  kvk_number: '',
-  btw_number: '',
-  iban: '',
-  billing_email: '',
-  billing_address_line1: '',
-  billing_address_line2: '',
-  billing_postal_code: '',
-  billing_city: '',
-  billing_country: 'Nederland',
-  sector_raw: '',
-  mark_completed: false,
-}
-
-function getSectorLabel(sector: string | null) {
-  if (sector === 'real_estate') return 'Makelaardij'
-  if (sector === 'professional_services') return 'Zakelijke dienstverlening'
-  return 'Algemeen'
-}
+import { createIntakeToken, sendIntakeInvitation } from '@/lib/adminClientIntake'
+import {
+  getClientSectorLabel,
+  initialClientForm,
+  toClientPayload,
+  toEditForm,
+  validateClientProfile,
+  validateCreateEmails,
+  validateEditEmails,
+  type ClientForm,
+  type EmailValidationErrors,
+} from '@/lib/adminClientsFlow'
 
 const INPUT_CLASS = 'w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-brand-blue/50 transition-all'
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-function validateRequiredEmail(value: string, label: string) {
-  const trimmed = value.trim()
-  if (!trimmed) return `${label} is verplicht.`
-  if (!EMAIL_REGEX.test(trimmed)) return `Vul een geldig ${label.toLowerCase()} in.`
-  return ''
-}
 
 type IntakeActionNotice = {
   clientId: string
@@ -89,9 +45,9 @@ export default function AdminClientsPage() {
   const [actionError, setActionError] = useState('')
   const [createFieldErrors, setCreateFieldErrors] = useState<ProfileFieldErrors>({})
   const [editFieldErrors, setEditFieldErrors] = useState<ProfileFieldErrors>({})
-  const [createEmailErrors, setCreateEmailErrors] = useState<{ email?: string; billing_email?: string }>({})
-  const [editEmailErrors, setEditEmailErrors] = useState<{ email?: string; billing_email?: string }>({})
-  const [form, setForm] = useState<ClientForm>(initialForm)
+  const [createEmailErrors, setCreateEmailErrors] = useState<EmailValidationErrors>({})
+  const [editEmailErrors, setEditEmailErrors] = useState<EmailValidationErrors>({})
+  const [form, setForm] = useState<ClientForm>(initialClientForm)
   const [editForm, setEditForm] = useState<ClientForm | null>(null)
   const [triggeringId, setTriggeringId] = useState<string | null>(null)
   const [triggerSuccess, setTriggerSuccess] = useState<string | null>(null)
@@ -114,65 +70,6 @@ export default function AdminClientsPage() {
     if (Array.isArray(data)) setClients(data)
   }
 
-  const toPayload = (source: ClientForm) => ({
-    id: source.id,
-    owner_name: source.owner_name,
-    name: source.name,
-    email: source.email,
-    company: source.company,
-    phone: source.phone,
-    contact_person: source.contact_person,
-    kvk_number: source.kvk_number,
-    btw_number: source.btw_number,
-    iban: source.iban,
-    billing_email: source.billing_email,
-    billing_address_line1: source.billing_address_line1,
-    billing_address_line2: source.billing_address_line2,
-    billing_postal_code: source.billing_postal_code,
-    billing_city: source.billing_city,
-    billing_country: source.billing_country,
-    sector_raw: source.sector_raw,
-    mark_completed: source.mark_completed,
-  })
-
-  const toEditForm = (client: Client): ClientForm => ({
-    id: client.id,
-    owner_name: client.name || '',
-    name: client.name || '',
-    email: client.email || '',
-    company: client.company || '',
-    phone: client.phone || '',
-    contact_person: client.contact_person || '',
-    kvk_number: client.kvk_number || '',
-    btw_number: client.btw_number || '',
-    iban: client.iban || '',
-    billing_email: client.billing_email || client.email || '',
-    billing_address_line1: client.billing_address_line1 || '',
-    billing_address_line2: client.billing_address_line2 || '',
-    billing_postal_code: client.billing_postal_code || '',
-    billing_city: client.billing_city || '',
-    billing_country: client.billing_country || 'Nederland',
-    sector_raw: client.sector_raw || client.sector || '',
-    mark_completed: Boolean(client.onboarding_completed_at),
-  })
-
-  function validateCreateEmails(source: Pick<ClientForm, 'email' | 'billing_email'>) {
-    const errors: { email?: string; billing_email?: string } = {}
-    const emailError = validateRequiredEmail(source.email, 'E-mailadres')
-    const billingError = validateRequiredEmail(source.billing_email, 'Factuur e-mailadres')
-    if (emailError) errors.email = emailError
-    if (billingError) errors.billing_email = billingError
-    return errors
-  }
-
-  function validateEditEmails(source: Pick<ClientForm, 'email' | 'billing_email'>) {
-    const errors: { email?: string; billing_email?: string } = {}
-    const emailError = validateRequiredEmail(source.email, 'E-mailadres')
-    const billingError = validateRequiredEmail(source.billing_email, 'Factuur e-mailadres')
-    if (emailError) errors.email = emailError
-    if (billingError) errors.billing_email = billingError
-    return errors
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -187,13 +84,7 @@ export default function AdminClientsPage() {
       return
     }
 
-    const validation = validateCompanyProfileFields({
-      email: form.email,
-      billing_email: form.billing_email,
-      kvk_number: form.kvk_number,
-      btw_number: form.btw_number,
-      iban: form.iban,
-    })
+    const validation = validateClientProfile(form)
 
     if (Object.keys(validation.errors).length > 0) {
       setCreateFieldErrors(validation.errors)
@@ -204,13 +95,13 @@ export default function AdminClientsPage() {
     const res = await fetch('/api/admin/clients', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(toPayload(form)),
+      body: JSON.stringify(toClientPayload(form)),
     })
 
     if (res.ok) {
       const newClient = await res.json()
       setClients(prev => [newClient, ...prev])
-      setForm(initialForm)
+      setForm(initialClientForm)
       setShowForm(false)
     } else {
       const err = await res.json().catch(() => ({}))
@@ -236,13 +127,7 @@ export default function AdminClientsPage() {
       return
     }
 
-    const validation = validateCompanyProfileFields({
-      email: editForm.email,
-      billing_email: editForm.billing_email,
-      kvk_number: editForm.kvk_number,
-      btw_number: editForm.btw_number,
-      iban: editForm.iban,
-    })
+    const validation = validateClientProfile(editForm)
 
     if (Object.keys(validation.errors).length > 0) {
       setEditFieldErrors(validation.errors)
@@ -253,7 +138,7 @@ export default function AdminClientsPage() {
     const res = await fetch('/api/admin/clients', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(toPayload(editForm)),
+      body: JSON.stringify(toClientPayload(editForm)),
     })
 
     if (res.ok) {
@@ -320,43 +205,47 @@ export default function AdminClientsPage() {
     setIntakeLinkLoadingId(clientId)
     setActionError('')
     setIntakeActionNotice(null)
+    let intakeUrl = ''
 
     try {
-      const res = await fetch(`/api/admin/clients/${clientId}/intake-token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      })
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        setActionError(err.error || 'Intake link aanmaken is mislukt')
+      const result = await createIntakeToken(clientId)
+      if (result.error) {
+        setActionError(result.error)
         setIntakeActionNotice({
           clientId,
-          message: err.error || 'Intake link aanmaken is mislukt.',
+          message: result.error,
           tone: 'error',
         })
         return
       }
 
-      const data = await res.json()
-      const { url, warnings } = data as { url: string; warnings?: string[] }
-      await navigator.clipboard.writeText(url)
+      intakeUrl = result.url || ''
+      if (!intakeUrl) {
+        setIntakeActionNotice({
+          clientId,
+          message: 'Intake-link kon niet worden aangemaakt.',
+          tone: 'error',
+        })
+        return
+      }
+
+      await navigator.clipboard.writeText(intakeUrl)
       setIntakeLinkCopiedId(clientId)
       setTimeout(() => setIntakeLinkCopiedId(null), 2000)
 
-      const notice = warnings?.length
-        ? `Intake-link gekopieerd. Let op: ${warnings[0]}`
+      const notice = result.warnings?.length
+        ? `Intake-link gekopieerd. Let op: ${result.warnings[0]}`
         : 'Intake-link gekopieerd. Deel deze link met de klant.'
       setIntakeActionNotice({
         clientId,
         message: notice,
-        tone: warnings?.length ? 'warning' : 'success',
+        tone: result.warnings?.length ? 'warning' : 'success',
       })
     } catch {
-      setActionError('Kopiëren mislukt. URL: ' + url)
+      setActionError('Kopiëren mislukt. URL: ' + intakeUrl)
       setIntakeActionNotice({
         clientId,
-        message: 'Kopiëren mislukt. Gebruik handmatig deze URL: ' + url,
+        message: 'Kopiëren mislukt. Gebruik handmatig deze URL: ' + intakeUrl,
         tone: 'error',
       })
     } finally {
@@ -370,59 +259,31 @@ export default function AdminClientsPage() {
     setIntakeActionNotice(null)
 
     try {
-      const tokenRes = await fetch(`/api/admin/clients/${clientId}/intake-token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      })
+      const result = await sendIntakeInvitation(clientId)
 
-      if (!tokenRes.ok) {
-        const err = await tokenRes.json().catch(() => ({}))
-        setActionError(err.error || 'Intake versturen is mislukt')
+      if (result.error) {
+        setActionError(result.error)
         setIntakeActionNotice({
           clientId,
-          message: err.error || 'Intake versturen is mislukt.',
+          message: result.error,
           tone: 'error',
         })
         return
       }
 
-      const tokenData = await tokenRes.json() as { token?: string; url?: string; warnings?: string[] }
-      if (!tokenData.token || !tokenData.url) {
+      const warnings = result.warnings ?? []
+      if (result.invitationSent) {
         setIntakeActionNotice({
           clientId,
-          message: 'Intake-token aanmaken is mislukt: onvolledige response.',
-          tone: 'error',
-        })
-        return
-      }
-
-      const inviteRes = await fetch(`/api/admin/clients/${clientId}/intake-token/send-invitation`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: tokenData.token, url: tokenData.url }),
-      })
-
-      const inviteData = await inviteRes.json().catch(() => ({})) as {
-        invitation_sent?: boolean
-        warnings?: string[]
-        error?: string
-      }
-
-      const warnings = [...(tokenData.warnings ?? []), ...(inviteData.warnings ?? []), ...(inviteData.error ? [inviteData.error] : [])]
-      const invitationSent = inviteRes.ok && Boolean(inviteData.invitation_sent)
-
-      if (invitationSent) {
-        setIntakeActionNotice({
-          clientId,
-          message: warnings?.length
+          message: warnings.length
             ? `Intake-uitnodiging is verstuurd. Let op: ${warnings[0]}`
             : 'Intake-uitnodiging is succesvol verstuurd naar het hoofdaccount.',
-          tone: warnings?.length ? 'warning' : 'success',
+          tone: warnings.length ? 'warning' : 'success',
         })
       } else {
         setIntakeActionNotice({
           clientId,
-          message: warnings?.length
+          message: warnings.length
             ? `Intake-uitnodiging kon niet worden verstuurd: ${warnings[0]}`
             : 'Intake-uitnodiging kon niet worden verstuurd. Probeer het opnieuw of kopieer de link handmatig.',
           tone: 'warning',
@@ -656,7 +517,7 @@ export default function AdminClientsPage() {
                       </span>
                     )}
                     <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-white/10 text-white/70 border border-white/15 ml-2">
-                      Sector (AI): {getSectorLabel(client.sector)}
+                      Sector (AI): {getClientSectorLabel(client.sector)}
                       {typeof client.sector_confidence === 'number' ? ` (${Math.round(client.sector_confidence * 100)}%)` : ''}
                     </span>
                   </div>
