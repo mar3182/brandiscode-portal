@@ -526,21 +526,24 @@ export async function POST(
 
     const authUserId = authData?.user?.id
 
-    // Upsert client_users
+    // Upsert client_users — altijd user_id updaten als authUserId bestaat
+    const upsertPayload: Record<string, unknown> = {
+      client_id: tokenRow.client_id,
+      email,
+      name: member.name.trim(),
+      role: member.role,
+      function_title: member.function_title?.trim() ?? null,
+      intake_profile: member.profile ?? {},
+    }
+
+    // Altijd user_id updaten als authUserId bestaat (lost bestaande entries zonder user_id op)
+    if (authUserId) {
+      upsertPayload.user_id = authUserId
+    }
+
     const { error: cuError } = await admin
       .from('client_users')
-      .upsert(
-        {
-          client_id: tokenRow.client_id,
-          email,
-          name: member.name.trim(),
-          role: member.role,
-          function_title: member.function_title?.trim() ?? null,
-          intake_profile: member.profile ?? {},
-          ...(authUserId ? { user_id: authUserId } : {}),
-        },
-        { onConflict: 'client_id,email' }
-      )
+      .upsert(upsertPayload, { onConflict: 'client_id,email' })
 
     if (cuError) {
       errors.push(`Gebruikersrecord opslaan mislukt voor ${email}: ${cuError.message}`)
