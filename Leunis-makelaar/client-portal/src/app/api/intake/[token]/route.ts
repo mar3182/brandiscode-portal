@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import OpenAI from 'openai'
 import { buildPortalReadyEmail, getTeamMemberEmailKind } from '@/lib/onboardingEmails.mjs'
+import { linkIntakeClientUser } from '@/lib/clientUsersFlow'
 import type { IntakeSubmitBody, IntakeTeamMember } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
@@ -509,45 +510,31 @@ export async function POST(
   for (const member of body.team_members as IntakeTeamMember[]) {
     const email = member.email.trim().toLowerCase()
     const temporaryPassword = generateTemporaryPassword()
-
-    // Create Supabase Auth user
-    const { data: authData, error: authError } = await admin.auth.admin.createUser({
+    const linkResult = await linkIntakeClientUser({
+      createAuthUser: (input) => admin.auth.admin.createUser(input),
+      listAuthUsers: (options) => admin.auth.admin.listUsers(options),
+      upsertClientUser: async (payload) => {
+        const { error } = await admin
+          .from('client_users')
+          .upsert(payload, { onConflict: 'client_id,email' })
+        return { error }
+      },
+    }, {
+      clientId: tokenRow.client_id,
       email,
-      password: temporaryPassword,
-      email_confirm: true,
+      name: member.name,
+      role: member.role,
+      functionTitle: member.function_title,
+      intakeProfile: member.profile,
+      temporaryPassword,
     })
 
-    const alreadyRegistered = Boolean(authError?.message.includes('already been registered'))
-
-    if (authError && !alreadyRegistered) {
-      errors.push(`Auth aanmaken mislukt voor ${email}: ${authError.message}`)
+    if (linkResult.error) {
+      errors.push(linkResult.error)
       continue
     }
 
-    const authUserId = authData?.user?.id
-
-    // Upsert client_users — altijd user_id updaten als authUserId bestaat
-    const upsertPayload: Record<string, unknown> = {
-      client_id: tokenRow.client_id,
-      email,
-      name: member.name.trim(),
-      role: member.role,
-      function_title: member.function_title?.trim() ?? null,
-      intake_profile: member.profile ?? {},
-    }
-
-    // Altijd user_id updaten als authUserId bestaat (lost bestaande entries zonder user_id op)
-    if (authUserId) {
-      upsertPayload.user_id = authUserId
-    }
-
-    const { error: cuError } = await admin
-      .from('client_users')
-      .upsert(upsertPayload, { onConflict: 'client_id,email' })
-
-    if (cuError) {
-      errors.push(`Gebruikersrecord opslaan mislukt voor ${email}: ${cuError.message}`)
-    }
+    const alreadyRegistered = linkResult.alreadyRegistered
 
     if (resend) {
       try {

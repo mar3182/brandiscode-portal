@@ -20,7 +20,9 @@ if (previewUrl) {
 	const tokenRoute = readFileSync(new URL('../src/app/api/admin/clients/[id]/intake-token/route.ts', import.meta.url), 'utf8')
 	const sendInvitationRoute = readFileSync(new URL('../src/app/api/admin/clients/[id]/intake-token/send-invitation/route.ts', import.meta.url), 'utf8')
 	const intakeRoute = readFileSync(new URL('../src/app/api/intake/[token]/route.ts', import.meta.url), 'utf8')
+	const clientUsersFlow = readFileSync(new URL('../src/lib/clientUsersFlow.ts', import.meta.url), 'utf8')
 	const adminPage = readFileSync(new URL('../src/app/admin/clients/page.tsx', import.meta.url), 'utf8')
+	const adminClientIntake = readFileSync(new URL('../src/lib/adminClientIntake.ts', import.meta.url), 'utf8')
 
 	assert.match(tokenRoute, /invitation_sent:/, 'token route should expose invitation_sent')
 	assert.match(tokenRoute, /no longer sends e-mail/, 'token route should document that invitations are handled by a dedicated endpoint')
@@ -33,10 +35,15 @@ if (previewUrl) {
 	assert.match(intakeRoute, /select\('id, company, name, email'\)/, 'intake route should load the client email for the portal-ready mail')
 	assert.match(intakeRoute, /buildPortalReadyEmail/, 'intake route should send portal-ready mail after intake')
 	assert.match(intakeRoute, /getTeamMemberEmailKind/, 'intake route should keep team-member mail scenarios explicit')
+	assert.match(intakeRoute, /linkIntakeClientUser/, 'intake route should use the tested client-user linking flow')
+	assert.match(clientUsersFlow, /findAuthUserIdByEmail\(adapter, email\)/, 'existing auth users should be resolved by normalized email')
+	assert.match(clientUsersFlow, /user_id: authUserId/, 'every intake client_users upsert should include the auth user id')
+	assert.match(clientUsersFlow, /if \(!authUserId\)/, 'intake should not write a client_users record without an auth user id')
 
 	assert.match(adminPage, /intakeActionNotice/, 'admin page should surface intake invitation status')
-	assert.match(adminPage, /intake-token\/send-invitation/, 'admin page should call the dedicated send-invitation endpoint')
-	assert.match(adminPage, /invitation_sent/, 'admin page should read invitation_sent from the API response')
+	assert.match(adminPage, /sendIntakeInvitation/, 'admin page should use the intake invitation helper')
+	assert.match(adminClientIntake, /intake-token\/send-invitation/, 'intake helper should call the dedicated send-invitation endpoint')
+	assert.match(adminClientIntake, /invitation_sent/, 'intake helper should read invitation_sent from the API response')
 
 	console.log('Intake route contract tests passed')
 }

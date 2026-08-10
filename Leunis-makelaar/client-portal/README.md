@@ -32,6 +32,22 @@ cp .env.example .env.local
 npm run dev
 ```
 
+## Tests
+
+De standaardtest draait de onboarding-scenario's, intake-contractchecks en de geisoleerde unit-tests:
+
+```bash
+npm test
+```
+
+Alleen de regressietests voor de koppeling tussen Supabase Auth en `client_users` uitvoeren:
+
+```bash
+npm run test:unit -- --runTestsByPath src/lib/clientUsersFlow.unit.test.ts
+```
+
+Deze unit-tests gebruiken uitsluitend mocks en maken geen verbinding met Supabase of een productiedatabase.
+
 ## Supabase Setup
 
 1. Maak een nieuw project aan op [supabase.com](https://supabase.com)
