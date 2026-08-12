@@ -17,6 +17,15 @@ import {
   type TrainingIntakeMemberInput,
 } from '@/lib/trainingIntake'
 import {
+  completeOnboardingStep,
+  createEmptyMember,
+  emptyBilling,
+  loadOnboardingData,
+  saveBilling as saveBillingRequest,
+  saveTrainingDraft as saveTrainingDraftRequest,
+  type BillingForm,
+} from '@/lib/onboardingFlow'
+import {
   ArrowRight,
   Building2,
   CheckCircle2,
@@ -42,47 +51,6 @@ const STATUS_LABELS: Record<'draft' | 'submitted' | 'reviewed' | 'planned', stri
   submitted: 'Ingediend',
   reviewed: 'Beoordeeld',
   planned: 'Gepland',
-}
-
-interface BillingForm {
-  contact_person: string
-  kvk_number: string
-  btw_number: string
-  iban: string
-  billing_email: string
-  billing_address_line1: string
-  billing_address_line2: string
-  billing_postal_code: string
-  billing_city: string
-  billing_country: string
-}
-
-const emptyBilling: BillingForm = {
-  contact_person: '',
-  kvk_number: '',
-  btw_number: '',
-  iban: '',
-  billing_email: '',
-  billing_address_line1: '',
-  billing_address_line2: '',
-  billing_postal_code: '',
-  billing_city: '',
-  billing_country: 'Nederland',
-}
-
-function createEmptyMember(index: number): TrainingIntakeMemberInput {
-  return {
-    full_name: '',
-    role: '',
-    top_tasks: ['', '', ''],
-    bottleneck: '',
-    kpi_goal: '',
-    digital_skill: null,
-    ai_experience: '',
-    prompt_data_boundary: '',
-    training_day_availability: '',
-    sort_order: index,
-  }
 }
 
 export default function OnboardingPage() {
@@ -119,108 +87,43 @@ export default function OnboardingPage() {
   })
 
   useEffect(() => {
+    let active = true
+
     async function load() {
       setLoading(true)
       setError('')
-      const [billingRes, intakeRes] = await Promise.all([
-        fetch('/api/onboarding/wizard'),
-        fetch('/api/training-intake'),
-      ])
 
-      let profileContactPerson = ''
-      let profileContactEmail = ''
+      try {
+        const result = await loadOnboardingData()
+        if (!active) return
 
-      if (billingRes.ok) {
-        const billingData = await billingRes.json()
-        if (billingData.client) {
-          profileContactPerson = billingData.client.contact_person ?? ''
-          profileContactEmail = billingData.client.billing_email ?? billingData.client.email ?? ''
-
-          setBilling({
-            contact_person: billingData.client.contact_person ?? '',
-            kvk_number: billingData.client.kvk_number ?? '',
-            btw_number: billingData.client.btw_number ?? '',
-            iban: billingData.client.iban ?? '',
-            billing_email: billingData.client.billing_email ?? '',
-            billing_address_line1: billingData.client.billing_address_line1 ?? '',
-            billing_address_line2: billingData.client.billing_address_line2 ?? '',
-            billing_postal_code: billingData.client.billing_postal_code ?? '',
-            billing_city: billingData.client.billing_city ?? '',
-            billing_country: billingData.client.billing_country ?? 'Nederland',
-          })
-        }
-      }
-
-      if (intakeRes.status === 401 || billingRes.status === 401) {
-        setError('Je account is nog niet gekoppeld aan een bedrijf. Neem contact op met Brand is Code.')
-        setLoading(false)
-        return
-      }
-
-      if (intakeRes.ok) {
-        const intakeData = await intakeRes.json()
-        const enabled = intakeData?.enabled === true
-        setTrainingEnabled(enabled)
-
-        if (!enabled) {
+        if (result.error) {
+          setError(result.error)
+          setBilling(result.billing)
+          setTraining(result.training)
+          setTrainingEnabled(result.trainingEnabled)
+          setStatus(result.status)
           setLoading(false)
           return
         }
 
-        if (intakeData.intake) {
-          const intakeContactPerson = intakeData.intake.contact_person ?? ''
-          const intakeContactEmail = intakeData.intake.contact_email ?? ''
-
-          setTraining({
-            training_duration: intakeData.intake.training_duration ?? '',
-            preferred_datetime: intakeData.intake.preferred_datetime ?? '',
-            preferred_time_note: intakeData.intake.preferred_time_note ?? '',
-            contact_person: intakeContactPerson || profileContactPerson,
-            contact_email: intakeContactEmail || profileContactEmail,
-            focus_area: intakeData.intake.focus_area ?? DEFAULT_FOCUS_AREA,
-            privacy_constraints: intakeData.intake.privacy_constraints ?? '',
-            data_usage_consent: Boolean(intakeData.intake.data_usage_consent),
-            communication_channel: intakeData.intake.communication_channel === 'portal' || intakeData.intake.communication_channel === 'email' || intakeData.intake.communication_channel === 'whatsapp'
-              ? intakeData.intake.communication_channel
-              : '',
-            communication_email: intakeData.intake.communication_email ?? '',
-            communication_whatsapp: intakeData.intake.communication_whatsapp ?? '',
-              communication_consent: Boolean(intakeData.intake.communication_consent),
-              communication_notes: intakeData.intake.communication_notes ?? '',
-            portal_notifications_enabled: Boolean(intakeData.intake.portal_notifications_enabled),
-            trainer_notes: intakeData.intake.trainer_notes ?? '',
-            members: Array.isArray(intakeData.members) && intakeData.members.length > 0
-              ? intakeData.members.map((member: any, index: number) => ({
-                id: member.id,
-                full_name: member.full_name ?? '',
-                role: member.role ?? '',
-                top_tasks: Array.isArray(member.top_tasks) && member.top_tasks.length === 3
-                  ? member.top_tasks
-                  : [member.top_tasks?.[0] ?? '', member.top_tasks?.[1] ?? '', member.top_tasks?.[2] ?? ''],
-                bottleneck: member.bottleneck ?? '',
-                kpi_goal: member.kpi_goal ?? '',
-                digital_skill: typeof member.digital_skill === 'number' ? member.digital_skill : null,
-                ai_experience: member.ai_experience ?? '',
-                prompt_data_boundary: member.prompt_data_boundary ?? '',
-                training_day_availability: member.training_day_availability ?? '',
-                sort_order: typeof member.sort_order === 'number' ? member.sort_order : index,
-              }))
-              : [createEmptyMember(0)],
-          })
-          setStatus(intakeData.intake.status ?? 'draft')
-        } else {
-          setTraining((prev) => ({
-            ...prev,
-            contact_person: prev.contact_person || profileContactPerson,
-            contact_email: prev.contact_email || profileContactEmail,
-          }))
-        }
+        setBilling(result.billing)
+        setTraining(result.training)
+        setTrainingEnabled(result.trainingEnabled)
+        setStatus(result.status)
+      } catch {
+        if (!active) return
+        setError('Er ging iets mis bij het laden van de onboarding.')
+      } finally {
+        if (active) setLoading(false)
       }
-
-      setLoading(false)
     }
 
-    load()
+    void load()
+
+    return () => {
+      active = false
+    }
   }, [])
 
   const completeness = useMemo(() => computeTrainingCompleteness(training), [training])
@@ -231,16 +134,10 @@ export default function OnboardingPage() {
   )
 
   async function saveBilling() {
-    const res = await fetch('/api/onboarding/wizard', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ step: 'billing', ...billing }),
-    })
-
-    const data = await res.json()
-    if (!res.ok) {
-      if (data.errors) setFieldErrors(data.errors)
-      setError(data.error ?? 'Bedrijfsgegevens opslaan is mislukt.')
+    const result = await saveBillingRequest(billing)
+    if (!result.ok) {
+      if (result.errors) setFieldErrors(result.errors)
+      setError(result.error ?? 'Bedrijfsgegevens opslaan is mislukt.')
       return false
     }
 
@@ -248,21 +145,15 @@ export default function OnboardingPage() {
     return true
   }
 
-  async function saveTrainingDraft(submit: boolean) {
-    const res = await fetch('/api/training-intake', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...training, submit }),
-    })
-
-    const data = await res.json()
-    if (!res.ok) {
-      setError(data.error ?? 'Opslaan mislukt.')
-      if (Array.isArray(data.validationErrors)) setValidationErrors(data.validationErrors)
+  async function saveTrainingDraftHelper(submit: boolean) {
+    const result = await saveTrainingDraftRequest(training, submit)
+    if (!result.ok) {
+      setError(result.error ?? 'Opslaan mislukt.')
+      if (Array.isArray(result.validationErrors)) setValidationErrors(result.validationErrors)
       return false
     }
 
-    setStatus(data.status)
+    setStatus(result.status ?? 'draft')
     setValidationErrors([])
     setSuccessMessage(submit ? 'Intake is ingediend.' : 'Concept is opgeslagen.')
     return true
@@ -274,11 +165,7 @@ export default function OnboardingPage() {
     setError('')
     const ok = await saveBilling()
     if (ok && !trainingEnabled) {
-      await fetch('/api/onboarding/wizard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ step: 'complete' }),
-      })
+      await completeOnboardingStep()
       setSaving(false)
       setStep(5)
       return
@@ -291,7 +178,7 @@ export default function OnboardingPage() {
     if (!trainingEnabled) return
     setSaving(true)
     setError('')
-    await saveTrainingDraft(false)
+    await saveTrainingDraftHelper(false)
     setSaving(false)
   }
 
@@ -308,17 +195,13 @@ export default function OnboardingPage() {
       return
     }
 
-    const saved = await saveTrainingDraft(true)
+    const saved = await saveTrainingDraftHelper(true)
     if (!saved) {
       setSaving(false)
       return
     }
 
-    await fetch('/api/onboarding/wizard', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ step: 'complete' }),
-    })
+    await completeOnboardingStep()
 
     setSaving(false)
     setStep(5)
@@ -663,11 +546,20 @@ export default function OnboardingPage() {
                 <textarea className={`${INPUT_CLASS} min-h-20`} placeholder="Grootste knelpunt *" value={member.bottleneck} onChange={(e) => updateMember(index, { bottleneck: e.target.value })} />
                 <textarea className={`${INPUT_CLASS} min-h-20`} placeholder="KPI/doelresultaat *" value={member.kpi_goal} onChange={(e) => updateMember(index, { kpi_goal: e.target.value })} />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <select className={INPUT_CLASS} value={member.digital_skill ?? ''} onChange={(e) => updateMember(index, { digital_skill: e.target.value ? Number(e.target.value) : null })}>
-                    <option value="">Digitale vaardigheid (1-5) *</option>
-                    {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}
-                  </select>
-                  <input className={INPUT_CLASS} placeholder="AI-ervaring *" value={member.ai_experience} onChange={(e) => updateMember(index, { ai_experience: e.target.value })} />
+                  <div>
+                    <label className="block text-sm text-white/60 mb-1.5">Digitale vaardigheid (kies 1 = beginner t/m 5 = expert) *</label>
+                    <select className={INPUT_CLASS} value={member.digital_skill ?? ''} onChange={(e) => updateMember(index, { digital_skill: e.target.value ? Number(e.target.value) : null })}>
+                      <option value="">Kies niveau</option>
+                      {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}
+                    </select>
+                    {validationErrors.length > 0 && (typeof member.digital_skill !== 'number' || member.digital_skill < 1 || member.digital_skill > 5) ? (
+                      <p className="text-red-400 text-xs mt-1">Kies een niveau tussen 1 en 5.</p>
+                    ) : null}
+                  </div>
+                  <div>
+                    <label className="block text-sm text-white/60 mb-1.5">AI-ervaring (korte omschrijving in tekst) *</label>
+                    <input className={INPUT_CLASS} placeholder="Bijv. nog nooit gebruikt / soms ChatGPT" value={member.ai_experience} onChange={(e) => updateMember(index, { ai_experience: e.target.value })} />
+                  </div>
                 </div>
                 <textarea className={`${INPUT_CLASS} min-h-20`} placeholder="Datagrens (wat mag niet in prompts) *" value={member.prompt_data_boundary} onChange={(e) => updateMember(index, { prompt_data_boundary: e.target.value })} />
                 <input className={INPUT_CLASS} placeholder="Beschikbaarheid trainingsdag *" value={member.training_day_availability} onChange={(e) => updateMember(index, { training_day_availability: e.target.value })} />
