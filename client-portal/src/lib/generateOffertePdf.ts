@@ -1,288 +1,256 @@
-import { jsPDF } from 'jspdf'
-import type { SupabaseClient } from '@supabase/supabase-js'
+import jsPDF from 'jspdf'
 import type { OfferteWithSprints } from './types'
 
-/**
- * Generates PDF buffer for an offerte (server-side)
- * Used by API routes and server operations
- */
-export async function generateOffertePdfBuffer(
-  offerte: OfferteWithSprints
-): Promise<Buffer> {
-  // Create PDF document
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
+function loadImage(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width
+      canvas.height = img.height
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0)
+      resolve(canvas.toDataURL('image/png'))
+    }
+    img.onerror = () => reject(new Error('Failed to load image'))
+    img.src = url
   })
+}
 
-  // Set colors and styling
-  const darkBg = '#0f0f0f'
-  const brandGold = '#D4AF37'
-  const textWhite = '#ffffff'
-
-  // Page dimensions
+export async function generateOffertePdf(offerte: OfferteWithSprints, signatureDataUrl?: string) {
+  const doc = new jsPDF('p', 'mm', 'a4')
   const pageWidth = doc.internal.pageSize.getWidth()
-  const pageHeight = doc.internal.pageSize.getHeight()
-  const margin = 15
+  const margin = 20
+  const contentWidth = pageWidth - margin * 2
+  let y = margin
 
-  let yPosition = margin
+  // Colors
+  const gold: [number, number, number] = [212, 168, 67] // #D4A843
+  const dark: [number, number, number] = [15, 15, 20] // brand-dark
+  const gray: [number, number, number] = [120, 120, 130]
+  const white: [number, number, number] = [255, 255, 255]
 
-  // Header section with brand color
-  doc.setFillColor(212, 175, 55) // Gold
-  doc.rect(0, 0, pageWidth, 30, 'F')
+  // Background
+  doc.setFillColor(...dark)
+  doc.rect(0, 0, pageWidth, doc.internal.pageSize.getHeight(), 'F')
 
-  // Title
-  doc.setFont('Helvetica', 'bold')
-  doc.setFontSize(24)
-  doc.setTextColor(15, 15, 15) // Dark text on gold background
-  doc.text('OFFERTE', margin, 20)
-
-  yPosition = 40
-
-  // Client section
-  doc.setFontSize(12)
-  doc.setTextColor(212, 175, 55) // Gold
-  doc.text('OPDRACHTGEVER', margin, yPosition)
-  yPosition += 8
-
-  doc.setFontSize(11)
-  doc.setTextColor(255, 255, 255) // White
-  if (offerte.clients?.name) {
-    doc.text(`${offerte.clients.name}`, margin, yPosition)
-    yPosition += 6
-  }
-  if (offerte.clients?.company) {
-    doc.text(`${offerte.clients.company}`, margin, yPosition)
-    yPosition += 6
-  }
-  if (offerte.clients?.contact_person) {
-    doc.text(`Contactpersoon: ${offerte.clients.contact_person}`, margin, yPosition)
-    yPosition += 6
-  }
-  if (offerte.clients?.email) {
-    doc.text(`Email: ${offerte.clients.email}`, margin, yPosition)
-    yPosition += 6
+  // === HEADER ===
+  // Load and add logo
+  try {
+    const logoDataUrl = await loadImage('/logo.png')
+    // Logo aspect ratio is ~1252:888 ≈ 1.41:1
+    const logoW = 45
+    const logoH = logoW / 1.41
+    doc.addImage(logoDataUrl, 'PNG', margin, y - 4, logoW, logoH)
+  } catch {
+    // Fallback: text if logo fails to load
+    doc.setFontSize(24)
+    doc.setTextColor(...gold)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Brand is Code', margin, y + 8)
   }
 
-  yPosition += 8
+  doc.setFontSize(9)
+  doc.setTextColor(...gray)
+  doc.setFont('helvetica', 'normal')
+  doc.text('info@brandiscode.com', pageWidth - margin, y + 4, { align: 'right' })
+  doc.text('brandiscode.com', pageWidth - margin, y + 9, { align: 'right' })
 
-  // Offerte details section
-  doc.setFontSize(12)
-  doc.setTextColor(212, 175, 55) // Gold
-  doc.text('OFFERTEDETAILS', margin, yPosition)
-  yPosition += 8
+  y += 18
 
-  doc.setFontSize(11)
-  doc.setTextColor(255, 255, 255)
-  doc.text(`Titel: ${offerte.title}`, margin, yPosition)
-  yPosition += 6
+  // Gold line
+  doc.setDrawColor(...gold)
+  doc.setLineWidth(0.5)
+  doc.line(margin, y, pageWidth - margin, y)
+  y += 12
 
-  const formattedDate = new Date(offerte.created_at).toLocaleDateString('nl-NL')
-  doc.text(`Datum: ${formattedDate}`, margin, yPosition)
-  yPosition += 6
+  // === OFFERTE TITLE ===
+  doc.setFontSize(18)
+  doc.setTextColor(...white)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Offerte', margin, y)
+  y += 10
 
-  doc.text(
-    `Bedrag: €${offerte.total_price.toLocaleString('nl-NL', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`,
-    margin,
-    yPosition
-  )
-  yPosition += 10
+  doc.setFontSize(14)
+  doc.text(offerte.title, margin, y)
+  y += 8
 
-  // Description
   if (offerte.description) {
-    doc.setFontSize(12)
-    doc.setTextColor(212, 175, 55)
-    doc.text('BESCHRIJVING', margin, yPosition)
-    yPosition += 8
-
     doc.setFontSize(10)
-    doc.setTextColor(255, 255, 255)
-    const splitText = doc.splitTextToSize(offerte.description, pageWidth - 2 * margin)
-    doc.text(splitText, margin, yPosition)
-    yPosition += splitText.length * 5 + 5
+    doc.setTextColor(...gray)
+    doc.setFont('helvetica', 'normal')
+    const descLines = doc.splitTextToSize(offerte.description, contentWidth)
+    doc.text(descLines, margin, y)
+    y += descLines.length * 5 + 4
   }
 
-  // Sprints section
-  if (offerte.sprints && offerte.sprints.length > 0) {
-    yPosition += 5
+  // === META INFO ===
+  y += 4
+  doc.setFontSize(9)
+  doc.setTextColor(...gray)
+  const createdDate = new Date(offerte.created_at).toLocaleDateString('nl-NL', {
+    day: 'numeric', month: 'long', year: 'numeric'
+  })
+  doc.text(`Datum: ${createdDate}`, margin, y)
+  
+  doc.setTextColor(...gold)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(16)
+  doc.text(`€${offerte.total_amount.toLocaleString('nl-NL')}`, pageWidth - margin, y, { align: 'right' })
+  doc.setFontSize(8)
+  doc.setTextColor(...gray)
+  doc.setFont('helvetica', 'normal')
+  doc.text('excl. BTW', pageWidth - margin, y + 5, { align: 'right' })
+
+  y += 14
+
+  // === SPRINTS ===
+  if (offerte.sprints.length > 0) {
+    doc.setDrawColor(...gold)
+    doc.setLineWidth(0.3)
+    doc.line(margin, y, pageWidth - margin, y)
+    y += 8
+
     doc.setFontSize(12)
-    doc.setTextColor(212, 175, 55)
-    doc.text('SPRINTS', margin, yPosition)
-    yPosition += 8
+    doc.setTextColor(...white)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Sprint overzicht', margin, y)
+    y += 8
 
     for (const sprint of offerte.sprints) {
-      // Sprint header
-      doc.setFontSize(11)
-      doc.setTextColor(255, 255, 255)
-      doc.text(`Sprint ${sprint.sprint_number}: ${sprint.title}`, margin, yPosition)
-      yPosition += 5
+      // Check page break
+      if (y > 250) {
+        doc.addPage()
+        doc.setFillColor(...dark)
+        doc.rect(0, 0, pageWidth, doc.internal.pageSize.getHeight(), 'F')
+        y = margin
+      }
 
+      // Sprint header
+      doc.setFillColor(255, 255, 255)
+      doc.setGState(doc.GState({ opacity: 0.05 }))
+      const sprintHeight = 10 + (sprint.deliverables?.length || 0) * 6 + 4
+      doc.roundedRect(margin, y - 4, contentWidth, sprintHeight, 2, 2, 'F')
+      doc.setGState(doc.GState({ opacity: 1 }))
+
+      // Sprint number badge
+      doc.setFontSize(9)
+      doc.setTextColor(...gold)
+      doc.setFont('helvetica', 'bold')
+      doc.text(`Sprint ${sprint.number}`, margin + 4, y + 2)
+
+      // Sprint title
+      doc.setTextColor(...white)
       doc.setFontSize(10)
-      doc.setTextColor(200, 200, 200)
-      doc.text(
-        `Duur: ${sprint.duration_weeks} weken | Status: ${sprint.status}`,
-        margin + 5,
-        yPosition
-      )
-      yPosition += 5
+      doc.text(sprint.title, margin + 30, y + 2)
+
+      // Sprint amount
+      doc.setTextColor(...gray)
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`€${sprint.amount.toLocaleString('nl-NL')}`, pageWidth - margin - 4, y + 2, { align: 'right' })
+
+      y += 8
 
       // Deliverables
       if (sprint.deliverables && sprint.deliverables.length > 0) {
-        doc.setFontSize(9)
-        for (const deliverable of sprint.deliverables) {
-          doc.text(`• ${deliverable.title}`, margin + 10, yPosition)
-          yPosition += 4
+        for (const d of sprint.deliverables) {
+          doc.setFontSize(8)
+          doc.setTextColor(...gray)
+          doc.text(`•  ${d.title}`, margin + 30, y + 2)
+          y += 5
         }
       }
 
-      yPosition += 3
+      y += 6
     }
+
+    // Total
+    y += 2
+    doc.setDrawColor(...gold)
+    doc.setLineWidth(0.3)
+    doc.line(margin, y, pageWidth - margin, y)
+    y += 7
+
+    doc.setFontSize(11)
+    doc.setTextColor(...white)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Totaal', margin, y)
+    doc.setTextColor(...gold)
+    doc.text(`€${offerte.total_amount.toLocaleString('nl-NL')}`, pageWidth - margin - 4, y, { align: 'right' })
+    doc.setFontSize(8)
+    doc.setTextColor(...gray)
+    doc.setFont('helvetica', 'normal')
+    doc.text('excl. BTW', pageWidth - margin - 4, y + 5, { align: 'right' })
+
+    y += 16
   }
 
-  // Footer
-  yPosition = pageHeight - 20
-  doc.setFontSize(9)
-  doc.setTextColor(150, 150, 150)
-  doc.text('Brand is Code © 2026 — Confidentieel', margin, yPosition)
-  doc.text(
-    `Pagina 1 van 1`,
-    pageWidth - margin - 20,
-    yPosition
-  )
+  // === SIGNATURE SECTION ===
+  const sigData = signatureDataUrl || offerte.signature_data
+  const signedAt = offerte.signed_at
 
-  // Convert to buffer
-  const pdfBytes = doc.output('arraybuffer')
-  return Buffer.from(pdfBytes)
-}
+  if (sigData && signedAt) {
+    // Check page break
+    if (y > 220) {
+      doc.addPage()
+      doc.setFillColor(...dark)
+      doc.rect(0, 0, pageWidth, doc.internal.pageSize.getHeight(), 'F')
+      y = margin
+    }
 
-/**
- * Uploads PDF buffer to Supabase Storage
- * Returns the storage path
- */
-export async function uploadOffertePdfToStorage(
-  pdfBuffer: Buffer,
-  offerteId: string,
-  adminClient: SupabaseClient
-): Promise<string> {
-  const bucket = 'signed-offertes'
-  const fileName = `offertes/${offerteId}/offerte-${offerteId}.pdf`
+    doc.setDrawColor(...gold)
+    doc.setLineWidth(0.3)
+    doc.line(margin, y, pageWidth - margin, y)
+    y += 8
 
-  const { data, error } = await adminClient.storage
-    .from(bucket)
-    .upload(fileName, pdfBuffer, {
-      contentType: 'application/pdf',
-      cacheControl: '3600',
-      upsert: true,
+    doc.setFontSize(12)
+    doc.setTextColor(...white)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Akkoord & Handtekening', margin, y)
+    y += 8
+
+    doc.setFontSize(9)
+    doc.setTextColor(...gray)
+    doc.setFont('helvetica', 'normal')
+    const signedDate = new Date(signedAt).toLocaleDateString('nl-NL', {
+      day: 'numeric', month: 'long', year: 'numeric'
     })
+    doc.text(`Akkoord op: ${signedDate}`, margin, y)
+    y += 8
 
-  if (error) {
-    throw new Error(`Failed to upload PDF to storage: ${error.message}`)
+    // Signature image
+    try {
+      doc.addImage(sigData, 'PNG', margin, y, 60, 25)
+      y += 30
+    } catch {
+      // If image fails, just note it
+      doc.text('(handtekening opgenomen)', margin, y)
+      y += 6
+    }
+
+    // Signature line
+    doc.setDrawColor(...gray)
+    doc.setLineWidth(0.2)
+    doc.line(margin, y, margin + 60, y)
+    y += 5
+    doc.setFontSize(8)
+    doc.text('Handtekening opdrachtgever', margin, y)
   }
 
-  return data.path
+  // === FOOTER ===
+  const footerY = doc.internal.pageSize.getHeight() - 12
+  doc.setFontSize(7)
+  doc.setTextColor(...gray)
+  doc.text('Brand is Code  •  Hofstede 11, 4691DH Tholen  •  info@brandiscode.com', pageWidth / 2, footerY, { align: 'center' })
+  doc.text('Dit document is digitaal ondertekend en heeft dezelfde juridische waarde als een handgeschreven handtekening.', pageWidth / 2, footerY + 4, { align: 'center' })
+
+  return doc
 }
 
-/**
- * Downloads PDF from Supabase Storage
- */
-export async function downloadOffertePdfFromStorage(
-  offerteId: string,
-  adminClient: SupabaseClient
-): Promise<Buffer> {
-  const bucket = 'signed-offertes'
-  const fileName = `offertes/${offerteId}/offerte-${offerteId}.pdf`
-
-  const { data, error } = await adminClient.storage
-    .from(bucket)
-    .download(fileName)
-
-  if (error) {
-    throw new Error(`Failed to download PDF: ${error.message}`)
-  }
-
-  const arrayBuffer = await data.arrayBuffer()
-  return Buffer.from(arrayBuffer)
-}
-
-/**
- * Client-side PDF generation (for browser download)
- */
-export function generateOffertePdf(
-  offerte: OfferteWithSprints,
-  downloadFilename?: string
-): void {
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-  })
-
-  const brandGold = '#D4AF37'
-  const pageWidth = doc.internal.pageSize.getWidth()
-  const pageHeight = doc.internal.pageSize.getHeight()
-  const margin = 15
-
-  let yPosition = margin
-
-  // Header
-  doc.setFillColor(212, 175, 55)
-  doc.rect(0, 0, pageWidth, 30, 'F')
-
-  doc.setFont('Helvetica', 'bold')
-  doc.setFontSize(24)
-  doc.setTextColor(15, 15, 15)
-  doc.text('OFFERTE', margin, 20)
-
-  yPosition = 40
-
-  // Client info
-  doc.setFontSize(12)
-  doc.setTextColor(212, 175, 55)
-  doc.text('OPDRACHTGEVER', margin, yPosition)
-  yPosition += 8
-
-  doc.setFontSize(11)
-  doc.setTextColor(50, 50, 50)
-  if (offerte.clients?.name) {
-    doc.text(`${offerte.clients.name}`, margin, yPosition)
-    yPosition += 6
-  }
-  if (offerte.clients?.company) {
-    doc.text(`${offerte.clients.company}`, margin, yPosition)
-    yPosition += 6
-  }
-
-  yPosition += 8
-
-  // Offerte details
-  doc.setFontSize(12)
-  doc.setTextColor(212, 175, 55)
-  doc.text('OFFERTEDETAILS', margin, yPosition)
-  yPosition += 8
-
-  doc.setFontSize(11)
-  doc.setTextColor(50, 50, 50)
-  doc.text(`Titel: ${offerte.title}`, margin, yPosition)
-  yPosition += 6
-
-  const formattedDate = new Date(offerte.created_at).toLocaleDateString('nl-NL')
-  doc.text(`Datum: ${formattedDate}`, margin, yPosition)
-  yPosition += 6
-
-  doc.text(
-    `Bedrag: €${offerte.total_price.toLocaleString('nl-NL', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`,
-    margin,
-    yPosition
-  )
-
-  // Download
-  const filename = downloadFilename || `offerte-${offerte.title.slice(0, 20)}.pdf`
+export async function downloadOffertePdf(offerte: OfferteWithSprints, signatureDataUrl?: string) {
+  const doc = await generateOffertePdf(offerte, signatureDataUrl)
+  const filename = `offerte-${offerte.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`
   doc.save(filename)
 }

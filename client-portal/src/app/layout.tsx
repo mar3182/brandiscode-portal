@@ -1,10 +1,9 @@
 import type { Metadata } from 'next'
-import { Providers } from './providers'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Brand is Code — Client Portal',
-  description: 'Client portal for Brand is Code services',
+  title: 'Client Portal — Brand is Code',
+  description: 'Beheer je projecten, offertes en feedback op één plek.',
 }
 
 export default function RootLayout({
@@ -13,10 +12,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body>
-        <Providers>{children}</Providers>
-      </body>
+    <html lang="nl">
+      <body className="text-white antialiased">{children}</body>
     </html>
   )
 }
