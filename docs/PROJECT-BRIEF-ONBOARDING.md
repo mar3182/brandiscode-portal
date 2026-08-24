@@ -200,7 +200,8 @@ Informatieve cards, geen invulvelden:
 | **adobeSign.ts committed to GitHub**      | B     | ✅ Klaar       | Commit 8848daab; all 7 functions implemented    |
 | **Vercel env variables**                  | PM    | ⏳ In progress | Add 4 Adobe Sign vars to Vercel Settings        |
 | **Vercel build & deploy**                 | PM    | ⏳ Blocked     | Waiting for env variables to complete build     |
-| Testen end-to-end met echte klant         | PM    | ⬜ Open        | Leunis Makelaars — eerst testgebruiker aanmaken |
+| **Login debugging & admin routing fix**   | PM    | ✅ Klaar       | Commit 7f9beb3 (error logging), 29dfc88 (diagnostic), 66897af (root routing) |
+| Testen end-to-end met echte klant         | PM    | ⏳ In progress | Login ✅ → Admin ✅ → Test onboarding wizard    |
 | Supabase migration uitgevoerd             | PM    | ✅ Klaar       | `migration-client-profile.sql` + Adobe Sign     |
 
 ---
