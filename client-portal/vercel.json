@@ -1,0 +1,13 @@
+{
+  "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/health",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/recurring-invoices",
+      "schedule": "59 23 28-31 * *"
+    }
+  ]
+}
