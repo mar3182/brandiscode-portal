@@ -1,0 +1,248 @@
+name: Staging CD Pipeline
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # Job 1: Build & Deploy to Vercel Preview
+  deploy-staging:
+    name: Deploy to Vercel Staging
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    outputs:
+      preview-url: ${{ steps.deploy.outputs.preview-url }}
+      deployment-url: ${{ steps.deploy.outputs.deployment-url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: cd client-portal && npm ci
+
+      - name: Build application
+        run: cd client-portal && npm run build
+
+      - name: Deploy to Vercel Preview
+        id: deploy
+        run: |
+          cd client-portal
+          
+          # Install Vercel CLI
+          npm install -g vercel
+          
+          # Deploy to Vercel (non-production, creates preview)
+          VERCEL_OUTPUT=$(vercel deploy --token=${{ secrets.VERCEL_TOKEN }} 2>&1)
+          
+          # Extract preview URL
+          PREVIEW_URL=$(echo "$VERCEL_OUTPUT" | grep -oP 'https://[^\s]+' | head -1)
+          
+          if [ -z "$PREVIEW_URL" ]; then
+            echo "❌ Failed to deploy to Vercel"
+            echo "$VERCEL_OUTPUT"
+            exit 1
+          fi
+          
+          echo "preview-url=$PREVIEW_URL" >> $GITHUB_OUTPUT
+          echo "deployment-url=$PREVIEW_URL" >> $GITHUB_OUTPUT
+          echo "✅ Deployed to: $PREVIEW_URL"
+
+      - name: Wait for deployment
+        run: sleep 5
+
+  # Job 2: Database Migration Validation
+  migration-validate:
+    name: Validate Pending Migrations
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Collect pending migrations
+        id: migrations
+        run: |
+          MIGRATIONS=$(find client-portal/supabase -name "migration-*.sql" -type f | sort)
+          MIGRATION_COUNT=$(echo "$MIGRATIONS" | grep -c .)
+          
+          if [ -z "$MIGRATIONS" ]; then
+            MIGRATION_COUNT=0
+          fi
+          
+          echo "migration-count=$MIGRATION_COUNT" >> $GITHUB_OUTPUT
+          echo "Found $MIGRATION_COUNT pending migrations"
+          echo "$MIGRATIONS"
+
+      - name: Validate migration syntax
+        run: |
+          FAILED=0
+          for migration in client-portal/supabase/migration-*.sql; do
+            if [ -f "$migration" ]; then
+              echo "Validating: $migration"
+              
+              # Check for destructive patterns without metadata
+              if grep -E "(DROP TABLE|DROP COLUMN|DELETE FROM|TRUNCATE)" "$migration" > /dev/null; then
+                if ! grep -E "(-- MIGRATION PURPOSE:|-- ROLLBACK:|-- RISICO:)" "$migration" > /dev/null; then
+                  echo "❌ Destructive operation found but missing metadata"
+                  FAILED=1
+                fi
+              fi
+            fi
+          done
+          
+          if [ $FAILED -eq 1 ]; then
+            exit 1
+          fi
+          echo "✅ All migrations validated"
+
+  # Job 3b: Live Preview Smoke Tests for Intake Flow
+  smoke-tests-intake-preview:
+    name: Smoke Tests - Intake Preview
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run live preview smoke tests
+        env:
+          PREVIEW_URL: ${{ needs.deploy-staging.outputs.preview-url }}
+        run: |
+          cd client-portal
+          node scripts/intake-route-contract-tests.mjs
+
+  # Job 3: Smoke Tests Suite A (No Authentication)
+  smoke-tests-no-auth:
+    name: Smoke Tests - No Auth
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Test unauthenticated endpoints
+        env:
+          STAGING_URL: ${{ needs.deploy-staging.outputs.preview-url }}
+        run: |
+          echo "🔍 Smoke contract test against: $STAGING_URL"
+          FAILED=0
+          
+          # --- Suite A contract (must match HANDOFF-SPECIALIST-CICD-EXECUTION.md) ---
+          # GET /login => 200
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$STAGING_URL/login")
+          if [ "$STATUS" -eq 200 ]; then
+            echo "✅ GET /login: $STATUS"
+          else
+            echo "❌ GET /login: Expected 200, got $STATUS"
+            FAILED=1
+          fi
+          
+          # GET /api/client-profile => 401
+          # GET /api/admin/clients => 401
+          # GET /api/onboarding => 401
+          # GET /api/facturen => 401
+          for endpoint in "/api/client-profile" "/api/admin/clients" "/api/onboarding" "/api/facturen"; do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$STAGING_URL$endpoint")
+            if [ "$STATUS" -eq 401 ]; then
+              echo "✅ GET $endpoint: $STATUS"
+            else
+              echo "❌ GET $endpoint: Expected 401, got $STATUS"
+              FAILED=1
+            fi
+          done
+          
+          # GET /api/health => 200
+          HEALTH_STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$STAGING_URL/api/health")
+          if [ "$HEALTH_STATUS" -eq 200 ]; then
+            echo "✅ GET /api/health: $HEALTH_STATUS"
+          else
+            echo "❌ GET /api/health: Expected 200, got $HEALTH_STATUS"
+            FAILED=1
+          fi
+          
+          if [ $FAILED -ne 0 ]; then
+            echo "❌ Smoke contract FAILED — staging deploy rejected"
+            exit 1
+          fi
+          echo "✅ Suite A complete: all 6 contract endpoints passed"
+
+  # Job 4: Health Endpoint Check
+  health-check-staging:
+    name: Health Check - Staging
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check /api/health endpoint
+        env:
+          STAGING_URL: ${{ needs.deploy-staging.outputs.preview-url }}
+        run: |
+          echo "🔍 Checking health endpoint..."
+          
+          RESPONSE=$(curl -s "$STAGING_URL/api/health")
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$STAGING_URL/api/health")
+          
+          if [ "$STATUS" -ne 200 ]; then
+            echo "❌ Health check failed: HTTP $STATUS"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+          
+          # Hard fail if 'status' field is absent from response
+          if ! echo "$RESPONSE" | grep -q '"status"'; then
+            echo "❌ Health response missing required 'status' field"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+          
+          echo "✅ Health endpoint OK: $RESPONSE"
+
+  # Job 5: Deployment Summary
+  deployment-summary:
+    name: Staging Deployment Summary
+    if: always()
+    needs: [deploy-staging, migration-validate, smoke-tests-no-auth, smoke-tests-intake-preview, health-check-staging]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write deployment summary
+        env:
+          PREVIEW_URL: ${{ needs.deploy-staging.outputs.preview-url }}
+          DEPLOY_RESULT: ${{ needs.deploy-staging.result }}
+          MIGRATION_RESULT: ${{ needs.migration-validate.result }}
+          SMOKE_RESULT: ${{ needs.smoke-tests-no-auth.result }}
+          INTAKE_SMOKE_RESULT: ${{ needs.smoke-tests-intake-preview.result }}
+          HEALTH_RESULT: ${{ needs.health-check-staging.result }}
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 🚀 Staging Deployment Summary
+          
+          | Component | Status |
+          |-----------|--------|
+          | Vercel Deploy | $DEPLOY_RESULT |
+          | Migration Validation | $MIGRATION_RESULT |
+          | Smoke Tests (No Auth) | $SMOKE_RESULT |
+          | Smoke Tests (Intake Preview) | $INTAKE_SMOKE_RESULT |
+          | Health Check | $HEALTH_RESULT |
+          
+          **Preview URL**: [\`$PREVIEW_URL\`]($PREVIEW_URL)
+          
+          **Timestamp**: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          
+          EOF
+          
+          # Check overall status
+          if [ "$DEPLOY_RESULT" = "success" ] && [ "$MIGRATION_RESULT" = "success" ] && [ "$SMOKE_RESULT" = "success" ] && [ "$INTAKE_SMOKE_RESULT" = "success" ] && [ "$HEALTH_RESULT" = "success" ]; then
+            echo "✅ **All checks passed** - Staging deployment healthy"
+            exit 0
+          else
+            echo "❌ **Some checks failed** - Review logs above"
+            exit 1
+          fi

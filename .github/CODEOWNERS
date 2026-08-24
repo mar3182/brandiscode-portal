@@ -1,0 +1,54 @@
+# CODEOWNERS — Domain-based review requirements
+# Each PR requires approval from the owning team for that domain.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# ==========================================
+# Frontend & Client Portal
+# ==========================================
+client-portal/src/app/**/*.tsx @team/frontend
+client-portal/src/components/**/*.tsx @team/frontend
+client-portal/src/lib/**/*.ts @team/frontend
+client-portal/tailwind.config.js @team/frontend
+client-portal/tsconfig.json @team/frontend
+
+# ==========================================
+# Backend & API
+# ==========================================
+# (When API is added to repo)
+/api/ @team/backend
+/server/ @team/backend
+
+# ==========================================
+# Database & Migrations
+# ==========================================
+supabase/migration-*.sql @team/database @team/backend
+supabase/schema.sql @team/database
+supabase/seed*.sql @team/database
+
+# ==========================================
+# Infrastructure & Workflows
+# ==========================================
+.github/workflows/ @team/devops @team/platform
+.github/policies/ @team/devops @team/platform
+docs/runbooks/ @team/devops
+
+# ==========================================
+# Security & Configuration
+# ==========================================
+.env.example @team/platform
+.gitignore @team/platform
+SECURITY.md @team/platform
+
+# ==========================================
+# Type & Build Config
+# ==========================================
+client-portal/package.json @team/frontend @team/platform
+client-portal/tsconfig.json @team/frontend
+next.config.js @team/frontend
+
+# ==========================================
+# Documentation
+# ==========================================
+README.md @team/all
+docs/ @team/all
+IMPLEMENTATIE-PLAN.md @team/all

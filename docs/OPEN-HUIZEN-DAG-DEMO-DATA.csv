@@ -1,0 +1,11 @@
+bezoeker_id,datum,tijdslot,woning_id,budget_segment,interesse_score,voorkeur,afspraak_gepland,lead_status,opmerkingen
+B001,2026-09-12,10:00-11:00,W101,300k-400k,8,Tuin en parkeren,Ja,Warm,Wil binnen 3 maanden kopen
+B002,2026-09-12,10:00-11:00,W102,400k-500k,6,Energielabel A,Nee,Lauw,Twijfelt over locatie
+B003,2026-09-12,11:00-12:00,W101,500k-650k,9,Ruime woonkamer,Ja,Warm,Wil tweede bezichtiging
+B004,2026-09-12,11:00-12:00,W103,250k-300k,5,Nabij school,Nee,Koud,Zoekt pas volgend jaar
+B005,2026-09-12,12:00-13:00,W102,400k-500k,7,Instapklaar,Ja,Warm,Direct financieringsgesprek gewenst
+B006,2026-09-12,12:00-13:00,W103,300k-400k,4,Lage maandlasten,Nee,Koud,Te klein voor gezin
+B007,2026-09-12,13:00-14:00,W101,650k+,9,Luxe afwerking,Ja,Warm,Bieding overweegt
+B008,2026-09-12,13:00-14:00,W102,300k-400k,6,Zonnige tuin,Nee,Lauw,Wil extra foto's
+B009,2026-09-12,14:00-15:00,W103,250k-300k,7,Rustige buurt,Ja,Warm,Eerste woningkoper
+B010,2026-09-12,14:00-15:00,W101,500k-650k,8,Thuiswerkruimte,Ja,Warm,Komt met aankoopmakelaar
