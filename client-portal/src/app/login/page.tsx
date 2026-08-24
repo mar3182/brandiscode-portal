@@ -25,20 +25,30 @@ export default function LoginPage() {
       return
     }
 
-    const supabase = createClient()
+    try {
+      const supabase = createClient()
+      console.log('🔐 Attempting login for:', email)
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    if (authError) {
-      setError('Onjuist e-mailadres of wachtwoord.')
+      if (authError) {
+        console.error('❌ Auth failed:', authError?.message)
+        setError('Onjuist e-mailadres of wachtwoord.')
+        setLoading(false)
+        return
+      }
+
+      console.log('✅ Login success → redirecting to /')
+      router.push('/')
+    } catch (err) {
+      console.error('🚨 Exception:', err)
+      const msg = err instanceof Error ? err.message : String(err)
+      setError(msg || 'Verbindingsfout bij inloggen')
       setLoading(false)
-      return
     }
-
-    router.push('/')
   }
 
   return (
