@@ -10,15 +10,9 @@ export async function GET(request: Request) {
     const supabase = createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      const { data: { user } } = await supabase.auth.getUser()
-      const isAdmin = user?.email === process.env.ADMIN_EMAIL
-
-      const safeNext = next && next.startsWith('/') ? next : null
-      if (safeNext) {
-        return NextResponse.redirect(`${origin}${safeNext}`)
-      }
-
-      return NextResponse.redirect(`${origin}${isAdmin ? '/admin' : '/dashboard'}`)
+      const safeNext = next && next.startsWith('/') ? next : '/'
+      // Redirect to root page or safe next URL - root page will check if user is admin and route accordingly
+      return NextResponse.redirect(`${origin}${safeNext}`)
     }
   }
 
