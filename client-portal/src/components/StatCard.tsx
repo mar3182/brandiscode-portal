@@ -5,19 +5,12 @@ interface StatCardProps {
   value: string | number
   subtitle?: string
   icon: LucideIcon
-  color?: 'gold' | 'blue' | 'green' | 'pink'
+  variant?: 'neutral' | 'accent'
 }
 
-const colorMap = {
-  gold: 'from-brand-gold/20 to-brand-gold/5 border-brand-gold/30 text-brand-gold',
-  blue: 'from-brand-blue/20 to-brand-blue/5 border-brand-blue/30 text-brand-blue',
-  green: 'from-emerald-500/20 to-emerald-500/5 border-emerald-500/30 text-emerald-400',
-  pink: 'from-brand-pink/20 to-brand-pink/5 border-brand-pink/30 text-brand-pink',
-}
-
-export default function StatCard({ title, value, subtitle, icon: Icon, color = 'gold' }: StatCardProps) {
+export default function StatCard({ title, value, subtitle, icon: Icon, variant = 'neutral' }: StatCardProps) {
   return (
-    <div className={`glass-card p-6 bg-gradient-to-br ${colorMap[color]}`}>
+    <div className={`glass-card p-6 ${variant === 'accent' ? 'stat-card-accent' : 'stat-card-neutral'}`}>
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm text-white/50">{title}</p>
@@ -25,7 +18,7 @@ export default function StatCard({ title, value, subtitle, icon: Icon, color = '
           {subtitle && <p className="text-xs text-white/40 mt-1">{subtitle}</p>}
         </div>
         <div className={`p-3 rounded-xl bg-white/5`}>
-          <Icon className="w-6 h-6" />
+          <Icon className="w-6 h-6 text-brand-gold" />
         </div>
       </div>
     </div>

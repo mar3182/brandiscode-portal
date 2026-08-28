@@ -117,3 +117,9 @@ bfg.jar
 .DS_Store
 *.wpress
 *.bak
+
+# ==========================================
+# KLANTCONTRACTEXPORTS (mogelijk persoonsgegevens, niet in git)
+# ==========================================
+LEUNIS-SPRINT1-OPDRACHTBEVESTIGING-EN-TOESTEMMINGEN.docx
+LEUNIS-SPRINT1-OPDRACHTBEVESTIGING-EN-TOESTEMMINGEN.pdf

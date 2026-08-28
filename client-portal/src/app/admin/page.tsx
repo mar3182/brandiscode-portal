@@ -99,10 +99,10 @@ export default function AdminDashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard title="Klanten" value={stats.clients} icon={Users} color="blue" />
-        <StatCard title="Offertes" value={stats.offertes} icon={FileText} color="gold" />
-        <StatCard title="Getekend" value={stats.signed} icon={CheckCircle2} color="green" />
-        <StatCard title="Feedback" value={stats.feedback} icon={MessageSquare} color="pink" />
+        <StatCard title="Klanten" value={stats.clients} icon={Users} variant="neutral" />
+        <StatCard title="Offertes" value={stats.offertes} icon={FileText} variant="accent" />
+        <StatCard title="Getekend" value={stats.signed} icon={CheckCircle2} variant="neutral" />
+        <StatCard title="Feedback" value={stats.feedback} icon={MessageSquare} variant="neutral" />
       </div>
 
       {/* Quick actions */}

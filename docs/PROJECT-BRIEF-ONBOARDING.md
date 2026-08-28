@@ -182,27 +182,27 @@ Informatieve cards, geen invulvelden:
 
 ## 7. VOORTGANG TRACKING
 
-| Taak                                      | Agent | Status        | Notities                                        |
-| ----------------------------------------- | ----- | ------------- | ----------------------------------------------- |
-| Backend API onboarding opslaan in clients | B     | ✅ Klaar       | `/api/onboarding/wizard` route                  |
-| Backend admin trigger endpoint            | B     | ✅ Klaar       | `/api/admin/onboarding/trigger` route           |
-| Middleware redirect naar onboarding       | B     | ✅ Klaar       | `middleware.ts` redirect na password_changed    |
-| Frontend wizard stap 1 (bedrijfsgegevens) | A     | ✅ Klaar       | KvK/BTW/IBAN maskers, validatie                 |
-| Frontend wizard stap 2 (tour)             | A     | ✅ Klaar       | Cards: Team, Facturen, AI Chat (binnenkort)     |
-| Frontend wizard stap 3 (voltooiing)       | A     | ✅ Klaar       | `onboarding_completed_at` + redirect dashboard  |
-| Admin trigger knop + voortgang            | C     | ✅ Klaar       | Status badge + RefreshCw trigger per klant      |
-| Responsive sidebar + mobile layout        | PM    | ✅ Klaar       | Hamburger menu, overlay, `ml-0 md:ml-64`        |
-| Vercel opschonen (1 project)              | PM    | ✅ Klaar       | `client-portal-deploy` verwijderd               |
-| **Adobe Sign API client library**         | B     | ✅ Klaar       | OAuth2, tokens, docs upload, agreement, polling |
-| **Server-side PDF generation**            | B     | ✅ Klaar       | jsPDF Buffer, auto-generation, storage upload   |
-| **Adobe Sign integration endpoints**      | B     | ✅ Klaar       | POST send-signature, GET status, webhook        |
-| **TypeScript compilation**                | PM    | ✅ Klaar       | `npx tsc --noEmit` EXIT:0                       |
-| **adobeSign.ts committed to GitHub**      | B     | ✅ Klaar       | Commit 8848daab; all 7 functions implemented    |
-| **Vercel env variables**                  | PM    | ⏳ In progress | Add 4 Adobe Sign vars to Vercel Settings        |
-| **Vercel build & deploy**                 | PM    | ⏳ Blocked     | Waiting for env variables to complete build     |
+| Taak                                      | Agent | Status        | Notities                                                                     |
+| ----------------------------------------- | ----- | ------------- | ---------------------------------------------------------------------------- |
+| Backend API onboarding opslaan in clients | B     | ✅ Klaar       | `/api/onboarding/wizard` route                                               |
+| Backend admin trigger endpoint            | B     | ✅ Klaar       | `/api/admin/onboarding/trigger` route                                        |
+| Middleware redirect naar onboarding       | B     | ✅ Klaar       | `middleware.ts` redirect na password_changed                                 |
+| Frontend wizard stap 1 (bedrijfsgegevens) | A     | ✅ Klaar       | KvK/BTW/IBAN maskers, validatie                                              |
+| Frontend wizard stap 2 (tour)             | A     | ✅ Klaar       | Cards: Team, Facturen, AI Chat (binnenkort)                                  |
+| Frontend wizard stap 3 (voltooiing)       | A     | ✅ Klaar       | `onboarding_completed_at` + redirect dashboard                               |
+| Admin trigger knop + voortgang            | C     | ✅ Klaar       | Status badge + RefreshCw trigger per klant                                   |
+| Responsive sidebar + mobile layout        | PM    | ✅ Klaar       | Hamburger menu, overlay, `ml-0 md:ml-64`                                     |
+| Vercel opschonen (1 project)              | PM    | ✅ Klaar       | `client-portal-deploy` verwijderd                                            |
+| **Adobe Sign API client library**         | B     | ✅ Klaar       | OAuth2, tokens, docs upload, agreement, polling                              |
+| **Server-side PDF generation**            | B     | ✅ Klaar       | jsPDF Buffer, auto-generation, storage upload                                |
+| **Adobe Sign integration endpoints**      | B     | ✅ Klaar       | POST send-signature, GET status, webhook                                     |
+| **TypeScript compilation**                | PM    | ✅ Klaar       | `npx tsc --noEmit` EXIT:0                                                    |
+| **adobeSign.ts committed to GitHub**      | B     | ✅ Klaar       | Commit 8848daab; all 7 functions implemented                                 |
+| **Vercel env variables**                  | PM    | ⏳ In progress | Add 4 Adobe Sign vars to Vercel Settings                                     |
+| **Vercel build & deploy**                 | PM    | ⏳ Blocked     | Waiting for env variables to complete build                                  |
 | **Login debugging & admin routing fix**   | PM    | ✅ Klaar       | Commit 7f9beb3 (error logging), 29dfc88 (diagnostic), 66897af (root routing) |
-| Testen end-to-end met echte klant         | PM    | ⏳ In progress | Login ✅ → Admin ✅ → Test onboarding wizard    |
-| Supabase migration uitgevoerd             | PM    | ✅ Klaar       | `migration-client-profile.sql` + Adobe Sign     |
+| Testen end-to-end met echte klant         | PM    | ⏳ In progress | Login ✅ → Admin ✅ → Test onboarding wizard                                   |
+| Supabase migration uitgevoerd             | PM    | ✅ Klaar       | `migration-client-profile.sql` + Adobe Sign                                  |
 
 ---
 

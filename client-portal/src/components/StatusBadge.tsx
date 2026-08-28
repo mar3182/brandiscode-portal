@@ -19,26 +19,26 @@ const statusLabels: Record<string, string> = {
   done: 'Klaar ✓',
 }
 
-const statusClasses: Record<string, string> = {
-  concept: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
-  verstuurd: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-  bekeken: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-  getekend: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-  afgewezen: 'bg-red-500/20 text-red-300 border-red-500/30',
-  betaald: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-  herinnering: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-  gepland: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
-  actief: 'bg-brand-gold/20 text-brand-gold border-brand-gold/30',
-  review: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-  afgerond: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-  todo: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
-  in_progress: 'bg-brand-gold/20 text-brand-gold border-brand-gold/30',
-  done: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+const statusTint: Record<string, 'neutral' | 'pending' | 'positive' | 'warning'> = {
+  concept: 'neutral',
+  gepland: 'neutral',
+  todo: 'neutral',
+  verstuurd: 'pending',
+  bekeken: 'pending',
+  in_progress: 'pending',
+  review: 'pending',
+  actief: 'pending',
+  getekend: 'positive',
+  betaald: 'positive',
+  afgerond: 'positive',
+  done: 'positive',
+  afgewezen: 'warning',
+  herinnering: 'warning',
 }
 
 export default function StatusBadge({ status }: { status: StatusType }) {
   return (
-    <span className={`status-badge border ${statusClasses[status] || ''}`}>
+    <span className={`status-badge status-${statusTint[status] || 'neutral'}`}>
       {statusLabels[status] || status}
     </span>
   )

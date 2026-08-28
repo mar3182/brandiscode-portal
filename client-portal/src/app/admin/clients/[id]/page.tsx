@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
+  AlertTriangle,
   ArrowLeft,
   BookOpen,
   Building2,
@@ -14,13 +15,19 @@ import {
   Clock,
   Copy,
   CreditCard,
+  Euro,
   ExternalLink,
   FileText,
+  FlaskConical,
   GraduationCap,
+  History,
+  ListChecks,
   Loader2,
   Mail,
   MessageSquare,
   Phone,
+  PlusCircle,
+  Power,
   RefreshCw,
   Sparkles,
   Star,
@@ -31,6 +38,8 @@ import type {
   AiKeyStatus,
   AiMode,
   AiProvider,
+  AiPromptVersion,
+  AiUsageEvent,
   Client,
   ClientAiSettings,
   Deliverable,
@@ -44,6 +53,7 @@ import type {
   TrainingIntakeStatus,
   TrainingSlot,
 } from '@/lib/types'
+import StatCard from '@/components/StatCard'
 
 // ── publish result ───────────────────────────────────────────────────────────
 interface PublishResult {
@@ -248,7 +258,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'training', label: 'Training', icon: <GraduationCap size={15} /> },
   { id: 'facturen', label: 'Facturen', icon: <CreditCard size={15} /> },
   { id: 'feedback', label: 'Feedback', icon: <MessageSquare size={15} /> },
-  { id: 'ai', label: 'AI Instellingen', icon: <Sparkles size={15} /> },
+  { id: 'ai', label: 'AI Tools', icon: <Sparkles size={15} /> },
 ]
 
 // ── sub-sections ──────────────────────────────────────────────────────────────
@@ -2246,6 +2256,595 @@ function AiSettingsTab({ clientId }: { clientId: string }) {
   )
 }
 
+// ── AI Tools: subnavigatie (Overzicht / Testen / Promptbeheer / Monitoring) ────
+
+type AiToolsSubTab = 'overzicht' | 'testen' | 'promptbeheer' | 'monitoring'
+
+const AI_SUB_TABS: { id: AiToolsSubTab; label: string }[] = [
+  { id: 'overzicht', label: 'Overzicht' },
+  { id: 'testen', label: 'Testen' },
+  { id: 'promptbeheer', label: 'Promptbeheer' },
+  { id: 'monitoring', label: 'Monitoring' },
+]
+
+const AI_TOOL_NAMES: { value: string; label: string }[] = [
+  { value: 'funda-tekst', label: 'Funda-tekst' },
+  { value: 'funda-multi', label: 'Funda-multi (4 kanalen)' },
+  { value: 'verfijn-tekst', label: 'Verfijn-tekst' },
+]
+
+type AiToolsOverview = {
+  settings: ClientAiSettings | null
+  active_prompt_versions: AiPromptVersion[]
+  recent_usage: AiUsageEvent[]
+  cost_this_month: number
+}
+
+function AiToolsTab({ clientId }: { clientId: string }) {
+  const [subTab, setSubTab] = useState<AiToolsSubTab>('overzicht')
+  const [toolName, setToolName] = useState<string>(AI_TOOL_NAMES[0].value)
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-1 bg-white/5 border border-white/10 rounded-xl p-1 overflow-x-auto">
+        {AI_SUB_TABS.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => setSubTab(s.id)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex-1 ${
+              subTab === s.id ? 'bg-brand-gold text-brand-dark shadow' : 'text-white/50 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {subTab !== 'overzicht' && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <label htmlFor="ai-tool-select" className="text-xs text-white/50">Tool</label>
+          <select
+            id="ai-tool-select"
+            value={toolName}
+            onChange={(e) => setToolName(e.target.value)}
+            className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-brand-gold/50"
+          >
+            {AI_TOOL_NAMES.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {subTab === 'overzicht' && <AiOverviewSubTab clientId={clientId} />}
+      {subTab === 'testen' && <AiTestSubTab clientId={clientId} toolName={toolName} />}
+      {subTab === 'promptbeheer' && <AiPromptBeheerSubTab clientId={clientId} toolName={toolName} />}
+      {subTab === 'monitoring' && <AiMonitoringSubTab clientId={clientId} />}
+    </div>
+  )
+}
+
+function AiOverviewSubTab({ clientId }: { clientId: string }) {
+  const [overview, setOverview] = useState<AiToolsOverview | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  async function load() {
+    setLoading(true)
+    setError('')
+    const res = await fetch(`/api/admin/clients/${clientId}/ai-tools`, { cache: 'no-store' })
+    const body = await res.json().catch(() => ({} as { error?: string }))
+    if (!res.ok) {
+      setError(body.error || 'Kon AI-overzicht niet laden.')
+      setLoading(false)
+      return
+    }
+    setOverview(body as AiToolsOverview)
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    load()
+  }, [clientId])
+
+  if (loading) {
+    return (
+      <div className="glass-card p-8 flex items-center justify-center gap-3 text-white/70">
+        <Loader2 className="w-5 h-5 animate-spin text-brand-gold" /> Overzicht laden...
+      </div>
+    )
+  }
+
+  if (error || !overview) {
+    return (
+      <div className="glass-card p-4 border border-red-500/40 bg-red-500/10 text-red-200 text-sm">
+        {error || 'Geen data beschikbaar.'}
+      </div>
+    )
+  }
+
+  const modeLabel = overview.settings
+    ? AI_MODE_OPTIONS.find((o) => o.value === overview.settings!.ai_mode)?.label ?? overview.settings.ai_mode
+    : null
+  const providerLabel = overview.settings
+    ? AI_PROVIDER_OPTIONS.find((o) => o.value === overview.settings!.provider)?.label ?? overview.settings.provider
+    : null
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <StatCard title="Kosten deze maand" value={fmt(overview.cost_this_month)} icon={Euro} variant="accent" />
+        <StatCard
+          title="Actieve promptversies"
+          value={overview.active_prompt_versions.length}
+          subtitle="per tool"
+          icon={ListChecks}
+        />
+        <StatCard
+          title="Recent gebruik"
+          value={overview.recent_usage.length}
+          subtitle="laatste runs (excl. testruns)"
+          icon={History}
+        />
+      </div>
+
+      {overview.settings && (
+        <div className="glass-card p-4 md:p-6 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+          <span className="text-white/50">AI-modus: <span className="text-white">{modeLabel}</span></span>
+          <span className="text-white/50">Provider: <span className="text-white">{providerLabel}</span></span>
+        </div>
+      )}
+
+      {overview.active_prompt_versions.length > 0 && (
+        <div className="glass-card p-4 md:p-6">
+          <h3 className="text-sm font-semibold text-white mb-3">Actieve promptversies per tool</h3>
+          <div className="space-y-2">
+            {overview.active_prompt_versions.map((v) => (
+              <div key={v.id} className="flex items-center justify-between gap-3 text-sm">
+                <span className="text-white/70">{v.tool_name}</span>
+                <span className="status-badge status-positive">v{v.version_number}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <AiSettingsTab clientId={clientId} />
+    </div>
+  )
+}
+
+function AiTestSubTab({ clientId, toolName }: { clientId: string; toolName: string }) {
+  const [versions, setVersions] = useState<AiPromptVersion[]>([])
+  const [versionId, setVersionId] = useState('')
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [result, setResult] = useState<{
+    output_text: string
+    provider: string
+    model: string
+    prompt_version_id: string
+  } | null>(null)
+
+  useEffect(() => {
+    setVersionId('')
+    setResult(null)
+    setError('')
+
+    async function loadVersions() {
+      const res = await fetch(`/api/admin/clients/${clientId}/ai-tools/${toolName}/prompt-versions`, { cache: 'no-store' })
+      const body = await res.json().catch(() => ({} as { prompt_versions?: AiPromptVersion[] }))
+      if (res.ok) setVersions(body.prompt_versions ?? [])
+    }
+
+    loadVersions()
+  }, [clientId, toolName])
+
+  async function handleTest(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (!input.trim()) {
+      setError('Testinvoer is verplicht.')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    setResult(null)
+
+    const res = await fetch(`/api/admin/clients/${clientId}/ai-tools/${toolName}/test`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        test_input: input,
+        ...(versionId ? { prompt_version_id: versionId } : {}),
+      }),
+    })
+    const body = await res.json().catch(() => ({} as { error?: string }))
+
+    if (!res.ok) {
+      setError(body.error || 'Testrun mislukt.')
+      setLoading(false)
+      return
+    }
+
+    setResult(body as { output_text: string; provider: string; model: string; prompt_version_id: string })
+    setLoading(false)
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="glass-card p-3 border border-amber-500/30 bg-amber-500/10 text-amber-200 text-sm flex items-start gap-2">
+        <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+        <span>TEST-omgeving — deze uitvoer is niet zichtbaar voor de klant en telt niet mee in het klantquotum.</span>
+      </div>
+
+      <form onSubmit={handleTest} className="glass-card p-4 md:p-6 space-y-4">
+        <div>
+          <label htmlFor="test-version" className="block text-xs text-white/50 mb-1">Promptversie</label>
+          <select
+            id="test-version"
+            value={versionId}
+            onChange={(e) => setVersionId(e.target.value)}
+            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-brand-gold/50"
+          >
+            <option value="">Actieve versie (standaard)</option>
+            {versions.map((v) => (
+              <option key={v.id} value={v.id}>
+                v{v.version_number}{v.is_active ? ' — actief' : ''}{v.notes ? ` — ${v.notes}` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label htmlFor="test-input" className="block text-xs text-white/50 mb-1">Testinvoer</label>
+          <textarea
+            id="test-input"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            rows={6}
+            placeholder="Bijv. woningkenmerken: vrijstaande woning, 4 slaapkamers, tuin op het zuiden, Tholen..."
+            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-white/30 focus:outline-none focus:border-brand-gold/50"
+          />
+        </div>
+
+        {error ? (
+          <div className="glass-card p-3 border border-red-500/40 bg-red-500/10 text-red-200 text-sm" role="alert">
+            {error}
+          </div>
+        ) : null}
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-brand-gold text-brand-dark text-sm font-semibold disabled:opacity-60"
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FlaskConical className="w-4 h-4" />}
+          Testen uitvoeren
+        </button>
+      </form>
+
+      {result ? (
+        <div className="glass-card p-4 md:p-6 space-y-2">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h3 className="text-sm font-semibold text-white">Gegenereerde output</h3>
+            <span className="text-xs text-white/40">{result.provider} · {result.model}</span>
+          </div>
+          <p className="text-sm text-white/80 whitespace-pre-wrap">{result.output_text}</p>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function AiPromptBeheerSubTab({ clientId, toolName }: { clientId: string; toolName: string }) {
+  const [versions, setVersions] = useState<AiPromptVersion[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [newPrompt, setNewPrompt] = useState('')
+  const [newNotes, setNewNotes] = useState('')
+  const [activateNew, setActivateNew] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [activatingId, setActivatingId] = useState<string | null>(null)
+
+  async function loadVersions() {
+    setLoading(true)
+    setError('')
+    const res = await fetch(`/api/admin/clients/${clientId}/ai-tools/${toolName}/prompt-versions`, { cache: 'no-store' })
+    const body = await res.json().catch(() => ({} as { prompt_versions?: AiPromptVersion[]; error?: string }))
+    if (!res.ok) {
+      setError(body.error || 'Kon promptversies niet laden.')
+      setLoading(false)
+      return
+    }
+    setVersions(body.prompt_versions ?? [])
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    loadVersions()
+    setShowForm(false)
+    setError('')
+  }, [clientId, toolName])
+
+  async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (!newPrompt.trim()) {
+      setError('System prompt is verplicht.')
+      return
+    }
+
+    setSaving(true)
+    setError('')
+
+    const res = await fetch(`/api/admin/clients/${clientId}/ai-tools/${toolName}/prompt-versions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_prompt: newPrompt,
+        notes: newNotes.trim() || undefined,
+        activate: activateNew,
+      }),
+    })
+    const body = await res.json().catch(() => ({} as { error?: string }))
+
+    setSaving(false)
+
+    if (!res.ok) {
+      setError(body.error || 'Aanmaken van promptversie is mislukt.')
+      return
+    }
+
+    setNewPrompt('')
+    setNewNotes('')
+    setActivateNew(true)
+    setShowForm(false)
+    await loadVersions()
+  }
+
+  // Er is geen los "activeren"-endpoint: een eerdere versie activeren maakt een
+  // nieuwe versie aan met dezelfde promptinhoud, direct actief. Zo blijft de
+  // volledige geschiedenis behouden en wordt de bestaande API niet aangepast.
+  async function handleActivate(version: AiPromptVersion) {
+    setActivatingId(version.id)
+    setError('')
+
+    const res = await fetch(`/api/admin/clients/${clientId}/ai-tools/${toolName}/prompt-versions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_prompt: version.system_prompt,
+        notes: version.notes ?? undefined,
+        activate: true,
+      }),
+    })
+    const body = await res.json().catch(() => ({} as { error?: string }))
+
+    setActivatingId(null)
+
+    if (!res.ok) {
+      setError(body.error || 'Activeren is mislukt.')
+      return
+    }
+
+    await loadVersions()
+  }
+
+  if (loading) {
+    return (
+      <div className="glass-card p-8 flex items-center justify-center gap-3 text-white/70">
+        <Loader2 className="w-5 h-5 animate-spin text-brand-gold" /> Promptversies laden...
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {error ? (
+        <div className="glass-card p-3 border border-red-500/40 bg-red-500/10 text-red-200 text-sm" role="alert">
+          {error}
+        </div>
+      ) : null}
+
+      {showForm ? (
+        <form onSubmit={handleCreate} className="glass-card p-4 md:p-6 space-y-3">
+          <div>
+            <label htmlFor="new-system-prompt" className="block text-xs text-white/50 mb-1">System prompt</label>
+            <textarea
+              id="new-system-prompt"
+              rows={8}
+              value={newPrompt}
+              onChange={(e) => setNewPrompt(e.target.value)}
+              placeholder="Volledige systeeminstructie voor deze tool..."
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-white/30 focus:outline-none focus:border-brand-gold/50"
+            />
+          </div>
+          <div>
+            <label htmlFor="new-notes" className="block text-xs text-white/50 mb-1">Notities (optioneel)</label>
+            <input
+              id="new-notes"
+              type="text"
+              value={newNotes}
+              onChange={(e) => setNewNotes(e.target.value)}
+              placeholder="Bijv. kortere zinnen, meer nadruk op tuin"
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-white/30 focus:outline-none focus:border-brand-gold/50"
+            />
+          </div>
+          <label className="flex items-center gap-2 text-xs text-white/60">
+            <input
+              type="checkbox"
+              checked={activateNew}
+              onChange={(e) => setActivateNew(e.target.checked)}
+              className="rounded"
+            />
+            Meteen activeren na aanmaken
+          </label>
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={saving}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-brand-gold text-brand-dark text-sm font-semibold disabled:opacity-60"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlusCircle className="w-4 h-4" />}
+              Opslaan
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              disabled={saving}
+              className="px-4 py-2 rounded-lg bg-white/10 text-white/80 text-sm font-medium disabled:opacity-60"
+            >
+              Annuleren
+            </button>
+          </div>
+        </form>
+      ) : (
+        <button
+          onClick={() => setShowForm(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-gold text-brand-dark text-sm font-semibold"
+        >
+          <PlusCircle className="w-4 h-4" /> Nieuwe versie
+        </button>
+      )}
+
+      {versions.length === 0 ? (
+        <div className="glass-card p-6 text-center text-white/40 text-sm">
+          Nog geen promptversies voor deze tool.
+        </div>
+      ) : (
+        <div className="glass-card divide-y divide-white/5">
+          {versions.map((v) => (
+            <div key={v.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-semibold text-white">v{v.version_number}</span>
+                  <span className={`status-badge ${v.is_active ? 'status-positive' : 'status-neutral'}`}>
+                    {v.is_active ? 'Actief' : 'Niet actief'}
+                  </span>
+                </div>
+                {v.notes && <p className="text-xs text-white/50 mt-1">{v.notes}</p>}
+                <p className="text-xs text-white/30 mt-1">
+                  Aangemaakt {fmtDateTime(v.created_at)}{v.created_by ? ` door ${v.created_by}` : ''}
+                </p>
+              </div>
+              {!v.is_active && (
+                <button
+                  onClick={() => handleActivate(v)}
+                  disabled={activatingId === v.id}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-brand-gold text-brand-dark text-xs font-semibold disabled:opacity-60 shrink-0"
+                >
+                  {activatingId === v.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Power className="w-3.5 h-3.5" />}
+                  Activeren
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AiMonitoringSubTab({ clientId }: { clientId: string }) {
+  const [overview, setOverview] = useState<AiToolsOverview | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  async function load() {
+    setLoading(true)
+    setError('')
+    const res = await fetch(`/api/admin/clients/${clientId}/ai-tools`, { cache: 'no-store' })
+    const body = await res.json().catch(() => ({} as { error?: string }))
+    if (!res.ok) {
+      setError(body.error || 'Kon monitoringgegevens niet laden.')
+      setLoading(false)
+      return
+    }
+    setOverview(body as AiToolsOverview)
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    load()
+  }, [clientId])
+
+  if (loading) {
+    return (
+      <div className="glass-card p-8 flex items-center justify-center gap-3 text-white/70">
+        <Loader2 className="w-5 h-5 animate-spin text-brand-gold" /> Monitoring laden...
+      </div>
+    )
+  }
+
+  if (error || !overview) {
+    return (
+      <div className="glass-card p-4 border border-red-500/40 bg-red-500/10 text-red-200 text-sm">
+        {error || 'Geen data beschikbaar.'}
+      </div>
+    )
+  }
+
+  const successCount = overview.recent_usage.filter((u) => u.request_status === 'success').length
+  const errorCount = overview.recent_usage.length - successCount
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <StatCard title="Kosten deze maand" value={fmt(overview.cost_this_month)} icon={Euro} variant="accent" />
+        <StatCard
+          title="Geslaagde runs"
+          value={successCount}
+          subtitle={`van laatste ${overview.recent_usage.length}`}
+          icon={CheckCircle2}
+        />
+        <StatCard
+          title="Mislukte runs"
+          value={errorCount}
+          subtitle={`van laatste ${overview.recent_usage.length}`}
+          icon={AlertTriangle}
+        />
+      </div>
+
+      <div className="glass-card overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-white/40 border-b border-white/10">
+              <th className="p-3 font-medium">Datum</th>
+              <th className="p-3 font-medium">Tool</th>
+              <th className="p-3 font-medium">Provider / model</th>
+              <th className="p-3 font-medium">Status</th>
+              <th className="p-3 font-medium">Kosten</th>
+            </tr>
+          </thead>
+          <tbody>
+            {overview.recent_usage.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="p-4 text-center text-white/40">Nog geen gebruik geregistreerd.</td>
+              </tr>
+            ) : (
+              overview.recent_usage.map((u) => (
+                <tr key={u.id} className="border-b border-white/5 last:border-0">
+                  <td className="p-3 text-white/70 whitespace-nowrap">{fmtDateTime(u.created_at)}</td>
+                  <td className="p-3 text-white/70">{u.tool_name}</td>
+                  <td className="p-3 text-white/50">{u.provider} · {u.model}</td>
+                  <td className="p-3">
+                    <span className={`status-badge ${u.request_status === 'success' ? 'status-positive' : 'status-warning'}`}>
+                      {u.request_status === 'success' ? 'Geslaagd' : 'Mislukt'}
+                    </span>
+                  </td>
+                  <td className="p-3 text-white/70">{u.estimated_cost != null ? fmt(u.estimated_cost) : '—'}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 // ── main page ─────────────────────────────────────────────────────────────────
 
 export default function ClientDetailPage() {
@@ -2369,7 +2968,7 @@ export default function ClientDetailPage() {
           {tab === 'training' && <TrainingTab trainingen={trainingen} clientId={client.id} onSessionPlanned={loadClientDetail} />}
           {tab === 'facturen' && <FacturenTab facturen={facturen} clientId={client.id} onRefresh={loadClientDetail} />}
           {tab === 'feedback' && <FeedbackTab clientId={client.id} companyName={client.company || client.name || 'klant'} />}
-          {tab === 'ai' && <AiSettingsTab clientId={client.id} />}
+          {tab === 'ai' && <AiToolsTab clientId={client.id} />}
         </div>
       </div>
     </div>

@@ -82,7 +82,7 @@ export default function AdminSidebar() {
       <div className="p-6 border-b border-white/10 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gold-gradient">Brand is Code</h1>
-          <p className="text-xs text-brand-orange mt-1 font-semibold">Admin Panel</p>
+          <p className="text-xs text-brand-gold mt-1 font-semibold">Admin Panel</p>
         </div>
         {/* Close button — mobile only */}
         <button
@@ -105,7 +105,7 @@ export default function AdminSidebar() {
               onClick={() => setMobileOpen(false)}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                 isActive
-                  ? 'bg-brand-orange/20 text-brand-orange border border-brand-orange/30'
+                  ? 'bg-brand-gold/20 text-brand-gold border border-brand-gold/30'
                   : 'text-white/60 hover:text-white hover:bg-white/5'
               }`}
             >

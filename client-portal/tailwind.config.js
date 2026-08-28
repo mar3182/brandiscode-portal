@@ -15,6 +15,12 @@ module.exports = {
           pink: '#E84393',
           orange: '#F7631B',
         },
+        status: {
+          neutral: '#9CA3AF',
+          pending: '#2E86AB',
+          positive: '#10B981',
+          warning: '#F59E0B',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

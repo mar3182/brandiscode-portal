@@ -196,6 +196,37 @@ CREATE TABLE portal_messages (
 
 ---
 
+## Fase 5 — Admin AI Workbench & UI-Simplificatie
+**Doel:** Als admin per klant de AI-tool kunnen zien, testen, aanpassen en monitoren zonder de klant te raken, plus een rustigere, consistentere UI.
+
+**Volledige uitwerking, datamodel, API-ontwerp, UI-voorstel en gefaseerd plan met agenttoewijzing staan in:**
+`docs/ADMIN-AI-WORKBENCH-EN-UI-SIMPLIFICATIE.md`
+
+Kernpunten:
+- Uitbreiding van het bestaande "AI Instellingen"-tabblad naar "AI Tools" met Overzicht/Testen/Promptbeheer/Monitoring.
+- Nieuwe tabellen `ai_prompt_versions`, `ai_eval_cases`, `ai_eval_runs` en een `is_admin_test`-vlag op `ai_usage_events`.
+- UI-simplificatie: één accentkleur, semantische statuskleuren, minder gelijktijdige visuele signalen per kaart.
+- Streamlit expliciet afgewezen voor het admin-gedeelte (zie document sectie 4); wel optioneel voor losstaande, read-only evaluatie-analyse.
+- Additief en omkeerbaar: geen wijziging aan het bestaande klantproduct.
+
+**Status (28 augustus 2026):** backend (migratie + API-routes), designtokens en workbench-UI zijn geïmplementeerd; `npx tsc --noEmit` slaagt. Tijdens validatie is een aparte bevinding gedaan (zie Fase 5A hieronder) die eerst wordt afgehandeld voordat de migratie op productie wordt uitgevoerd (E1) en de scope-toets (E2) plaatsvindt.
+
+---
+
+## Fase 5A — Opruimtaak: ESLint-configuratie & bestaande lintfouten
+**Doel:** vaststellen of `npm run lint`/`npm run build` in CI daadwerkelijk ooit slaagden, en de circa 45 bestaande lintmeldingen (waaronder 1 functionele bug in de Funda-tekst-tool) gecontroleerd opruimen vóórdat verder wordt gegaan met Fase 5.
+
+**Volledige foutenlijst, risico-indeling en gefaseerd plan met agenttoewijzing staan in:**
+`docs/OPRUIMTAAK-LINT-EN-BUILD.md`
+
+Kernpunten:
+- Geen gecommit `.eslintrc.json` in `client-portal`; onduidelijk of de CI-lintgate ooit echt heeft gefaald of geslaagd — eerst verifiëren, niet aannemen.
+- Eén echte correctheidsfout (`react-hooks/rules-of-hooks` in `funda-tekst/page.tsx`, de Sprint 1-kerntool) wordt apart en eerst gefixt, met handmatige regressietest.
+- Overige meldingen zijn mechanisch (`no-explicit-any`, `prefer-const`, `no-unused-vars`, `no-unescaped-entities`) en worden gebatcht per risiconiveau, niet per bestand.
+- Losstaand van de AI Workbench-taak; voorkomt scopevermenging tussen de twee werkstromen.
+
+---
+
 ## Prioriteitsvolgorde
 
 ```
@@ -258,4 +289,5 @@ Next.js 14 (Vercel)
 - [ ] E-mailadressen Leunis team ophalen bij Arno's assistent  
 - [ ] seed-leunis-team.sql updaten met echte client ID + emails
 - [ ] 5 voorbeeld Funda-teksten van Arno ontvangen
+- [ ] Admin AI Workbench + UI-simplificatie opstarten (zie `docs/ADMIN-AI-WORKBENCH-EN-UI-SIMPLIFICATIE.md`, Fase A1/A2)
 - [ ] `OPENAI_API_KEY` toevoegen aan Vercel

@@ -104,25 +104,25 @@ export default function DashboardPage() {
           value={offertes.length}
           subtitle={`${signedOffertes} getekend`}
           icon={FileText}
-          color="gold"
+          variant="accent"
         />
         <StatCard
           title="Actieve sprints"
           value={activeSprintCount}
           icon={BarChart3}
-          color="blue"
+          variant="neutral"
         />
         <StatCard
           title="Afgerond"
           value={completedSprintCount}
           icon={CheckCircle2}
-          color="green"
+          variant="neutral"
         />
         <StatCard
           title="Totaal sprints"
           value={sprints.length}
           icon={Clock}
-          color="pink"
+          variant="neutral"
         />
       </div>
 

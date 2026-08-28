@@ -4,9 +4,11 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [develop, main]
+  push:
+    branches: [main]
 
 concurrency:
-  group: pr-check-${{ github.head_ref }}
+  group: pr-check-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 env:

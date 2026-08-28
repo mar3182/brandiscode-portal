@@ -40,19 +40,34 @@ body {
 
 /* Status badges */
 .status-badge {
-  @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium;
+  @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border;
 }
 
-.status-actief {
-  @apply bg-emerald-500/20 text-emerald-300 border border-emerald-500/30;
+/* Semantische statustinten */
+.status-neutral {
+  @apply bg-gray-500/20 text-gray-300 border-gray-500/30;
 }
 
-.status-wacht {
-  @apply bg-amber-500/20 text-amber-300 border border-amber-500/30;
+.status-pending {
+  @apply bg-brand-blue/20 text-blue-300 border-brand-blue/30;
 }
 
-.status-afgerond {
-  @apply bg-brand-blue/20 text-blue-300 border border-brand-blue/30;
+.status-positive {
+  @apply bg-emerald-500/20 text-emerald-300 border-emerald-500/30;
+}
+
+.status-warning {
+  @apply bg-amber-500/20 text-amber-300 border-amber-500/30;
+}
+
+/* StatCard varianten */
+.stat-card-neutral {
+  /* gebruikt de bestaande .glass-card, geen extra gradient nodig */
+}
+
+.stat-card-accent {
+  background: linear-gradient(135deg, rgba(212, 168, 67, 0.15), rgba(212, 168, 67, 0.03));
+  border-color: rgba(212, 168, 67, 0.3);
 }
 
 /* Signature pad */

@@ -63,6 +63,43 @@ export type ClientAiSettingsUpsert = {
   updated_by: string
 }
 
+// --- Admin AI Workbench: promptversies & evaluaties ---
+// Ref: docs/ADMIN-AI-WORKBENCH-EN-UI-SIMPLIFICATIE.md
+
+export interface AiPromptVersion {
+  id: string
+  client_id: string | null
+  tool_name: string
+  version_number: number
+  system_prompt: string
+  notes: string | null
+  is_active: boolean
+  created_by: string | null
+  created_at: string
+}
+
+export interface AiEvalCase {
+  id: string
+  client_id: string | null
+  tool_name: string
+  label: string
+  input_payload: Record<string, unknown>
+  reference_facts: Record<string, unknown> | null
+  source: string | null
+  created_at: string
+}
+
+export interface AiEvalRun {
+  id: string
+  eval_case_id: string
+  prompt_version_id: string
+  output_text: string
+  scores: Record<string, unknown> | null
+  reviewer: string | null
+  passed: boolean | null
+  created_at: string
+}
+
 export interface Client {
   id: string
   email: string
