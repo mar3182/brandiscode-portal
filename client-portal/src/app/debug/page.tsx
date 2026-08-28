@@ -105,7 +105,7 @@ export default function DebugPage() {
           <div className="bg-amber-500/20 border border-amber-500/50 rounded-lg p-4">
             <h3 className="font-bold text-amber-300 mb-2">📝 Debugging:</h3>
             <ol className="text-white/80 text-sm space-y-1 list-decimal list-inside">
-              <li>Check if "Your email" matches "Admin email"</li>
+              <li>Check if &quot;Your email&quot; matches &quot;Admin email&quot;</li>
               <li>If not matching but should be: check Vercel env vars</li>
               <li>Copy email exactly (check for spaces, case)</li>
               <li>If admin=NO but should be YES: redeploy Vercel</li>

@@ -429,7 +429,7 @@ export default function FundaTekstPage() {
     setPromptNoticeMessage('Gallery prompt toegevoegd aan uitbreidingen.')
   }
 
-  function useGalleryPromptAsRefinement(prompt: string) {
+  function applyGalleryPromptAsRefinement(prompt: string) {
     setVerfijnInput(prompt)
     setPromptNoticeMessage('Gallery prompt geladen in verfijnveld.')
   }
@@ -1298,7 +1298,7 @@ export default function FundaTekstPage() {
                   <div className="flex gap-2 mt-3">
                     <button
                       type="button"
-                      onClick={() => useGalleryPromptAsRefinement(item.prompt)}
+                      onClick={() => applyGalleryPromptAsRefinement(item.prompt)}
                       className="px-3 py-1.5 rounded-lg bg-brand-blue/20 border border-brand-blue/40 text-brand-blue text-xs font-medium hover:bg-brand-blue/30 transition-all"
                     >
                       Gebruik nu
