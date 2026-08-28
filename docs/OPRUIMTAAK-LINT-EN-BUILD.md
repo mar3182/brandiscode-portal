@@ -53,6 +53,20 @@
 
 **Optionele vervolgstap (niet uitgevoerd, aparte beslissing):** branch protection op `main` instellen die de 8 checks verplicht vóór mergen, in combinatie met altijd via feature branches + PR's werken. Dit voorkomt dat risicovolle code ooit op `main` komt, niet alleen dat hij niet wordt gedeployed. Dit is een grotere workflowverandering (geen directe pushes meer mogelijk) en wordt hier bewust niet zelf geactiveerd.
 
+## 1B. Vervolgbevinding na de eerste live-test (28 augustus 2026, na push `cb50394`)
+
+Na het pushen van de Stap 0-fix bleek dat "PR Quality & Security Gates" inderdaad triggerde (de fix werkt), maar **3 losstaande, nieuwe problemen** aan het licht kwamen — geen van alle onderdeel van de eerder genoemde 45 lintmeldingen:
+
+1. **`Setup & Cache Dependencies` faalt fundamenteel.** De stap draait `npm ci --workspaces --if-present` op repo-root, gevolgd door `cd client-portal && npm ci` en `cd ../brandiscode && npm ci || true`. Er bestaat **geen root-`package.json`** en **geen `brandiscode/`-map** in deze repository. Dit is onmogelijk om ooit te laten slagen — de workflow lijkt geschreven (of gekopieerd) voor een heel andere monorepo-structuur dan wat hier daadwerkelijk staat. **Conclusie: de volledige CI-kwaliteitspijplijn heeft vermoedelijk nog nooit één keer succesvol gedraaid sinds het aanmaken van dit bestand**, los van de ontbrekende push-trigger uit 1A.
+2. **GitGuardian secretscan faalt met "Invalid GitGuardian API key."** De `GITGUARDIAN_API_KEY`-secret in de GitHub-repo-instellingen ontbreekt of is ongeldig. Dit kan alleen door jou opgelost worden (nieuwe/geldige sleutel aanmaken bij GitGuardian en als repo-secret instellen), of bewust worden overgeslagen als je geen GitGuardian gebruikt.
+3. **Mijn eigen `migration-ai-workbench.sql` werd terecht gemarkeerd** door de migratie-veiligheidscheck: die zoekt letterlijk naar `-- MIGRATION PURPOSE:`, `-- ROLLBACK:`, `-- RISICO:` zodra `DROP TABLE` ergens in het bestand voorkomt (ook in documentatie-commentaar). **Al opgelost** — de exacte markers zijn toegevoegd, lokaal geverifieerd met dezelfde grep-logica als de CI-check.
+
+**Impact:** dit is groter dan de oorspronkelijke opruimtaak. De structurele `npm ci`-fout blokkeert **elke toekomstige push** volledig, ongeacht lintstatus. Aanbevolen aanpak, in volgorde:
+
+1. `Install dependencies`-stap in `01-pr-checks.yml` corrigeren naar de werkelijke structuur (alleen `cd client-portal && npm ci`, geen root-workspaces, geen `brandiscode/`-fallback) — klein, veilig, feitelijk onderbouwd. **Nog niet doorgevoerd, ter goedkeuring.**
+2. GitGuardian-sleutel: door jou te leveren of bewust de stap tijdelijk niet-blokkerend te maken (aparte beslissing, geen technische keuze). **Doorgevoerd (28 augustus 2026):** `continue-on-error: true` toegevoegd aan de "Run GitGuardian"-stap, met een comment dat dit tijdelijk is totdat een geldige `GITGUARDIAN_API_KEY`-secret is ingesteld. TruffleHog (de andere secretscan in dezelfde job) blijft onaangetast en blijft wél blokkerend.
+3. Pas daarna verdergaan met Stap 1 t/m 5 van dit document (de 45 lintmeldingen), want die zijn nu pas voor het eerst *daadwerkelijk* te zien zodra de pipeline voorbij `setup` komt.
+
 ## 2. Volgorde van aanpak (risico-gebaseerd, niet bestandsvolgorde)
 
 ### Stap 0 — CI-status verifiëren (verplicht, eerst) — ✅ afgerond, zie 1A hierboven
