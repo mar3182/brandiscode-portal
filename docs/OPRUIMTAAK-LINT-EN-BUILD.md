@@ -67,6 +67,12 @@ Na het pushen van de Stap 0-fix bleek dat "PR Quality & Security Gates" inderdaa
 2. GitGuardian-sleutel: door jou te leveren of bewust de stap tijdelijk niet-blokkerend te maken (aparte beslissing, geen technische keuze). **Doorgevoerd (28 augustus 2026):** `continue-on-error: true` toegevoegd aan de "Run GitGuardian"-stap, met een comment dat dit tijdelijk is totdat een geldige `GITGUARDIAN_API_KEY`-secret is ingesteld. TruffleHog (de andere secretscan in dezelfde job) blijft onaangetast en blijft wél blokkerend.
 3. Pas daarna verdergaan met Stap 1 t/m 5 van dit document (de 45 lintmeldingen), want die zijn nu pas voor het eerst *daadwerkelijk* te zien zodra de pipeline voorbij `setup` komt.
 
+**Extra bevindingen tijdens verificatie (28 augustus 2026), na live pipeline-run op commit `868005d`:**
+- De metadata-comments (`-- MIGRATION PURPOSE:` / `-- RISICO:` / `-- ROLLBACK:`) in `migration-ai-workbench.sql` bleken alleen lokaal aangepast en nooit gecommit te zijn — `Database Migration Safety Validation` faalde daardoor alsnog. **Gefixt in commit `8d1e391`.**
+- `actions/upload-artifact@v3` (gebruikt in zowel `01-pr-checks.yml` als `03-production-cd.yml`) wordt sinds april 2024 door GitHub automatisch als failure behandeld (deprecated), waardoor `Dependency Vulnerability Scan` en `Build Artifact` faalden. **Gefixt in commit `ef538ae`**, omgezet naar `@v4`.
+
+**Status na alle fixes (run [33155266984](https://github.com/mar3182/brandiscode-portal/actions/runs/33155266984)):** alle jobs slagen behalve `Lint & Code Quality` — precies de reeds geplande Stap 1 t/m 5 hieronder (de 45 bekende lintmeldingen). De CI-infrastructuur zelf is nu gezond en levert voor het eerst betrouwbare signalen.
+
 ## 2. Volgorde van aanpak (risico-gebaseerd, niet bestandsvolgorde)
 
 ### Stap 0 — CI-status verifiëren (verplicht, eerst) — ✅ afgerond, zie 1A hierboven
