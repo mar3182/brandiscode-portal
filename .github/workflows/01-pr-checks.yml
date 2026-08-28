@@ -48,10 +48,8 @@ jobs:
 
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
-        run: |
-          npm ci --workspaces --if-present
-          cd client-portal && npm ci
-          cd ../brandiscode && npm ci || true
+        # Alleen client-portal bevat een package.json in deze repo; geen root-workspaces of brandiscode/-map.
+        run: cd client-portal && npm ci
 
   # Job 2: Linting
   lint:

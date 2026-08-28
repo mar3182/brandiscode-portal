@@ -63,7 +63,7 @@ Na het pushen van de Stap 0-fix bleek dat "PR Quality & Security Gates" inderdaa
 
 **Impact:** dit is groter dan de oorspronkelijke opruimtaak. De structurele `npm ci`-fout blokkeert **elke toekomstige push** volledig, ongeacht lintstatus. Aanbevolen aanpak, in volgorde:
 
-1. `Install dependencies`-stap in `01-pr-checks.yml` corrigeren naar de werkelijke structuur (alleen `cd client-portal && npm ci`, geen root-workspaces, geen `brandiscode/`-fallback) — klein, veilig, feitelijk onderbouwd. **Nog niet doorgevoerd, ter goedkeuring.**
+1. **`Install dependencies`-stap in `01-pr-checks.yml` corrigeren naar de werkelijke structuur.** **Doorgevoerd (28 augustus 2026):** `npm ci --workspaces --if-present` en de `brandiscode/`-fallback verwijderd; de stap draait nu alleen `cd client-portal && npm ci`. Downstream jobs (lint, typecheck, test, build, dependency-check) deden dit al correct — alleen de `setup`-job had de fout. De harmless cache-padverwijzingen naar `brandiscode/node_modules` in de overige jobs zijn bewust ongemoeid gelaten (geen fout, `actions/cache` slaat ontbrekende paden simpelweg over).
 2. GitGuardian-sleutel: door jou te leveren of bewust de stap tijdelijk niet-blokkerend te maken (aparte beslissing, geen technische keuze). **Doorgevoerd (28 augustus 2026):** `continue-on-error: true` toegevoegd aan de "Run GitGuardian"-stap, met een comment dat dit tijdelijk is totdat een geldige `GITGUARDIAN_API_KEY`-secret is ingesteld. TruffleHog (de andere secretscan in dezelfde job) blijft onaangetast en blijft wél blokkerend.
 3. Pas daarna verdergaan met Stap 1 t/m 5 van dit document (de 45 lintmeldingen), want die zijn nu pas voor het eerst *daadwerkelijk* te zien zodra de pipeline voorbij `setup` komt.
 
