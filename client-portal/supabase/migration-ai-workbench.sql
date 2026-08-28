@@ -43,7 +43,14 @@
 --   FROM ai_usage_events;
 --   -- Verwacht: admin_test_rijen = 0 direct na migratie.
 --
+-- MIGRATION PURPOSE: Admin AI Workbench (promptversies, evals, admin-testruns)
+-- toevoegen zonder bestaande klantdata te raken; zie sectie Gate 1 hierboven.
+-- RISICO: Laag. Alleen additieve DDL (nieuwe kolom met default, nieuwe tabellen).
+-- Geen bestaande rijen worden verwijderd of overschreven.
+--
 -- Rollback-pad (in omgekeerde volgorde van aanmaken)
+-- ROLLBACK: onderstaande statements zijn documentatie voor handmatige rollback,
+-- niet onderdeel van deze migratie zelf.
 --   DROP TABLE IF EXISTS ai_eval_runs;
 --   DROP TABLE IF EXISTS ai_eval_cases;
 --   DROP TABLE IF EXISTS ai_prompt_versions;
