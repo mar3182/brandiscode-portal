@@ -58,16 +58,30 @@ jobs:
               'RFC Governance Validation'
             ];
             
-            const { data } = await github.rest.checks.listForRef({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: context.sha,
-              status: 'completed',
-              per_page: 100
-            });
-            
-            const completedChecks = data.check_runs;
-            const completedNames = completedChecks.map(c => c.name);
+            const maxAttempts = 20;
+            const pollIntervalMs = 30_000;
+            let completedChecks = [];
+
+            for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+              const { data } = await github.rest.checks.listForRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: context.sha,
+                status: 'completed',
+                per_page: 100
+              });
+
+              completedChecks = data.check_runs;
+              const completedNames = new Set(completedChecks.map(c => c.name));
+              const allChecksCompleted = REQUIRED_CHECKS.every(name => completedNames.has(name));
+
+              if (allChecksCompleted || attempt === maxAttempts) {
+                break;
+              }
+
+              console.log(`Waiting for required checks (${attempt}/${maxAttempts})...`);
+              await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+            }
             
             console.log('Completed checks found:');
             completedChecks.forEach(c => console.log(`  - ${c.name}: ${c.conclusion}`));
