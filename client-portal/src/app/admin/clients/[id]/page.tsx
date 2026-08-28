@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -1960,7 +1960,7 @@ function AiSettingsTab({ clientId }: { clientId: string }) {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  async function loadSettings() {
+  const loadSettings = useCallback(async () => {
     setLoading(true)
     setError('')
     const res = await fetch(`/api/admin/clients/${clientId}/ai-settings`, { cache: 'no-store' })
@@ -1975,11 +1975,11 @@ function AiSettingsTab({ clientId }: { clientId: string }) {
     setSettings(body.settings)
     setForm(toFormState(body.settings))
     setLoading(false)
-  }
+  }, [clientId])
 
   useEffect(() => {
     loadSettings()
-  }, [clientId])
+  }, [loadSettings])
 
   function updateField<K extends keyof AiSettingsFormState>(key: K, value: AiSettingsFormState[K]) {
     setForm((prev) => {
@@ -2329,7 +2329,7 @@ function AiOverviewSubTab({ clientId }: { clientId: string }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     setError('')
     const res = await fetch(`/api/admin/clients/${clientId}/ai-tools`, { cache: 'no-store' })
@@ -2341,11 +2341,11 @@ function AiOverviewSubTab({ clientId }: { clientId: string }) {
     }
     setOverview(body as AiToolsOverview)
     setLoading(false)
-  }
+  }, [clientId])
 
   useEffect(() => {
     load()
-  }, [clientId])
+  }, [load])
 
   if (loading) {
     return (
@@ -2549,7 +2549,7 @@ function AiPromptBeheerSubTab({ clientId, toolName }: { clientId: string; toolNa
   const [saving, setSaving] = useState(false)
   const [activatingId, setActivatingId] = useState<string | null>(null)
 
-  async function loadVersions() {
+  const loadVersions = useCallback(async () => {
     setLoading(true)
     setError('')
     const res = await fetch(`/api/admin/clients/${clientId}/ai-tools/${toolName}/prompt-versions`, { cache: 'no-store' })
@@ -2561,13 +2561,13 @@ function AiPromptBeheerSubTab({ clientId, toolName }: { clientId: string; toolNa
     }
     setVersions(body.prompt_versions ?? [])
     setLoading(false)
-  }
+  }, [clientId, toolName])
 
   useEffect(() => {
     loadVersions()
     setShowForm(false)
     setError('')
-  }, [clientId, toolName])
+  }, [loadVersions])
 
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -2752,7 +2752,7 @@ function AiMonitoringSubTab({ clientId }: { clientId: string }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     setError('')
     const res = await fetch(`/api/admin/clients/${clientId}/ai-tools`, { cache: 'no-store' })
@@ -2764,11 +2764,11 @@ function AiMonitoringSubTab({ clientId }: { clientId: string }) {
     }
     setOverview(body as AiToolsOverview)
     setLoading(false)
-  }
+  }, [clientId])
 
   useEffect(() => {
     load()
-  }, [clientId])
+  }, [load])
 
   if (loading) {
     return (
@@ -2863,7 +2863,9 @@ export default function ClientDetailPage() {
     router.replace(`/admin/clients/${id}?tab=${tabId}`)
   }
 
-  async function loadClientDetail() {
+  const loadClientDetail = useCallback(async () => {
+    if (!id) return
+
     setLoading(true)
     const res = await fetch(`/api/admin/clients/${id}`)
     if (!res.ok) {
@@ -2874,11 +2876,11 @@ export default function ClientDetailPage() {
     }
     setData(await res.json())
     setLoading(false)
-  }
+  }, [id])
 
   useEffect(() => {
-    if (id) loadClientDetail()
-  }, [id])
+    loadClientDetail()
+  }, [loadClientDetail])
 
   if (loading) {
     return (

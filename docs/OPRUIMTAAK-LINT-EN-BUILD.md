@@ -1,7 +1,7 @@
 # Opruimtaak: ESLint-configuratie & bestaande lintfouten
 **Versie:** 1.0
 **Datum:** 28 augustus 2026
-**Status:** Stap 1 en deterministische lintconfiguratie uitgevoerd; 5 `exhaustive-deps`-waarschuwingen blijven gecontroleerd open
+**Status:** Stap 1 en deterministische lintconfiguratie uitgevoerd; alle ESLint-waarschuwingen en -errors opgelost
 **Aanleiding:** ontdekt tijdens validatie van de Admin AI Workbench (zie `docs/ADMIN-AI-WORKBENCH-EN-UI-SIMPLIFICATIE.md`)
 
 ## 0. Wat er is gevonden
@@ -82,7 +82,7 @@ Na het pushen van de Stap 0-fix bleek dat "PR Quality & Security Gates" inderdaa
 
 **Uitgevoerd:** `useGalleryPromptAsRefinement` was geen Hook maar een klik-handler. De naam is gewijzigd naar `applyGalleryPromptAsRefinement`, zodat de React Hooks-linter de handler niet meer als Hook-invocatie binnen `onClick` behandelt. TypeScript en ESLint zijn daarna groen gevalideerd. De vier `react/no-unescaped-entities`-errors in de debugpagina zijn tegelijk mechanisch opgelost.
 
-**Aanvullend uitgevoerd:** `client-portal/.eslintrc.json` is toegevoegd met `next/core-web-vitals`, zodat lokale en CI-linting dezelfde non-interactieve configuratie gebruiken. De actuele run rapporteert alleen vijf bestaande `react-hooks/exhaustive-deps`-waarschuwingen in de admin-klantpagina; deze blijven open voor Stap 4, omdat dependency-wijzigingen daar mogelijk extra fetches veroorzaken.
+**Aanvullend uitgevoerd:** `client-portal/.eslintrc.json` is toegevoegd met `next/core-web-vitals`, zodat lokale en CI-linting dezelfde non-interactieve configuratie gebruiken. De vijf `react-hooks/exhaustive-deps`-waarschuwingen in de admin-klantpagina zijn opgelost met stabiele `useCallback`-loaders; refresh-callbacks blijven beschikbaar en er ontstaat geen extra fetch-loop.
 
 ### Stap 2 — Triviale, nul-risico fixes (batch)
 `prefer-const`, `no-unused-vars`, `no-unescaped-entities` — mechanisch, geen gedragswijziging. In één batch per map (`api/*` → Backend Specialist, overige pagina's/componenten → Frontend Developer).
