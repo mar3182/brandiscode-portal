@@ -1,6 +1,6 @@
 # Implementatieplan — Client Portal Uitbreidingen
 ## Brand is Code · Client Portal v2
-**Project:** `/Users/admin/Desktop/Leunis-makelaar/client-portal`  
+**Project:** `/Users/admin/Desktop/Brandiscode/client-portal`  
 **Status bijhouden:** vervang `[ ]` door `[x]` als een taak klaar is
 
 ---

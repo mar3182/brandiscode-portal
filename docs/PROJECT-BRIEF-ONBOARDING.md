@@ -79,7 +79,7 @@ Een professionele, geautomatiseerde onboarding flow bouwen voor nieuwe klanten v
 **Stack:** Next.js 14, TypeScript, Supabase, Tailwind CSS, Vercel  
 **Repo:** https://github.com/mar3182/brandiscode-portal  
 **Live:** https://portal.brandiscode.com  
-**Root in repo:** `Leunis-makelaar/client-portal/`
+**Root in repo:** `Brandiscode/client-portal/`
 
 **Bestaande relevante tabellen:**
 - `clients` — inclusief billing velden (contact_person, kvk_number, btw_number, iban, billing_address_line1/2, billing_postal_code, billing_city, billing_country, onboarding_completed_at)

@@ -18,7 +18,7 @@ argument-hint: "Beschrijf het backend probleem of de feature die je wil bouwen"
 - **Framework:** Next.js 14 (App Router) — API routes in `src/app/api/`
 - **Database:** Supabase (PostgreSQL + RLS)
 - **Auth:** Supabase Auth (`@supabase/ssr`)
-- **Deploy:** Vercel (root: `Leunis-makelaar/client-portal`)
+- **Deploy:** Vercel (root: `Brandiscode/client-portal`)
 - **CI/CD:** GitHub Actions (`.github/workflows/`)
 - **Repo:** https://github.com/mar3182/brandiscode-portal
 

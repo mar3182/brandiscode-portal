@@ -15,7 +15,7 @@ Je werkt als ontwikkelaar aan het **Brand is Code client portal** — een Next.j
   - Server components / API routes: `createClient()` uit `@/lib/supabase/server`
   - Client components: `createClient()` uit `@/lib/supabase/client`
   - Admin operaties (omzeil RLS): `createAdminClient()` uit `@/lib/supabase/admin`
-- **Deploy:** Vercel, root directory = `Leunis-makelaar/client-portal`
+- **Deploy:** Vercel, root directory = `Brandiscode/client-portal`
 - **Repo:** https://github.com/mar3182/brandiscode-portal (git root = `/Users/admin/Desktop`)
 - **Live URL:** https://portal.brandiscode.com
 
@@ -25,7 +25,7 @@ Je werkt als ontwikkelaar aan het **Brand is Code client portal** — een Next.j
 
 ```
 /Users/admin/Desktop/               ← git root
-  Leunis-makelaar/
+  Brandiscode/
     client-portal/                  ← Next.js app (Vercel root)
       src/
         app/                        ← App router pagina's
