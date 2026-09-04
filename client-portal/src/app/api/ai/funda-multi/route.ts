@@ -25,18 +25,18 @@ function normalizeImageDataUrl(value: string): string | null {
 }
 
 function getOpenAI(): OpenAI {
-  // OPENAI_API_KEY is preferred (more reliable)
-  if (process.env.OPENAI_API_KEY) {
-    return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  }
-  // Fallback to GitHub Models / Azure
+  // GITHUB_TOKEN is preferred (free credits)
   if (process.env.GITHUB_TOKEN) {
     return new OpenAI({
       apiKey: process.env.GITHUB_TOKEN,
       baseURL: 'https://models.inference.ai.azure.com',
     })
   }
-  throw new Error('Geen OPENAI_API_KEY of GITHUB_TOKEN geconfigureerd')
+  // Fallback to OpenAI direct
+  if (process.env.OPENAI_API_KEY) {
+    return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  }
+  throw new Error('Geen GITHUB_TOKEN of OPENAI_API_KEY geconfigureerd')
 }
 
 const SYSTEM_PROMPT = `Je bent een vastgoedcopywriter voor Leunis Makelaars op het eiland Tholen, Zeeland. Je schrijft content voor 4 media-kanalen tegelijk. Geef je antwoord als geldig JSON met PRECIES deze sleutels: "funda", "instagram", "facebook", "brochure".
