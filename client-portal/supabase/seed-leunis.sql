@@ -9,17 +9,22 @@ DECLARE
   v_sprint_id UUID;
 BEGIN
 
--- 1. Client aanmaken
-INSERT INTO clients (name, company, email, phone, sector_raw, sector)
+-- 1. Client aanmaken met slug
+INSERT INTO clients (name, company, email, phone, sector_raw, sector, slug)
 VALUES (
   'Arno Leunis & Henk Sturris',
   'Leunis Makelaars',
   'arno@leunismakelaars.nl',
   '+31 166 604 490',
   'makelaardij',
-  'real_estate'
+  'real_estate',
+  'leunis-makelaars' -- slug gegenereerd op basis van company name
 )
-ON CONFLICT (email) DO UPDATE SET company = EXCLUDED.company, sector_raw = EXCLUDED.sector_raw, sector = EXCLUDED.sector
+ON CONFLICT (email) DO UPDATE SET 
+  company = EXCLUDED.company, 
+  sector_raw = EXCLUDED.sector_raw, 
+  sector = EXCLUDED.sector,
+  slug = COALESCE(clients.slug, 'leunis-makelaars')
 RETURNING id INTO v_client_id;
 
 -- 2. Offerte aanmaken

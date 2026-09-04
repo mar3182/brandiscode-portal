@@ -3,17 +3,27 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
+import { usePathname, useParams } from 'next/navigation'
 import { LayoutDashboard, FileText, BarChart3, MessageSquare, LogOut, ShieldCheck, Users, ClipboardList, Receipt, Building2, Menu, X, Sparkles } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import type { Client } from '@/lib/types'
 
-export default function Sidebar() {
+interface SidebarProps {
+  client?: Client
+}
+
+export default function Sidebar({ client }: SidebarProps) {
   const pathname = usePathname()
+  const params = useParams()
+  const clientId = params?.clientId as string
   const supabase = createClient()
   const [openOnboardingCount, setOpenOnboardingCount] = useState(0)
   const [trainingEnabled, setTrainingEnabled] = useState(false)
   const [openFacturenCount, setOpenFacturenCount] = useState(0)
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  // Genereer klant-specifieke base path
+  const clientBasePath = clientId ? `/${clientId}` : ''
 
   useEffect(() => {
     async function loadOnboardingCount() {
@@ -62,23 +72,23 @@ export default function Sidebar() {
 
   const navigation = useMemo(() => {
     const items = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Offertes', href: '/dashboard/offertes', icon: FileText },
-    { name: 'Projectstatus', href: '/dashboard/projecten', icon: BarChart3 },
-    { name: 'Bedrijfsgegevens', href: '/dashboard/bedrijfsgegevens', icon: Building2 },
-    { name: 'Facturen', href: '/dashboard/facturen', icon: Receipt, badge: openFacturenCount, badgeClass: 'bg-red-500/20 text-red-300' },
-    { name: 'Funda-teksten', href: '/dashboard/funda-tekst', icon: Sparkles },
-    { name: 'Feedback', href: '/dashboard/feedback', icon: MessageSquare },
-    { name: 'Team', href: '/dashboard/team', icon: Users },
-    { name: 'Wachtwoord', href: '/dashboard/wachtwoord-wijzigen', icon: ShieldCheck },
+    { name: 'Dashboard', href: `${clientBasePath}/dashboard`, icon: LayoutDashboard },
+    { name: 'Offertes', href: `${clientBasePath}/dashboard/offertes`, icon: FileText },
+    { name: 'Projectstatus', href: `${clientBasePath}/dashboard/projecten`, icon: BarChart3 },
+    { name: 'Bedrijfsgegevens', href: `${clientBasePath}/dashboard/bedrijfsgegevens`, icon: Building2 },
+    { name: 'Facturen', href: `${clientBasePath}/dashboard/facturen`, icon: Receipt, badge: openFacturenCount, badgeClass: 'bg-red-500/20 text-red-300' },
+    { name: 'Funda-teksten', href: `${clientBasePath}/dashboard/funda-tekst`, icon: Sparkles },
+    { name: 'Feedback', href: `${clientBasePath}/dashboard/feedback`, icon: MessageSquare },
+    { name: 'Team', href: `${clientBasePath}/dashboard/team`, icon: Users },
+    { name: 'Wachtwoord', href: `${clientBasePath}/dashboard/wachtwoord-wijzigen`, icon: ShieldCheck },
     ] as Array<{ name: string; href: string; icon: React.ComponentType<{ className?: string }>; badge?: number; badgeClass?: string }>
 
     if (trainingEnabled) {
-      items.splice(3, 0, { name: 'Training Intake', href: '/dashboard/onboarding', icon: ClipboardList, badge: openOnboardingCount })
+      items.splice(3, 0, { name: 'Training Intake', href: `${clientBasePath}/dashboard/onboarding`, icon: ClipboardList, badge: openOnboardingCount })
     }
 
     return items
-  }, [openFacturenCount, openOnboardingCount, trainingEnabled])
+  }, [openFacturenCount, openOnboardingCount, trainingEnabled, clientBasePath])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
