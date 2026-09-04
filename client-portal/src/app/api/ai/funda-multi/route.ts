@@ -195,7 +195,17 @@ Geef je antwoord als JSON: { "funda": "...", "instagram": "...", "facebook": "..
     return NextResponse.json(parsed, { headers: { 'Cache-Control': 'no-store' } })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    console.error('funda-multi fout:', message)
+    const fullError = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+    console.error('❌ Funda-multi API error:', {
+      message: fullError,
+      provider,
+      hasOpenAIKey: !!process.env.OPENAI_API_KEY,
+      hasGitHubToken: !!process.env.GITHUB_TOKEN,
+    })
+    if (err instanceof Error && 'status' in err) {
+      console.error('OpenAI API status:', (err as any).status)
+      console.error('OpenAI API response:', (err as any).response?.data || (err as any).error)
+    }
     if (clientId) {
       await logAiUsage({ clientId, toolName: 'funda-multi', provider, model, status: 'error' })
     }
