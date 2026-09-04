@@ -7,19 +7,19 @@ import { resolveClientId, logAiUsage } from '@/lib/ai-usage'
 export const dynamic = 'force-dynamic'
 
 function getOpenAI(): OpenAI {
-  // GITHUB_TOKEN is preferred (free credits)
+  // OPENAI_API_KEY is preferred (has credits now)
   console.log('🔍 getOpenAI() called. GITHUB_TOKEN present:', !!process.env.GITHUB_TOKEN, 'OPENAI_API_KEY present:', !!process.env.OPENAI_API_KEY)
+  if (process.env.OPENAI_API_KEY) {
+    console.log('✅ Using OPENAI_API_KEY -> OpenAI direct')
+    return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  }
+  // Fallback to GitHub Models / Azure
   if (process.env.GITHUB_TOKEN) {
     console.log('✅ Using GITHUB_TOKEN -> Azure Models')
     return new OpenAI({
       apiKey: process.env.GITHUB_TOKEN,
       baseURL: 'https://models.inference.ai.azure.com',
     })
-  }
-  // Fallback to OpenAI direct
-  if (process.env.OPENAI_API_KEY) {
-    console.log('✅ Using OPENAI_API_KEY -> OpenAI direct')
-    return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   }
   console.error('❌ Neither GITHUB_TOKEN nor OPENAI_API_KEY available!')
   throw new Error('Geen GITHUB_TOKEN of OPENAI_API_KEY geconfigureerd')
