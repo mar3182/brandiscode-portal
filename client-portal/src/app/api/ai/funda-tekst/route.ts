@@ -72,6 +72,13 @@ export async function POST(req: NextRequest) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
+  if (!user?.email) {
+    return NextResponse.json(
+      { error: 'Niet ingelogd' },
+      { status: 401, headers: { 'Cache-Control': 'no-store' } }
+    )
+  }
+
   const provider = process.env.GITHUB_TOKEN ? 'github-models' : 'openai'
   const model = 'gpt-4o'
   let clientId: string | null = null

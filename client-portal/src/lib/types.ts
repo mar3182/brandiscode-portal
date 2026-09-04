@@ -44,6 +44,7 @@ export interface AiUsageEvent {
   output_tokens: number | null
   estimated_cost: number | null
   request_status: 'success' | 'error'
+  is_admin_test: boolean
   created_at: string
 }
 
@@ -120,6 +121,7 @@ export interface Client {
   sector: ClientSector | null
   sector_confidence: number | null
   intake_profile: Record<string, unknown> | null
+  slug: string | null
   onboarding_completed_at: string | null
   microsoft_subscription: MicrosoftSubscription | null
   software_inventory: string[] | null

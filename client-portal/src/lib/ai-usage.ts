@@ -64,6 +64,7 @@ export async function checkAiLimit(clientId: string): Promise<UsageStatus> {
     .select('id', { count: 'exact', head: true })
     .eq('client_id', clientId)
     .eq('request_status', 'success')
+    .eq('is_admin_test', false)
     .gte('created_at', startOfMonth.toISOString())
 
   const usedThisMonth = count ?? 0
