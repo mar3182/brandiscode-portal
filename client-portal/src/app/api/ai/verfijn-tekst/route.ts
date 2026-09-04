@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const openai = getOpenAI()
+    console.log(`🚀 Starting verfijn-tekst with provider: ${provider}`)
     const body: VerfijnRequest = await req.json()
 
     if (!body.tekst?.trim() || !body.instructie?.trim()) {

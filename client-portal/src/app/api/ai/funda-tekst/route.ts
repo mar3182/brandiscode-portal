@@ -100,6 +100,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const openai = getOpenAI()
+    const provider = process.env.GITHUB_TOKEN ? 'github-models' : 'openai'
+    console.log(`🚀 Starting funda-tekst with provider: ${provider}`)
     const body: FundaTekstRequest = await req.json()
     const promptAddition = sanitizePromptAddition(body.prompt_addition)
 

@@ -109,6 +109,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const openai = getOpenAI()
+    console.log(`🚀 Starting funda-multi with provider: ${provider}`)
     const body: FundaTekstRequest = await req.json()
     const promptAddition = sanitizePromptAddition(body.prompt_addition)
 
