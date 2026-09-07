@@ -50,13 +50,13 @@ export async function GET(
       .from('ai_usage_daily')
       .select('*')
       .eq('client_id', clientId)
-      .order('date', { ascending: false })
+      .order('usage_date', { ascending: false })
       .limit(30),
     admin
       .from('ai_usage_daily')
       .select('tokens_used')
       .eq('client_id', clientId)
-      .gte('date', startOfMonth.toISOString().split('T')[0]),
+      .gte('usage_date', startOfMonth.toISOString().split('T')[0]),
   ])
 
   if (toolsRes.error) return noStore({ error: toolsRes.error.message }, 500)

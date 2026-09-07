@@ -2419,7 +2419,7 @@ function AiOverviewSubTab({ clientId }: { clientId: string }) {
           <div className="space-y-1 max-h-[200px] overflow-y-auto">
             {recentUsage.slice(0, 10).map((usage: any, idx: number) => (
               <div key={idx} className="flex items-center justify-between text-xs">
-                <span className="text-white/50">{new Date(usage.date).toLocaleDateString('nl-NL')}</span>
+                <span className="text-white/50">{new Date(usage.usage_date).toLocaleDateString('nl-NL')}</span>
                 <span className="text-white/70">{(usage.tokens_used || 0).toLocaleString('nl-NL')} tokens</span>
               </div>
             ))}
