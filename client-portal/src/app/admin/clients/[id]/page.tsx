@@ -2258,10 +2258,11 @@ function AiSettingsTab({ clientId }: { clientId: string }) {
 
 // ── AI Tools: subnavigatie (Overzicht / Testen / Promptbeheer / Monitoring) ────
 
-type AiToolsSubTab = 'overzicht' | 'testen' | 'promptbeheer' | 'monitoring'
+type AiToolsSubTab = 'overzicht' | 'testen' | 'promptbeheer' | 'monitoring' | 'toegang'
 
 const AI_SUB_TABS: { id: AiToolsSubTab; label: string }[] = [
   { id: 'overzicht', label: 'Overzicht' },
+  { id: 'toegang', label: 'Toegang' },
   { id: 'testen', label: 'Testen' },
   { id: 'promptbeheer', label: 'Promptbeheer' },
   { id: 'monitoring', label: 'Monitoring' },
@@ -2300,7 +2301,7 @@ function AiToolsTab({ clientId }: { clientId: string }) {
         ))}
       </div>
 
-      {subTab !== 'overzicht' && (
+      {subTab !== 'overzicht' && subTab !== 'toegang' && (
         <div className="flex items-center gap-2 flex-wrap">
           <label htmlFor="ai-tool-select" className="text-xs text-white/50">Tool</label>
           <select
@@ -2317,6 +2318,7 @@ function AiToolsTab({ clientId }: { clientId: string }) {
       )}
 
       {subTab === 'overzicht' && <AiOverviewSubTab clientId={clientId} />}
+      {subTab === 'toegang' && <AiToolAccessSubTab clientId={clientId} />}
       {subTab === 'testen' && <AiTestSubTab clientId={clientId} toolName={toolName} />}
       {subTab === 'promptbeheer' && <AiPromptBeheerSubTab clientId={clientId} toolName={toolName} />}
       {subTab === 'monitoring' && <AiMonitoringSubTab clientId={clientId} />}
@@ -2741,6 +2743,306 @@ function AiPromptBeheerSubTab({ clientId, toolName }: { clientId: string; toolNa
               )}
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AiToolAccessSubTab({ clientId }: { clientId: string }) {
+  const [tools, setTools] = useState<any[]>([])
+  const [access, setAccess] = useState<Record<string, any>>({})
+  const [feedback, setFeedback] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [grantingToolId, setGrantingToolId] = useState<string | null>(null)
+  const [grantForm, setGrantForm] = useState({ access_type: 'testing', monthly_token_limit: 500000 })
+  const [respondingFeedbackId, setRespondingFeedbackId] = useState<string | null>(null)
+  const [responseText, setResponseText] = useState('')
+  const [savingResponse, setSavingResponse] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    loadData()
+  }, [clientId])
+
+  async function loadData() {
+    setLoading(true)
+    setError('')
+    try {
+      const [toolsRes, feedbackRes] = await Promise.all([
+        fetch('/api/admin/ai-tools'),
+        fetch(`/api/admin/clients/${clientId}/ai-tool-feedback`),
+      ])
+
+      if (!toolsRes.ok || !feedbackRes.ok) throw new Error('Failed to load data')
+
+      const toolsData = await toolsRes.json()
+      const feedbackData = await feedbackRes.json()
+
+      setTools(Array.isArray(toolsData.tools) ? toolsData.tools : toolsData)
+      setFeedback(Array.isArray(feedbackData.feedback) ? feedbackData.feedback : feedbackData)
+
+      // Load access records for each tool
+      const accessMap: Record<string, any> = {}
+      for (const tool of (Array.isArray(toolsData.tools) ? toolsData.tools : toolsData)) {
+        const accessRes = await fetch(`/api/admin/ai-tool-access?tool_id=${tool.id}`)
+        if (accessRes.ok) {
+          const accessData = await accessRes.json()
+          const clientAccess = Array.isArray(accessData.access)
+            ? accessData.access.filter((a: any) => a.client_id === clientId)
+            : []
+          accessMap[tool.id] = clientAccess
+        }
+      }
+      setAccess(accessMap)
+    } catch (err: any) {
+      setError(err.message || 'Failed to load AI tool data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleGrantAccess(toolId: string) {
+    if (!window.confirm('Toegang verlenen?')) return
+    try {
+      const res = await fetch('/api/admin/ai-tool-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tool_id: toolId,
+          client_id: clientId,
+          access_type: grantForm.access_type,
+          monthly_token_limit: grantForm.monthly_token_limit,
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to grant access')
+      setGrantingToolId(null)
+      setGrantForm({ access_type: 'testing', monthly_token_limit: 500000 })
+      await loadData()
+    } catch (err: any) {
+      alert('Fout: ' + (err.message || 'Kon toegang niet verlenen'))
+    }
+  }
+
+  async function handleRespondToFeedback(feedbackId: string) {
+    if (!responseText.trim()) {
+      alert('Voer een antwoord in')
+      return
+    }
+    setSavingResponse(prev => ({ ...prev, [feedbackId]: true }))
+    try {
+      const res = await fetch(`/api/admin/ai-tool-feedback`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          feedback_id: feedbackId,
+          admin_response: responseText,
+          status: 'acknowledged',
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to save response')
+      setRespondingFeedbackId(null)
+      setResponseText('')
+      await loadData()
+    } catch (err: any) {
+      alert('Fout: ' + (err.message || 'Kon antwoord niet opslaan'))
+    } finally {
+      setSavingResponse(prev => ({ ...prev, [feedbackId]: false }))
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="glass-card p-8 flex items-center justify-center gap-3 text-white/70">
+        <Loader2 className="w-5 h-5 animate-spin text-brand-gold" /> Toegang laden...
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="glass-card p-4 border border-red-500/40 bg-red-500/10 text-red-200 text-sm">
+        {error}
+      </div>
+    )
+  }
+
+  const feedbackSummary = {
+    total: feedback.length,
+    avg_rating: feedback.length > 0 ? Math.round((feedback.reduce((sum: number, f: any) => sum + (f.rating || 0), 0) / feedback.length) * 10) / 10 : 0,
+    new: feedback.filter((f: any) => f.status === 'new').length,
+    bugs: feedback.filter((f: any) => f.feedback_type === 'bug').length,
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* AI Tools Access Section */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-white">AI Testing Tools</h3>
+        <div className="grid grid-cols-1 gap-3">
+          {tools.map(tool => {
+            const toolAccess = access[tool.id] || []
+            const hasAccess = toolAccess.length > 0
+            return (
+              <div key={tool.id} className="bg-white/5 border border-white/10 rounded-xl p-4">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium text-white">{tool.name}</h4>
+                    <p className="text-xs text-white/40">{tool.slug}</p>
+                  </div>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    tool.status === 'development' ? 'bg-yellow-500/20 text-yellow-300' :
+                    tool.status === 'beta' ? 'bg-blue-500/20 text-blue-300' :
+                    'bg-green-500/20 text-green-300'
+                  }`}>
+                    {tool.status}
+                  </span>
+                </div>
+
+                {hasAccess ? (
+                  <div className="text-xs text-white/50 mb-2">
+                    ✓ Toegang verleend op {new Date(toolAccess[0].access_granted_at).toLocaleDateString('nl-NL')}
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => setGrantingToolId(tool.id)}
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-brand-orange text-white text-xs font-medium hover:bg-brand-orange/90"
+                    >
+                      <PlusCircle size={12} /> Toegang verlenen
+                    </button>
+
+                    {grantingToolId === tool.id && (
+                      <div className="mt-3 p-3 bg-white/5 border border-white/10 rounded-lg space-y-2">
+                        <div>
+                          <label className="text-xs text-white/50 block mb-1">Toegangstype</label>
+                          <select
+                            value={grantForm.access_type}
+                            onChange={(e) => setGrantForm(prev => ({ ...prev, access_type: e.target.value }))}
+                            className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded text-white text-xs"
+                          >
+                            <option value="testing">Testing</option>
+                            <option value="beta">Beta</option>
+                            <option value="production">Production</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-white/50 block mb-1">Maandelijkse tokenlimiet</label>
+                          <input
+                            type="number"
+                            value={grantForm.monthly_token_limit}
+                            onChange={(e) => setGrantForm(prev => ({ ...prev, monthly_token_limit: parseInt(e.target.value) || 0 }))}
+                            className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded text-white text-xs"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleGrantAccess(tool.id)}
+                            className="flex-1 px-2 py-1 bg-brand-orange text-white rounded text-xs font-medium hover:bg-brand-orange/90"
+                          >
+                            Verlenen
+                          </button>
+                          <button
+                            onClick={() => setGrantingToolId(null)}
+                            className="flex-1 px-2 py-1 bg-white/10 text-white rounded text-xs hover:bg-white/20"
+                          >
+                            Annuleer
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Feedback Section */}
+      {feedbackSummary.total > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-white">Feedback ({feedbackSummary.total})</h3>
+            <div className="flex gap-3 text-xs">
+              <span className="text-white/50">⭐ Gem: <span className="text-white">{feedbackSummary.avg_rating}</span></span>
+              {feedbackSummary.new > 0 && <span className="text-yellow-300">🆕 {feedbackSummary.new}</span>}
+              {feedbackSummary.bugs > 0 && <span className="text-red-300">🐛 {feedbackSummary.bugs}</span>}
+            </div>
+          </div>
+          <div className="space-y-2">
+            {feedback.map(f => (
+              <div key={f.id} className="bg-white/5 border border-white/10 rounded-xl p-3 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-white/40">{f.tool_id}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${
+                        f.feedback_type === 'bug' ? 'bg-red-500/20 text-red-300' :
+                        f.feedback_type === 'feature-request' ? 'bg-blue-500/20 text-blue-300' :
+                        'bg-yellow-500/20 text-yellow-300'
+                      }`}>
+                        {f.feedback_type}
+                      </span>
+                      <span className="text-xs text-yellow-400">{'⭐'.repeat(f.rating || 0)}</span>
+                    </div>
+                    <p className="text-xs text-white/70 mt-1">{f.comment}</p>
+                  </div>
+                  <span className={`text-xs px-1.5 py-0.5 rounded whitespace-nowrap ${
+                    f.status === 'new' ? 'bg-white/10 text-white' :
+                    f.status === 'fixed' ? 'bg-green-500/20 text-green-300' :
+                    'bg-yellow-500/20 text-yellow-300'
+                  }`}>
+                    {f.status}
+                  </span>
+                </div>
+
+                {respondingFeedbackId === f.id ? (
+                  <div className="pt-2 border-t border-white/10 space-y-2">
+                    <textarea
+                      value={responseText}
+                      onChange={(e) => setResponseText(e.target.value)}
+                      placeholder="Antwoord..."
+                      className="w-full px-2 py-1 text-xs bg-white/5 border border-white/10 rounded text-white placeholder:text-white/30"
+                      rows={2}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleRespondToFeedback(f.id)}
+                        disabled={savingResponse[f.id]}
+                        className="flex-1 px-2 py-1 bg-brand-orange text-white rounded text-xs font-medium disabled:opacity-60"
+                      >
+                        {savingResponse[f.id] ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'Antwoord'}
+                      </button>
+                      <button
+                        onClick={() => { setRespondingFeedbackId(null); setResponseText(''); }}
+                        className="flex-1 px-2 py-1 bg-white/10 text-white rounded text-xs hover:bg-white/20"
+                      >
+                        Annuleer
+                      </button>
+                    </div>
+                  </div>
+                ) : f.admin_response ? (
+                  <div className="pt-2 border-t border-white/10 bg-brand-orange/10 p-2 rounded text-xs text-white/80 italic">
+                    Admin: {f.admin_response}
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setRespondingFeedbackId(f.id); setResponseText(''); }}
+                    className="text-xs text-brand-orange hover:text-brand-orange/80 font-medium pt-2 border-t border-white/10 w-full text-left"
+                  >
+                    → Antwoorden
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {feedbackSummary.total === 0 && (
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center text-white/40 text-sm">
+          Geen feedback ontvangen
         </div>
       )}
     </div>
