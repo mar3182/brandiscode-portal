@@ -2327,7 +2327,7 @@ function AiToolsTab({ clientId }: { clientId: string }) {
 }
 
 function AiOverviewSubTab({ clientId }: { clientId: string }) {
-  const [overview, setOverview] = useState<AiToolsOverview | null>(null)
+  const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -2341,7 +2341,7 @@ function AiOverviewSubTab({ clientId }: { clientId: string }) {
       setLoading(false)
       return
     }
-    setOverview(body as AiToolsOverview)
+    setData(body)
     setLoading(false)
   }, [clientId])
 
@@ -2357,7 +2357,7 @@ function AiOverviewSubTab({ clientId }: { clientId: string }) {
     )
   }
 
-  if (error || !overview) {
+  if (error || !data) {
     return (
       <div className="glass-card p-4 border border-red-500/40 bg-red-500/10 text-red-200 text-sm">
         {error || 'Geen data beschikbaar.'}
@@ -2365,53 +2365,67 @@ function AiOverviewSubTab({ clientId }: { clientId: string }) {
     )
   }
 
-  const modeLabel = overview.settings
-    ? AI_MODE_OPTIONS.find((o) => o.value === overview.settings!.ai_mode)?.label ?? overview.settings.ai_mode
-    : null
-  const providerLabel = overview.settings
-    ? AI_PROVIDER_OPTIONS.find((o) => o.value === overview.settings!.provider)?.label ?? overview.settings.provider
-    : null
+  const tools = data.tools ?? []
+  const accessedTools = tools.filter((t: any) => t.has_access)
+  const tokensThisMonth = data.tokens_this_month ?? 0
+  const recentUsage = data.recent_usage ?? []
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard title="Kosten deze maand" value={fmt(overview.cost_this_month)} icon={Euro} variant="accent" />
+        <StatCard title="Tokens deze maand" value={tokensThisMonth.toLocaleString('nl-NL')} icon={FlaskConical} variant="accent" />
         <StatCard
-          title="Actieve promptversies"
-          value={overview.active_prompt_versions.length}
-          subtitle="per tool"
-          icon={ListChecks}
+          title="Tools met toegang"
+          value={accessedTools.length}
+          subtitle={`van ${tools.length}`}
+          icon={Sparkles}
         />
         <StatCard
           title="Recent gebruik"
-          value={overview.recent_usage.length}
-          subtitle="laatste runs (excl. testruns)"
+          value={recentUsage.length}
+          subtitle="dagen met gebruik"
           icon={History}
         />
       </div>
 
-      {overview.settings && (
-        <div className="glass-card p-4 md:p-6 flex flex-wrap gap-x-6 gap-y-2 text-sm">
-          <span className="text-white/50">AI-modus: <span className="text-white">{modeLabel}</span></span>
-          <span className="text-white/50">Provider: <span className="text-white">{providerLabel}</span></span>
-        </div>
-      )}
-
-      {overview.active_prompt_versions.length > 0 && (
+      {tools.length > 0 && (
         <div className="glass-card p-4 md:p-6">
-          <h3 className="text-sm font-semibold text-white mb-3">Actieve promptversies per tool</h3>
+          <h3 className="text-sm font-semibold text-white mb-3">AI Testing Tools Status</h3>
           <div className="space-y-2">
-            {overview.active_prompt_versions.map((v) => (
-              <div key={v.id} className="flex items-center justify-between gap-3 text-sm">
-                <span className="text-white/70">{v.tool_name}</span>
-                <span className="status-badge status-positive">v{v.version_number}</span>
+            {tools.map((tool: any) => (
+              <div key={tool.id} className="flex items-center justify-between gap-3 text-sm">
+                <div className="flex-1">
+                  <span className="text-white/70">{tool.name}</span>
+                  <span className="text-xs text-white/40 ml-2">({tool.slug})</span>
+                </div>
+                {tool.has_access ? (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-300">
+                    ✓ Toegang
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-white/10 text-white/50">
+                    Geen toegang
+                  </span>
+                )}
               </div>
             ))}
           </div>
         </div>
       )}
 
-      <AiSettingsTab clientId={clientId} />
+      {recentUsage.length > 0 && (
+        <div className="glass-card p-4 md:p-6">
+          <h3 className="text-sm font-semibold text-white mb-3">Recent Gebruik (30 dagen)</h3>
+          <div className="space-y-1 max-h-[200px] overflow-y-auto">
+            {recentUsage.slice(0, 10).map((usage: any, idx: number) => (
+              <div key={idx} className="flex items-center justify-between text-xs">
+                <span className="text-white/50">{new Date(usage.date).toLocaleDateString('nl-NL')}</span>
+                <span className="text-white/70">{(usage.tokens_used || 0).toLocaleString('nl-NL')} tokens</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,12 +1,10 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-import type { AiPromptVersion, AiUsageEvent, ClientAiSettings } from '@/lib/types'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const
-const RECENT_USAGE_LIMIT = 20
 
 function noStore(payload: unknown, status = 200) {
   return NextResponse.json(payload, { status, headers: NO_STORE_HEADERS })
@@ -19,7 +17,7 @@ async function checkAdmin() {
   return user
 }
 
-/** GET /api/admin/clients/[id]/ai-tools — overzicht: instellingen, actieve promptversies, recent gebruik, kosten deze maand */
+/** GET /api/admin/clients/[id]/ai-tools — overzicht: tools, toegang, recent gebruik, kosten deze maand */
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -30,6 +28,7 @@ export async function GET(
   const clientId = params.id
   const admin = createAdminClient()
 
+  // Verify client exists
   const { data: client, error: clientError } = await admin
     .from('clients')
     .select('id')
@@ -43,44 +42,53 @@ export async function GET(
   startOfMonth.setDate(1)
   startOfMonth.setHours(0, 0, 0, 0)
 
-  const [settingsRes, promptVersionsRes, recentUsageRes, monthUsageRes] = await Promise.all([
-    admin.from('client_ai_settings').select('*').eq('client_id', clientId).maybeSingle(),
+  // Fetch all AI tools, access records, and usage data
+  const [toolsRes, accessRes, recentUsageRes, monthUsageRes] = await Promise.all([
+    admin.from('ai_tools').select('*').order('name'),
+    admin.from('ai_tool_access').select('*').eq('client_id', clientId),
     admin
-      .from('ai_prompt_versions')
+      .from('ai_usage_daily')
       .select('*')
       .eq('client_id', clientId)
-      .eq('is_active', true)
-      .order('tool_name', { ascending: true }),
+      .order('date', { ascending: false })
+      .limit(30),
     admin
-      .from('ai_usage_events')
-      .select('*')
+      .from('ai_usage_daily')
+      .select('tokens_used')
       .eq('client_id', clientId)
-      .eq('is_admin_test', false)
-      .order('created_at', { ascending: false })
-      .limit(RECENT_USAGE_LIMIT),
-    admin
-      .from('ai_usage_events')
-      .select('estimated_cost')
-      .eq('client_id', clientId)
-      .eq('is_admin_test', false)
-      .gte('created_at', startOfMonth.toISOString()),
+      .gte('date', startOfMonth.toISOString().split('T')[0]),
   ])
 
-  if (settingsRes.error) return noStore({ error: settingsRes.error.message }, 500)
-  if (promptVersionsRes.error) return noStore({ error: promptVersionsRes.error.message }, 500)
+  if (toolsRes.error) return noStore({ error: toolsRes.error.message }, 500)
+  if (accessRes.error) return noStore({ error: accessRes.error.message }, 500)
   if (recentUsageRes.error) return noStore({ error: recentUsageRes.error.message }, 500)
   if (monthUsageRes.error) return noStore({ error: monthUsageRes.error.message }, 500)
 
-  const costThisMonth = ((monthUsageRes.data ?? []) as { estimated_cost: number | null }[]).reduce(
-    (sum, row) => sum + (row.estimated_cost ?? 0),
-    0
-  )
+  const tools = toolsRes.data ?? []
+  const access = accessRes.data ?? []
+  const recentUsage = recentUsageRes.data ?? []
+  const monthUsage = monthUsageRes.data ?? []
+
+  // Calculate monthly tokens
+  const tokensThisMonth = monthUsage.reduce((sum, row) => sum + (row.tokens_used || 0), 0)
+
+  // Build tools with access info
+  const toolsWithAccess = tools.map(tool => {
+    const toolAccess = access.find((a: any) => a.tool_id === tool.id)
+    return {
+      ...tool,
+      has_access: !!toolAccess,
+      access_type: toolAccess?.access_type || null,
+      access_granted_at: toolAccess?.access_granted_at || null,
+      monthly_token_limit: toolAccess?.monthly_token_limit || null,
+    }
+  })
 
   return noStore({
-    settings: (settingsRes.data as ClientAiSettings | null) ?? null,
-    active_prompt_versions: (promptVersionsRes.data ?? []) as AiPromptVersion[],
-    recent_usage: (recentUsageRes.data ?? []) as AiUsageEvent[],
-    cost_this_month: costThisMonth,
+    tools: toolsWithAccess,
+    access_records: access,
+    recent_usage: recentUsage,
+    tokens_this_month: tokensThisMonth,
   })
 }
 
