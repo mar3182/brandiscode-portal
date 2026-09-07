@@ -203,6 +203,10 @@ Informatieve cards, geen invulvelden:
 | **Login debugging & admin routing fix**   | PM    | ✅ Klaar       | Commit 7f9beb3 (error logging), 29dfc88 (diagnostic), 66897af (root routing) |
 | Testen end-to-end met echte klant         | PM    | ⏳ In progress | Login ✅ → Admin ✅ → Test onboarding wizard                                   |
 | Supabase migration uitgevoerd             | PM    | ✅ Klaar       | `migration-client-profile.sql` + Adobe Sign                                  |
+| **AI provider switcher (admin UI)**       | PM    | ✅ Klaar       | Added to AiToolAccessSubTab; supports OpenAI, Azure, Anthropic, GitHub       |
+| **AI provider API endpoint**              | PM    | ✅ Klaar       | POST `/api/admin/clients/[id]/ai-provider` upserts ClientAiSettings          |
+| **Woningbeschrijving tool seed**          | PM    | ✅ Klaar       | Migration creates tool, grants access to Leunis, 500k token limit            |
+| **Client AI tools dashboard**             | PM    | ✅ Klaar       | New page `/dashboard/ai-tools` shows available tools with links              |
 
 ---
 
