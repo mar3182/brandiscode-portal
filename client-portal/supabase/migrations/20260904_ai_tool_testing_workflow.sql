@@ -145,7 +145,7 @@ CREATE TABLE ai_billing (
 -- ============================================================================
 CREATE INDEX idx_ai_tool_access_tool_id ON ai_tool_access(tool_id);
 CREATE INDEX idx_ai_tool_access_client_id ON ai_tool_access(client_id);
-CREATE INDEX idx_ai_tool_access_status ON ai_tool_access(status) WHERE access_revoked_at IS NULL;
+CREATE INDEX idx_ai_tool_access_access_type ON ai_tool_access(access_type) WHERE access_revoked_at IS NULL;
 CREATE INDEX idx_ai_evals_tool_id ON ai_evals(tool_id);
 CREATE INDEX idx_ai_evals_status ON ai_evals(status);
 CREATE INDEX idx_ai_eval_results_eval_id ON ai_eval_results(eval_id);
