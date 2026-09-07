@@ -455,3 +455,122 @@ export interface OfferteWithSprints extends Offerte {
 export interface SprintWithDeliverables extends Sprint {
   deliverables: Deliverable[]
 }
+
+// --- AI Tool Testing Workflow ---
+export type AiToolStatus = 'development' | 'beta' | 'production' | 'archived'
+export type AiAccessType = 'testing' | 'beta' | 'production'
+export type AiEvalType = 'quality' | 'performance' | 'user-experience' | 'accuracy'
+export type AiFeedbackType = 'bug' | 'feature-request' | 'quality' | 'performance' | 'ux'
+export type AiFeedbackStatus = 'new' | 'reviewed' | 'acknowledged' | 'fixed' | 'wontfix'
+export type AiBillingStatus = 'pending' | 'sent' | 'paid' | 'overdue' | 'cancelled'
+
+export interface AiTool {
+  id: string
+  slug: string
+  name: string
+  description: string | null
+  version: string
+  status: AiToolStatus
+  readiness_percentage: number
+  readiness_notes: string | null
+  created_by: string | null
+  created_at: string
+  published_at: string | null
+  updated_at: string
+}
+
+export interface AiToolAccess {
+  id: string
+  tool_id: string
+  client_id: string
+  access_type: AiAccessType
+  monthly_token_limit: number
+  token_reset_day: number
+  token_reset_date: string
+  access_granted_at: string
+  access_revoked_at: string | null
+  reason_for_access: string | null
+  created_by: string | null
+  admin_notes: string | null
+}
+
+export interface AiEval {
+  id: string
+  tool_id: string
+  eval_name: string
+  eval_type: AiEvalType
+  description: string | null
+  status: 'draft' | 'active' | 'completed' | 'archived'
+  total_samples: number
+  passed_samples: number
+  avg_score: number
+  pass_rate: number
+  feedback_summary: string | null
+  created_by: string | null
+  created_at: string
+  completed_at: string | null
+}
+
+export interface AiEvalResult {
+  id: string
+  eval_id: string
+  input_json: Record<string, unknown>
+  expected_output: string
+  actual_output: string | null
+  score: number | null
+  passed: boolean
+  evaluator_comment: string | null
+  created_at: string
+}
+
+export interface AiToolFeedback {
+  id: string
+  tool_id: string
+  client_id: string
+  feedback_type: AiFeedbackType
+  rating: number
+  comment: string
+  screenshot_url: string | null
+  generated_text_sample: string | null
+  input_sample: string | null
+  status: AiFeedbackStatus
+  admin_response: string | null
+  admin_response_at: string | null
+  created_by: string | null
+  created_at: string
+}
+
+export interface AiBilling {
+  id: string
+  client_id: string
+  tool_id: string
+  access_id: string | null
+  billing_period_start: string
+  billing_period_end: string
+  monthly_token_limit: number
+  tokens_used: number
+  overage_tokens: number
+  base_price_eur: number
+  overage_price_per_1k_tokens: number
+  overage_cost_eur: number
+  total_cost_eur: number
+  invoice_number: string
+  invoice_generated_at: string | null
+  invoice_pdf_url: string | null
+  invoice_emailed_at: string | null
+  payment_status: AiBillingStatus
+  payment_date: string | null
+  triggered_by: string | null
+  triggered_at: string | null
+  admin_notes: string | null
+  created_at: string
+}
+
+export interface AiUsageDaily {
+  id: string
+  client_id: string
+  tool_id: string
+  usage_date: string
+  tokens_used: number
+  request_count: number
+}
