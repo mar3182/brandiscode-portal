@@ -2774,6 +2774,8 @@ function AiToolAccessSubTab({ clientId }: { clientId: string }) {
   const [respondingFeedbackId, setRespondingFeedbackId] = useState<string | null>(null)
   const [responseText, setResponseText] = useState('')
   const [savingResponse, setSavingResponse] = useState<Record<string, boolean>>({})
+  const [selectedProvider, setSelectedProvider] = useState<string>('openai')
+  const [savingProvider, setSavingProvider] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     loadData()
@@ -2835,6 +2837,30 @@ function AiToolAccessSubTab({ clientId }: { clientId: string }) {
       await loadData()
     } catch (err: any) {
       alert('Fout: ' + (err.message || 'Kon toegang niet verlenen'))
+    }
+  }
+
+  async function handleUpdateProvider(toolId: string, newProvider: string) {
+    setSavingProvider(prev => ({ ...prev, [toolId]: true }))
+    try {
+      const res = await fetch(`/api/admin/clients/${clientId}/ai-provider`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tool_id: toolId,
+          provider: newProvider,
+        }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || 'Failed to update provider')
+      }
+      setSelectedProvider(newProvider)
+      await loadData()
+    } catch (err: any) {
+      alert('Fout: ' + (err.message || 'Kon provider niet opslaan'))
+    } finally {
+      setSavingProvider(prev => ({ ...prev, [toolId]: false }))
     }
   }
 
@@ -2914,8 +2940,32 @@ function AiToolAccessSubTab({ clientId }: { clientId: string }) {
                 </div>
 
                 {hasAccess ? (
-                  <div className="text-xs text-white/50 mb-2">
-                    ✓ Toegang verleend op {new Date(toolAccess[0].access_granted_at).toLocaleDateString('nl-NL')}
+                  <div className="text-xs text-white/50 mb-2 space-y-3">
+                    <div>✓ Toegang verleend op {new Date(toolAccess[0].access_granted_at).toLocaleDateString('nl-NL')}</div>
+                    
+                    {/* AI Provider Selector */}
+                    <div className="bg-white/5 border border-white/10 rounded-lg p-3 space-y-2">
+                      <label htmlFor={`provider-${tool.id}`} className="text-xs text-white/50 block">
+                        AI Model Provider
+                      </label>
+                      <select
+                        id={`provider-${tool.id}`}
+                        onChange={(e) => handleUpdateProvider(tool.id, e.target.value)}
+                        disabled={savingProvider[tool.id]}
+                        defaultValue={selectedProvider}
+                        className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-brand-orange/50 disabled:opacity-60"
+                      >
+                        <option value="openai">OpenAI (GPT-4o, GPT-4 Turbo)</option>
+                        <option value="azure-openai">Azure OpenAI</option>
+                        <option value="anthropic">Anthropic (Claude)</option>
+                        <option value="github-models">GitHub Models</option>
+                      </select>
+                      {savingProvider[tool.id] && (
+                        <div className="text-xs text-brand-orange flex items-center gap-1">
+                          <Loader2 className="w-3 h-3 animate-spin" /> Opslaan...
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <>
