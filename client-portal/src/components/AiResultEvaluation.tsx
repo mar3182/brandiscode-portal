@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Check, Loader2, Send } from 'lucide-react'
 import type { MediaFormat } from '@/lib/types'
 
@@ -23,7 +23,6 @@ const CRITERIA: Array<{ key: ScoreField; label: string }> = [
 ]
 
 export default function AiResultEvaluation({ format, generationKey, text, inputSample }: Props) {
-  const [toolId, setToolId] = useState('')
   const [scores, setScores] = useState<Partial<Record<ScoreField, number>>>({})
   const [comment, setComment] = useState('')
   const [showComment, setShowComment] = useState(false)
@@ -31,18 +30,8 @@ export default function AiResultEvaluation({ format, generationKey, text, inputS
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    fetch('/api/client/ai-tools')
-      .then((response) => response.ok ? response.json() : null)
-      .then((data: { tools?: Array<{ id: string; slug: string }> } | null) => {
-        const tool = data?.tools?.find((item) => item.slug === 'funda-tekst')
-        if (tool) setToolId(tool.id)
-      })
-      .catch(() => setError('De evaluatie kan momenteel niet worden geladen.'))
-  }, [])
-
   async function submit() {
-    if (!toolId || CRITERIA.some(({ key }) => !scores[key])) {
+    if (CRITERIA.some(({ key }) => !scores[key])) {
       setError('Geef voor elk criterium een cijfer van 1 tot 5.')
       return
     }
@@ -54,7 +43,7 @@ export default function AiResultEvaluation({ format, generationKey, text, inputS
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tool_id: toolId,
+          tool_slug: 'funda-tekst',
           generation_key: generationKey,
           result_format: format,
           ...scores,
@@ -120,11 +109,11 @@ export default function AiResultEvaluation({ format, generationKey, text, inputS
         <button
           type="button"
           onClick={() => void submit()}
-          disabled={submitting || !toolId}
+          disabled={submitting}
           className="inline-flex items-center gap-2 rounded-lg bg-brand-blue/20 px-4 py-2 text-xs font-medium text-brand-blue border border-brand-blue/30 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-          Evaluatie opslaan
+          Evaluatie versturen
         </button>
       </div>
     </div>

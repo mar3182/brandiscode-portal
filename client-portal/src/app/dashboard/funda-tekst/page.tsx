@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { Sparkles, Loader2, Copy, Check, RotateCcw, Upload, X, Pen, AlertTriangle, Info } from 'lucide-react'
 import type { FundaTekstRequest, FundaTekstResponse, FundaMultiResponse, MediaFormat } from '@/lib/types'
 import AiResultEvaluation from '@/components/AiResultEvaluation'
+import AiTextCheck from '@/components/AiTextCheck'
 
 const INPUT_CLASS =
   'w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-brand-blue/50 transition-all'
@@ -247,6 +248,7 @@ export default function FundaTekstPage() {
   const [promptNotice, setPromptNotice] = useState('')
   const [applyVerfijnToFuture, setApplyVerfijnToFuture] = useState(false)
   const [showRelevantOnly, setShowRelevantOnly] = useState(false)
+  const [galleryStatusFilter, setGalleryStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const lastRequestRef = useRef<FundaTekstRequest | null>(null)
   const [generationKey, setGenerationKey] = useState('')
   const [usageData, setUsageData] = useState<{ usedThisMonth: number; limit: number | null; percentUsed: number | null } | null>(null)
@@ -318,6 +320,11 @@ export default function FundaTekstPage() {
       setImageNames(body.images.map((_, index) => `Fictieve AI-woning ${index + 1}`))
       setImageError('')
       setApiError('')
+      const usageResponse = await fetch('/api/ai/usage', { cache: 'no-store' })
+      if (usageResponse.ok) {
+        const usage = await usageResponse.json() as { usedThisMonth: number; limit: number | null; percentUsed: number | null }
+        setUsageData(usage)
+      }
     } catch (error) {
       setSyntheticError(error instanceof Error ? error.message : 'De fictieve testwoning kon niet worden gegenereerd.')
     } finally {
@@ -457,6 +464,12 @@ export default function FundaTekstPage() {
   const visibleGalleryItems = showRelevantOnly
     ? sortedGalleryItems.filter((item) => scoreGalleryItem(item) > 0)
     : sortedGalleryItems
+  const statusFilteredGalleryItems = visibleGalleryItems.filter((item) => {
+    const state = getGalleryPromptState(item.prompt)
+    return galleryStatusFilter === 'all'
+      || (galleryStatusFilter === 'active' && state === 'active')
+      || (galleryStatusFilter === 'inactive' && state !== 'active')
+  })
 
   function togglePromptExtension(id: string) {
     setPromptExtensions((prev) =>
@@ -1432,19 +1445,38 @@ export default function FundaTekstPage() {
               <span className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-white/50">Niet toegevoegd = nog niet opgeslagen</span>
             </div>
 
-            <label className="inline-flex items-center gap-2 mb-4 text-xs text-white/65">
-              <input
-                type="checkbox"
-                checked={showRelevantOnly}
-                onChange={(e) => setShowRelevantOnly(e.target.checked)}
-                className="rounded border-white/20 bg-white/5 text-brand-blue focus:ring-brand-blue/40"
-              />
-              Alleen relevante prompts tonen
-            </label>
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              {([
+                ['all', 'Alle prompts'],
+                ['active', 'Actief'],
+                ['inactive', 'Niet actief'],
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setGalleryStatusFilter(value)}
+                  className={`rounded-full border px-3 py-1.5 text-xs transition-all ${galleryStatusFilter === value ? 'border-brand-blue/50 bg-brand-blue/20 text-brand-blue' : 'border-white/10 bg-white/5 text-white/50 hover:text-white/80'}`}
+                >
+                  {label}{value === 'active' ? ` (${promptExtensions.filter((item) => item.enabled && PROMPT_GALLERY_ITEMS.some((galleryItem) => galleryItem.prompt.toLowerCase() === item.text.toLowerCase())).length})` : ''}
+                </button>
+              ))}
+              <label className="ml-auto inline-flex items-center gap-2 text-xs text-white/55">
+                <input
+                  type="checkbox"
+                  checked={showRelevantOnly}
+                  onChange={(e) => setShowRelevantOnly(e.target.checked)}
+                  className="rounded border-white/20 bg-white/5 text-brand-blue focus:ring-brand-blue/40"
+                />
+                Alleen relevante
+              </label>
+            </div>
 
             <div className="space-y-3">
-              {visibleGalleryItems.map((item) => (
-                <div key={item.id} className="p-3 rounded-xl bg-white/5 border border-white/10">
+              {statusFilteredGalleryItems.map((item) => {
+                const state = getGalleryPromptState(item.prompt)
+                const isActive = state === 'active'
+                return (
+                <div key={item.id} className={`p-3 rounded-xl border ${isActive ? 'border-green-400/30 bg-green-500/5' : 'border-white/10 bg-white/5'}`}>
                   {(() => {
                     const state = getGalleryPromptState(item.prompt)
                     const stateLabel = state === 'active' ? 'Actief' : state === 'inactive' ? 'Inactief' : 'Niet toegevoegd'
@@ -1478,15 +1510,15 @@ export default function FundaTekstPage() {
                       onClick={() => applyGalleryPromptAsRefinement(item.prompt)}
                       className="px-3 py-1.5 rounded-lg bg-brand-blue/20 border border-brand-blue/40 text-brand-blue text-xs font-medium hover:bg-brand-blue/30 transition-all"
                     >
-                      Gebruik nu
+                      Gebruik alleen voor deze tekst
                     </button>
-                    {getGalleryPromptState(item.prompt) === 'active' ? (
+                    {isActive ? (
                       <button
                         type="button"
-                        onClick={() => toggleGalleryPrompt(item.prompt)}
-                        className="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-400/30 text-amber-300 text-xs font-medium hover:bg-amber-500/20 transition-all"
+                        disabled
+                        className="cursor-default px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-400/30 text-green-300 text-xs font-medium"
                       >
-                        Deactiveer prompt
+                        Actief
                       </button>
                     ) : (
                       <button
@@ -1499,9 +1531,10 @@ export default function FundaTekstPage() {
                     )}
                   </div>
                 </div>
-              ))}
+                )
+              })}
 
-              {visibleGalleryItems.length === 0 && (
+              {statusFilteredGalleryItems.length === 0 && (
                 <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-xs text-white/55">
                   Geen prompts gevonden die matchen met de huidige woningselectie. Zet de filter uit om alle prompts te bekijken.
                 </div>
@@ -1616,6 +1649,13 @@ export default function FundaTekstPage() {
                   inputSample={JSON.stringify(lastRequestRef.current ?? {})}
                 />
               )}
+              {generationKey && (
+                <AiTextCheck
+                  format="funda"
+                  text={result.tekst}
+                  inputSample={JSON.stringify(lastRequestRef.current ?? {})}
+                />
+              )}
               {/* Verfijn */}
               <div className="mt-4 pt-4 border-t border-white/10">
                 {verfijnSuccess && (
@@ -1712,8 +1752,17 @@ export default function FundaTekstPage() {
               </div>
               {generationKey && (
                 <AiResultEvaluation
+                  key={`${generationKey}-${activeTab}-evaluation`}
                   format={activeTab}
                   generationKey={generationKey}
+                  text={multiResult[activeTab]}
+                  inputSample={JSON.stringify(lastRequestRef.current ?? {})}
+                />
+              )}
+              {generationKey && (
+                <AiTextCheck
+                  key={`${generationKey}-${activeTab}-check`}
+                  format={activeTab}
                   text={multiResult[activeTab]}
                   inputSample={JSON.stringify(lastRequestRef.current ?? {})}
                 />

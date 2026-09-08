@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { Sparkles, Loader2, Copy, Check, RotateCcw, Upload, X, Pen, AlertTriangle, Info } from 'lucide-react'
 import type { FundaTekstRequest, FundaTekstResponse, FundaMultiResponse, MediaFormat } from '@/lib/types'
 import AiResultEvaluation from '@/components/AiResultEvaluation'
+import AiTextCheck from '@/components/AiTextCheck'
 
 const INPUT_CLASS =
   'w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-brand-blue/50 transition-all'
@@ -318,6 +319,11 @@ export default function FundaTekstPage() {
       setImageNames(body.images.map((_, index) => `Fictieve AI-woning ${index + 1}`))
       setImageError('')
       setApiError('')
+      const usageResponse = await fetch('/api/ai/usage', { cache: 'no-store' })
+      if (usageResponse.ok) {
+        const usage = await usageResponse.json() as { usedThisMonth: number; limit: number | null; percentUsed: number | null }
+        setUsageData(usage)
+      }
     } catch (error) {
       setSyntheticError(error instanceof Error ? error.message : 'De fictieve testwoning kon niet worden gegenereerd.')
     } finally {
@@ -1566,6 +1572,13 @@ export default function FundaTekstPage() {
                   inputSample={JSON.stringify(lastRequestRef.current ?? {})}
                 />
               )}
+              {generationKey && (
+                <AiTextCheck
+                  format="funda"
+                  text={result.tekst}
+                  inputSample={JSON.stringify(lastRequestRef.current ?? {})}
+                />
+              )}
               {/* Verfijn */}
               <div className="mt-4 pt-4 border-t border-white/10">
                 {verfijnSuccess && (
@@ -1662,8 +1675,17 @@ export default function FundaTekstPage() {
               </div>
               {generationKey && (
                 <AiResultEvaluation
+                  key={`${generationKey}-${activeTab}-evaluation`}
                   format={activeTab}
                   generationKey={generationKey}
+                  text={multiResult[activeTab]}
+                  inputSample={JSON.stringify(lastRequestRef.current ?? {})}
+                />
+              )}
+              {generationKey && (
+                <AiTextCheck
+                  key={`${generationKey}-${activeTab}-check`}
+                  format={activeTab}
                   text={multiResult[activeTab]}
                   inputSample={JSON.stringify(lastRequestRef.current ?? {})}
                 />

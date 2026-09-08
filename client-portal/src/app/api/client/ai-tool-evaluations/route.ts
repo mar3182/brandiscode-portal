@@ -37,7 +37,8 @@ export async function POST(req: NextRequest) {
     if (!clientUser?.client_id) return response({ error: 'Klant niet gevonden' }, 404)
 
     const body = await req.json() as Record<string, unknown>
-    const toolId = typeof body.tool_id === 'string' ? body.tool_id : ''
+    let toolId = typeof body.tool_id === 'string' ? body.tool_id : ''
+    const toolSlug = typeof body.tool_slug === 'string' ? body.tool_slug : ''
     const generationKey = typeof body.generation_key === 'string' ? body.generation_key.trim().slice(0, 120) : ''
     const resultFormat = typeof body.result_format === 'string' ? body.result_format : ''
     const generatedTextSample = typeof body.generated_text_sample === 'string'
@@ -48,8 +49,18 @@ export async function POST(req: NextRequest) {
       : null
     const comment = typeof body.comment === 'string' ? body.comment.trim().slice(0, 2000) : null
 
-    if (!toolId || !generationKey || !FORMATS.has(resultFormat) || !generatedTextSample) {
+    if (!generationKey || !FORMATS.has(resultFormat) || !generatedTextSample || (!toolId && !toolSlug)) {
       return response({ error: 'Ongeldige evaluatiegegevens' }, 400)
+    }
+
+    if (!toolId && toolSlug) {
+      const { data: tool, error: toolError } = await admin
+        .from('ai_tools')
+        .select('id')
+        .eq('slug', toolSlug)
+        .maybeSingle()
+      if (toolError || !tool?.id) return response({ error: 'AI-tool niet gevonden' }, 404)
+      toolId = tool.id
     }
 
     let parsedInputSample: Record<string, unknown> = {}
