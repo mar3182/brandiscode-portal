@@ -41,6 +41,17 @@ function createFallbackImage(label: string, accent: string, variant: number): st
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
 }
 
+async function imageDataUrl(image: { b64_json?: string | null; url?: string | null }): Promise<string> {
+  if (image.b64_json) return `data:image/png;base64,${image.b64_json}`
+  if (!image.url) return ''
+
+  const imageResponse = await fetch(image.url)
+  if (!imageResponse.ok) return ''
+  const contentType = imageResponse.headers.get('content-type') || 'image/png'
+  const bytes = Buffer.from(await imageResponse.arrayBuffer())
+  return `data:${contentType};base64,${bytes.toString('base64')}`
+}
+
 function asText(value: unknown, fallback: string): string {
   if (typeof value === 'string' && value.trim()) return value.trim()
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
@@ -166,9 +177,7 @@ export async function POST() {
           quality: 'low',
           n: 2,
         })
-        images = (imageResult.data ?? [])
-          .map((image) => image.b64_json ? `data:image/png;base64,${image.b64_json}` : '')
-          .filter(Boolean)
+        images = (await Promise.all((imageResult.data ?? []).map(imageDataUrl))).filter(Boolean)
         if (images.length === 0) throw new Error('Geen beelden ontvangen')
       } catch (imageError) {
         console.warn('OpenAI image generation unavailable, using demo fallback:', imageError)
