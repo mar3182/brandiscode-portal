@@ -34,26 +34,60 @@ function asText(value: unknown, fallback: string): string {
   return fallback
 }
 
-function normalizeSyntheticHome(raw: unknown): Record<string, unknown> {
+type SyntheticProfile = {
+  adres: string
+  plaats: string
+  woningtype: string
+  ligging: string
+  kenmerken: string[]
+  staat: string
+  bouwjaar: string
+  woonoppervlakte: string
+  perceeloppervlakte: string
+  kamers: string
+  slaapkamers: string
+  vraagprijs: string
+}
+
+const SYNTHETIC_PROFILES: SyntheticProfile[] = [
+  {
+    adres: 'Zeedistelstraat 14', plaats: 'Tholen', woningtype: 'Tussenwoning',
+    ligging: 'Rustige woonwijk op loopafstand van het centrum van Tholen', kenmerken: ['Tuin op het zuiden', 'Dakkapel', 'Vloerverwarming'], staat: 'Goed onderhouden', bouwjaar: '2018', woonoppervlakte: '118', perceeloppervlakte: '174', kamers: '5', slaapkamers: '3', vraagprijs: '€ 389.000 k.k.',
+  },
+  {
+    adres: 'Kreekzicht 7', plaats: 'Sint-Annaland', woningtype: 'Vrijstaande woning',
+    ligging: 'Aan de rand van het dorp met vrij uitzicht over het landschap', kenmerken: ['Garage', 'Zonnepanelen', 'Open keuken'], staat: 'Instapklaar', bouwjaar: '2006', woonoppervlakte: '156', perceeloppervlakte: '612', kamers: '6', slaapkamers: '4', vraagprijs: '€ 575.000 k.k.',
+  },
+  {
+    adres: 'Appelgaard 22', plaats: 'Oud-Vossemeer', woningtype: '2-onder-1-kapwoning',
+    ligging: 'Groene, kindvriendelijke straat nabij voorzieningen en wandelroutes', kenmerken: ['Garage', 'Tuin op het westen', 'Badkamer vernieuwd'], staat: 'Gerenoveerd', bouwjaar: '1994', woonoppervlakte: '132', perceeloppervlakte: '298', kamers: '5', slaapkamers: '4', vraagprijs: '€ 449.000 k.k.',
+  },
+  {
+    adres: 'Windroos 3', plaats: 'Poortvliet', woningtype: 'Appartement',
+    ligging: 'Rustig gelegen met zicht op de dorpskern en de polders', kenmerken: ['Balkon', 'Inpandige berging', 'Dubbele beglazing'], staat: 'Goed onderhouden', bouwjaar: '2012', woonoppervlakte: '86', perceeloppervlakte: 'n.v.t.', kamers: '3', slaapkamers: '2', vraagprijs: '€ 319.000 k.k.',
+  },
+]
+
+function normalizeSyntheticHome(raw: unknown, fallback: SyntheticProfile): Record<string, unknown> {
   const source = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {}
   const kenmerken = Array.isArray(source.kenmerken)
     ? source.kenmerken.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).map((item) => item.trim())
     : []
 
   return {
-    woningtype: asText(source.woningtype, 'Vrijstaande woning'),
-    adres: asText(source.adres, 'Dorpsstraat 12'),
-    plaats: asText(source.plaats, 'Tholen'),
-    vraagprijs: asText(source.vraagprijs, '€ 425.000 k.k.'),
-    bouwjaar: asText(source.bouwjaar, '2021'),
-    woonoppervlakte: asText(source.woonoppervlakte, '142'),
-    perceeloppervlakte: asText(source.perceeloppervlakte, '385'),
-    kamers: asText(source.kamers, '6'),
-    slaapkamers: asText(source.slaapkamers, '4'),
+    woningtype: asText(source.woningtype, fallback.woningtype),
+    adres: asText(source.adres, fallback.adres),
+    plaats: asText(source.plaats, fallback.plaats),
+    vraagprijs: asText(source.vraagprijs, fallback.vraagprijs),
+    bouwjaar: asText(source.bouwjaar, fallback.bouwjaar),
+    woonoppervlakte: asText(source.woonoppervlakte, fallback.woonoppervlakte),
+    perceeloppervlakte: asText(source.perceeloppervlakte, fallback.perceeloppervlakte),
+    kamers: asText(source.kamers, fallback.kamers),
+    slaapkamers: asText(source.slaapkamers, fallback.slaapkamers),
     prijsklasse: asText(source.prijsklasse, 'midden'),
-    ligging: asText(source.ligging, 'Rustige woonwijk nabij het centrum van Tholen'),
-    kenmerken: kenmerken.length > 0 ? kenmerken : ['Tuin op het zuiden', 'Zonnepanelen', 'Garage'],
-    staat: asText(source.staat, 'Instapklaar'),
+    ligging: asText(source.ligging, fallback.ligging),
+    kenmerken: kenmerken.length > 0 ? kenmerken : fallback.kenmerken,
+    staat: asText(source.staat, fallback.staat),
     bijzonderheden: asText(source.bijzonderheden, 'Alle woninggegevens in deze test zijn fictief.'),
     lengte: asText(source.lengte, 'normaal'),
   }
@@ -82,6 +116,8 @@ export async function POST() {
   const model = 'gpt-4o-mini'
 
   try {
+    const variationSeed = crypto.randomUUID()
+    const fallbackProfile = SYNTHETIC_PROFILES[Math.floor(Math.random() * SYNTHETIC_PROFILES.length)]
     const completion = await openai.chat.completions.create({
       model,
       response_format: { type: 'json_object' },
@@ -94,14 +130,14 @@ export async function POST() {
         },
         {
           role: 'user',
-          content: 'Maak een aantrekkelijke fictieve testwoning in Zeeland die geschikt is om een Funda-, Instagram-, Facebook- en brochuretekst te testen. Kies lengte normaal. Zet in bijzonderheden expliciet dat alle gegevens fictief zijn.',
+          content: `Maak een nieuwe, gevarieerde fictieve testwoning in Zeeland die geschikt is om een Funda-, Instagram-, Facebook- en brochuretekst te testen. Kies lengte normaal. Zet in bijzonderheden expliciet dat alle gegevens fictief zijn. Gebruik deze variatiecode ${variationSeed} en dit profiel als richting, maar neem niet letterlijk steeds dezelfde waarden over: ${JSON.stringify(fallbackProfile)}.`,
         },
       ],
     })
 
     const raw = completion.choices[0]?.message?.content ?? '{}'
     const jsonContent = raw.replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '')
-    const data = normalizeSyntheticHome(JSON.parse(jsonContent))
+    const data = normalizeSyntheticHome(JSON.parse(jsonContent), fallbackProfile)
 
     let images: string[] = []
     let imageSource: 'openai' | 'demo-fallback' = 'openai'
