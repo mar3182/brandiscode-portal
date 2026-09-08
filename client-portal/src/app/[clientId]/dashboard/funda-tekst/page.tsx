@@ -642,8 +642,11 @@ export default function FundaTekstPage() {
   async function convertToJpeg(file: File): Promise<File> {
     const image = await loadImageFromFile(file)
     const canvas = document.createElement('canvas')
-    canvas.width = image.naturalWidth || image.width
-    canvas.height = image.naturalHeight || image.height
+    const sourceWidth = image.naturalWidth || image.width
+    const sourceHeight = image.naturalHeight || image.height
+    const scale = Math.min(1, 1600 / Math.max(sourceWidth, sourceHeight))
+    canvas.width = Math.max(1, Math.round(sourceWidth * scale))
+    canvas.height = Math.max(1, Math.round(sourceHeight * scale))
 
     const ctx = canvas.getContext('2d')
     if (!ctx) {
@@ -659,7 +662,7 @@ export default function FundaTekstPage() {
           else reject(new Error('Conversie naar JPEG is mislukt'))
         },
         'image/jpeg',
-        0.9
+        0.72
       )
     })
 
@@ -688,7 +691,12 @@ export default function FundaTekstPage() {
       const type = (file.type || '').toLowerCase()
 
       if (SUPPORTED_IMAGE_MIME_TYPES.has(type)) {
-        validFiles.push(file)
+        try {
+          validFiles.push(await convertToJpeg(file))
+          convertedCount += 1
+        } catch {
+          conversionFailedCount += 1
+        }
         continue
       }
 
@@ -722,7 +730,7 @@ export default function FundaTekstPage() {
       errorParts.push('HEIC/HEIF kon in deze browser niet automatisch worden omgezet naar JPEG.')
     }
     if (convertedCount > 0) {
-      errorParts.push(`${convertedCount} HEIC/HEIF afbeelding(en) automatisch omgezet naar JPEG.`)
+      errorParts.push(`${convertedCount} afbeelding(en) gecomprimeerd voor veilige AI-analyse.`)
     }
     if (errorParts.length > 0) setImageError(errorParts.join(' '))
 
