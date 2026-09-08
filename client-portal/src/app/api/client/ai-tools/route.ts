@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Get tools client has active access to
-    const { data: accessRecords, error } = await supabase
+    const { data: accessRecords, error } = await admin
       .from('ai_tool_access')
       .select(
         `
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
     // Get token usage for this month
     const tools = await Promise.all(
       (accessRecords || []).map(async (access: any) => {
-        const { data: usageResult } = await supabase.rpc(
+        const { data: usageResult } = await admin.rpc(
           'get_tokens_used_this_month',
           {
             p_client_id: clientUser.client_id,

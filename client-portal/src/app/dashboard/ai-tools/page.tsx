@@ -34,46 +34,10 @@ export default function AiToolsPage() {
           return
         }
 
-        // Get client_id for this user
-        const { data: clientUser } = await supabase
-          .from('client_users')
-          .select('client_id')
-          .eq('email', user.email)
-          .single()
-
-        if (!clientUser?.client_id) {
-          setError('Klant niet gevonden')
-          setLoading(false)
-          return
-        }
-
-        // Get tools this client has access to
-        const { data: accessData, error: accessError } = await supabase
-          .from('ai_tool_access')
-          .select(`
-            id,
-            tool_id,
-            access_type,
-            monthly_token_limit,
-            access_granted_at,
-            ai_tools!inner(id, slug, name, description, status, readiness_percentage)
-          `)
-          .eq('client_id', clientUser.client_id)
-
-        if (accessError) throw accessError
-
-        const toolsWithAccess: AiToolWithAccess[] = (accessData || [])
-          .map((access: any) => ({
-            ...access.ai_tools,
-            access_info: {
-              id: access.id,
-              access_type: access.access_type,
-              monthly_token_limit: access.monthly_token_limit,
-              access_granted_at: access.access_granted_at,
-            },
-          }))
-
-        setTools(toolsWithAccess)
+        const response = await fetch('/api/client/ai-tools', { cache: 'no-store' })
+        const body = await response.json().catch(() => ({})) as { tools?: AiToolWithAccess[]; error?: string }
+        if (!response.ok) throw new Error(body.error || 'Kon AI tools niet laden')
+        setTools(body.tools ?? [])
       } catch (err: any) {
         console.error('Failed to load AI tools:', err)
         setError(err.message || 'Kon AI tools niet laden')
