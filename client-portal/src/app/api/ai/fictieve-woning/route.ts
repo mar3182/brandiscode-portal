@@ -130,7 +130,8 @@ export async function POST() {
 
   try {
     const variationSeed = crypto.randomUUID()
-    const fallbackIndex = Math.floor(Math.random() * SYNTHETIC_PROFILES.length)
+    const variationNumber = Number.parseInt(variationSeed.replace(/-/g, '').slice(0, 8), 16)
+    const fallbackIndex = variationNumber % SYNTHETIC_PROFILES.length
     const fallbackProfile = SYNTHETIC_PROFILES[fallbackIndex]
     const completion = await openai.chat.completions.create({
       model,
@@ -157,7 +158,7 @@ export async function POST() {
     let imageSource: 'openai' | 'demo-fallback' = 'openai'
     if (process.env.OPENAI_API_KEY) {
       try {
-        const imagePrompt = `Create a realistic but entirely fictional real-estate listing photo of a ${String(data.woningtype)} in a Dutch Zeeland village. No people, no readable signs, no logos, no exact real-world landmark, no text. Warm daylight, professional property photography, ${String(data.bijzonderheden)}.`
+        const imagePrompt = `Create a realistic but entirely fictional real-estate listing photo of a ${String(data.woningtype)} in a Dutch Zeeland village. No people, no readable signs, no logos, no exact real-world landmark, no text. Warm daylight, professional property photography, ${String(data.bijzonderheden)}. This is variation ${variationSeed}; use a clearly different camera angle, facade composition and garden arrangement from any previous generation.`
         const imageResult = await openai.images.generate({
           model: 'gpt-image-1',
           prompt: imagePrompt,
@@ -179,8 +180,8 @@ export async function POST() {
     if (images.length === 0) {
       imageSource = 'demo-fallback'
       images = [
-        createFallbackImage(`${fallbackProfile.plaats} - beeld 1`, '#6e8792', fallbackIndex),
-        createFallbackImage(`${fallbackProfile.plaats} - beeld 2`, '#806b5e', fallbackIndex + 1),
+        createFallbackImage(`${fallbackProfile.plaats} - beeld ${variationSeed.slice(0, 4)}A`, '#6e8792', variationNumber),
+        createFallbackImage(`${fallbackProfile.plaats} - beeld ${variationSeed.slice(0, 4)}B`, '#806b5e', variationNumber + 1),
       ]
     }
 
