@@ -28,6 +28,37 @@ function createFallbackImage(label: string, accent: string): string {
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
 }
 
+function asText(value: unknown, fallback: string): string {
+  if (typeof value === 'string' && value.trim()) return value.trim()
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return fallback
+}
+
+function normalizeSyntheticHome(raw: unknown): Record<string, unknown> {
+  const source = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {}
+  const kenmerken = Array.isArray(source.kenmerken)
+    ? source.kenmerken.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).map((item) => item.trim())
+    : []
+
+  return {
+    woningtype: asText(source.woningtype, 'Vrijstaande woning'),
+    adres: asText(source.adres, 'Dorpsstraat 12'),
+    plaats: asText(source.plaats, 'Tholen'),
+    vraagprijs: asText(source.vraagprijs, '€ 425.000 k.k.'),
+    bouwjaar: asText(source.bouwjaar, '2021'),
+    woonoppervlakte: asText(source.woonoppervlakte, '142'),
+    perceeloppervlakte: asText(source.perceeloppervlakte, '385'),
+    kamers: asText(source.kamers, '6'),
+    slaapkamers: asText(source.slaapkamers, '4'),
+    prijsklasse: asText(source.prijsklasse, 'midden'),
+    ligging: asText(source.ligging, 'Rustige woonwijk nabij het centrum van Tholen'),
+    kenmerken: kenmerken.length > 0 ? kenmerken : ['Tuin op het zuiden', 'Zonnepanelen', 'Garage'],
+    staat: asText(source.staat, 'Instapklaar'),
+    bijzonderheden: asText(source.bijzonderheden, 'Alle woninggegevens in deze test zijn fictief.'),
+    lengte: asText(source.lengte, 'normaal'),
+  }
+}
+
 export async function POST() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -69,11 +100,8 @@ export async function POST() {
     })
 
     const raw = completion.choices[0]?.message?.content ?? '{}'
-    const data = JSON.parse(raw) as Record<string, unknown>
-    const requiredStrings = ['woningtype', 'adres', 'plaats', 'vraagprijs', 'bouwjaar', 'woonoppervlakte', 'perceeloppervlakte', 'kamers', 'slaapkamers', 'ligging', 'staat', 'bijzonderheden', 'lengte']
-    if (requiredStrings.some((key) => typeof data[key] !== 'string') || !Array.isArray(data.kenmerken)) {
-      throw new Error('De fictieve woningdata is onvolledig')
-    }
+    const jsonContent = raw.replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '')
+    const data = normalizeSyntheticHome(JSON.parse(jsonContent))
 
     let images: string[] = []
     let imageSource: 'openai' | 'demo-fallback' = 'openai'
