@@ -202,6 +202,11 @@ interface FormState {
   lengte: Lengte
 }
 
+type SyntheticHomeResponse = {
+  data: FormState & { kenmerken: string[] }
+  images: string[]
+}
+
 const initialForm: FormState = {
   woningtype: 'Vrijstaande woning',
   adres: '',
@@ -249,6 +254,8 @@ export default function FundaTekstPage() {
   const [costAcknowledged, setCostAcknowledged] = useState(false)
   const [acknowledgementLoading, setAcknowledgementLoading] = useState(false)
   const [acknowledgementError, setAcknowledgementError] = useState('')
+  const [syntheticLoading, setSyntheticLoading] = useState(false)
+  const [syntheticError, setSyntheticError] = useState('')
 
   useEffect(() => {
     fetch('/api/ai/usage')
@@ -292,6 +299,29 @@ export default function FundaTekstPage() {
       setAcknowledgementError(error instanceof Error ? error.message : 'Het kostenakkoord kon niet worden opgeslagen.')
     } finally {
       setAcknowledgementLoading(false)
+    }
+  }
+
+  async function handleGenerateSyntheticHome() {
+    if (!(await ensureCostAcknowledged())) return
+    setSyntheticLoading(true)
+    setSyntheticError('')
+    try {
+      const response = await fetch('/api/ai/fictieve-woning', { method: 'POST' })
+      const body = await response.json().catch(() => ({})) as Partial<SyntheticHomeResponse> & { error?: string }
+      if (!response.ok || !body.data || !body.images?.length) {
+        throw new Error(body.error || 'De fictieve testwoning kon niet worden gegenereerd.')
+      }
+      setForm((current) => ({ ...current, ...body.data }))
+      setKenmerken(body.data.kenmerken)
+      setImages(body.images)
+      setImageNames(body.images.map((_, index) => `Fictieve AI-woning ${index + 1}`))
+      setImageError('')
+      setApiError('')
+    } catch (error) {
+      setSyntheticError(error instanceof Error ? error.message : 'De fictieve testwoning kon niet worden gegenereerd.')
+    } finally {
+      setSyntheticLoading(false)
     }
   }
 
@@ -473,6 +503,26 @@ export default function FundaTekstPage() {
   function addGalleryPromptToExtensions(prompt: string) {
     addPromptExtension(prompt)
     setPromptNoticeMessage('Gallery prompt toegevoegd aan uitbreidingen.')
+  }
+
+  function getGalleryPromptState(prompt: string): 'active' | 'inactive' | 'not-added' {
+    const normalizedPrompt = prompt.trim().toLowerCase()
+    const extension = promptExtensions.find((item) => item.text.trim().toLowerCase() === normalizedPrompt)
+    if (!extension) return 'not-added'
+    return extension.enabled ? 'active' : 'inactive'
+  }
+
+  function toggleGalleryPrompt(prompt: string) {
+    const normalizedPrompt = prompt.trim().toLowerCase()
+    const extension = promptExtensions.find((item) => item.text.trim().toLowerCase() === normalizedPrompt)
+    if (!extension) {
+      addPromptExtension(prompt)
+      setPromptNoticeMessage('Gallery prompt toegevoegd en geactiveerd.')
+      return
+    }
+
+    togglePromptExtension(extension.id)
+    setPromptNoticeMessage(extension.enabled ? 'Gallery prompt gedeactiveerd.' : 'Gallery prompt geactiveerd.')
   }
 
   function applyGalleryPromptAsRefinement(prompt: string) {
@@ -895,6 +945,22 @@ export default function FundaTekstPage() {
             <h2 className="text-sm font-semibold text-white/80 uppercase tracking-wider mb-4">
               Woning basisinfo
             </h2>
+            <div className="mb-5 rounded-xl border border-brand-gold/30 bg-brand-gold/10 p-4">
+              <p className="text-sm font-medium text-brand-gold">Snel testen met fictieve data</p>
+              <p className="mt-1 text-xs leading-relaxed text-white/55">
+                AI vult het formulier met synthetische woningdata en maakt twee fictieve woningbeelden. Dit gebruikt extra tokens en beeldgeneratie; de beelden zijn niet geschikt voor publicatie.
+              </p>
+              <button
+                type="button"
+                onClick={() => void handleGenerateSyntheticHome()}
+                disabled={syntheticLoading || !acknowledgementChecked || !costAcknowledged}
+                className="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand-gold/20 px-4 py-2 text-xs font-medium text-brand-gold border border-brand-gold/30 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {syntheticLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Genereer fictieve testwoning
+              </button>
+              {syntheticError && <p className="mt-2 text-xs text-red-300">{syntheticError}</p>}
+            </div>
             <div className="space-y-4">
               {/* Woningtype */}
               <div>
@@ -1360,6 +1426,11 @@ export default function FundaTekstPage() {
             <p className="text-xs text-white/40 mb-4">
               Kies uit kant-en-klare verfijningsprompts. De lijst wordt automatisch gesorteerd op woningtype, ligging en prijsklasse.
             </p>
+            <div className="mb-4 flex flex-wrap gap-2 text-[11px] text-white/50">
+              <span className="rounded-full border border-green-400/30 bg-green-500/10 px-2.5 py-1 text-green-300">Actief = wordt meegestuurd</span>
+              <span className="rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-amber-300">Inactief = opgeslagen, maar niet meegestuurd</span>
+              <span className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-white/50">Niet toegevoegd = nog niet opgeslagen</span>
+            </div>
 
             <label className="inline-flex items-center gap-2 mb-4 text-xs text-white/65">
               <input
@@ -1374,15 +1445,30 @@ export default function FundaTekstPage() {
             <div className="space-y-3">
               {visibleGalleryItems.map((item) => (
                 <div key={item.id} className="p-3 rounded-xl bg-white/5 border border-white/10">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-white/85">{item.title}</p>
-                      <p className="text-xs text-white/45 mt-0.5">{item.subtitle}</p>
-                    </div>
-                    <span className="text-[10px] px-2 py-1 rounded-full bg-white/10 border border-white/15 text-white/55">
-                      Relevantie {scoreGalleryItem(item)}
-                    </span>
-                  </div>
+                  {(() => {
+                    const state = getGalleryPromptState(item.prompt)
+                    const stateLabel = state === 'active' ? 'Actief' : state === 'inactive' ? 'Inactief' : 'Niet toegevoegd'
+                    const stateClass = state === 'active'
+                      ? 'bg-green-500/10 border-green-400/30 text-green-300'
+                      : state === 'inactive'
+                        ? 'bg-amber-500/10 border-amber-400/30 text-amber-300'
+                        : 'bg-white/10 border-white/15 text-white/55'
+
+                    return (
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-white/85">{item.title}</p>
+                          <p className="text-xs text-white/45 mt-0.5">{item.subtitle}</p>
+                        </div>
+                        <div className="flex flex-wrap justify-end gap-1.5">
+                          <span className={`text-[10px] px-2 py-1 rounded-full border ${stateClass}`}>{stateLabel}</span>
+                          <span className="text-[10px] px-2 py-1 rounded-full bg-white/10 border border-white/15 text-white/55">
+                            Relevantie {scoreGalleryItem(item)}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })()}
 
                   <p className="text-xs text-white/70 mt-2 leading-relaxed">{item.prompt}</p>
 
@@ -1394,13 +1480,23 @@ export default function FundaTekstPage() {
                     >
                       Gebruik nu
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => addGalleryPromptToExtensions(item.prompt)}
-                      className="px-3 py-1.5 rounded-lg bg-brand-gold/20 border border-brand-gold/40 text-brand-gold text-xs font-medium hover:bg-brand-gold/30 transition-all"
-                    >
-                      Voeg toe als vaste uitbreiding
-                    </button>
+                    {getGalleryPromptState(item.prompt) === 'active' ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleGalleryPrompt(item.prompt)}
+                        className="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-400/30 text-amber-300 text-xs font-medium hover:bg-amber-500/20 transition-all"
+                      >
+                        Deactiveer prompt
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => toggleGalleryPrompt(item.prompt)}
+                        className="px-3 py-1.5 rounded-lg bg-brand-gold/20 border border-brand-gold/40 text-brand-gold text-xs font-medium hover:bg-brand-gold/30 transition-all"
+                      >
+                        {getGalleryPromptState(item.prompt) === 'inactive' ? 'Activeer prompt' : 'Toevoegen en activeren'}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

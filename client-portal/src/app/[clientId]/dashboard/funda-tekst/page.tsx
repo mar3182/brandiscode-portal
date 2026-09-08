@@ -202,6 +202,11 @@ interface FormState {
   lengte: Lengte
 }
 
+type SyntheticHomeResponse = {
+  data: FormState & { kenmerken: string[] }
+  images: string[]
+}
+
 const initialForm: FormState = {
   woningtype: 'Vrijstaande woning',
   adres: '',
@@ -249,6 +254,8 @@ export default function FundaTekstPage() {
   const [costAcknowledged, setCostAcknowledged] = useState(false)
   const [acknowledgementLoading, setAcknowledgementLoading] = useState(false)
   const [acknowledgementError, setAcknowledgementError] = useState('')
+  const [syntheticLoading, setSyntheticLoading] = useState(false)
+  const [syntheticError, setSyntheticError] = useState('')
 
   useEffect(() => {
     fetch('/api/ai/usage')
@@ -292,6 +299,29 @@ export default function FundaTekstPage() {
       setAcknowledgementError(error instanceof Error ? error.message : 'Het kostenakkoord kon niet worden opgeslagen.')
     } finally {
       setAcknowledgementLoading(false)
+    }
+  }
+
+  async function handleGenerateSyntheticHome() {
+    if (!(await ensureCostAcknowledged())) return
+    setSyntheticLoading(true)
+    setSyntheticError('')
+    try {
+      const response = await fetch('/api/ai/fictieve-woning', { method: 'POST' })
+      const body = await response.json().catch(() => ({})) as Partial<SyntheticHomeResponse> & { error?: string }
+      if (!response.ok || !body.data || !body.images?.length) {
+        throw new Error(body.error || 'De fictieve testwoning kon niet worden gegenereerd.')
+      }
+      setForm((current) => ({ ...current, ...body.data }))
+      setKenmerken(body.data.kenmerken)
+      setImages(body.images)
+      setImageNames(body.images.map((_, index) => `Fictieve AI-woning ${index + 1}`))
+      setImageError('')
+      setApiError('')
+    } catch (error) {
+      setSyntheticError(error instanceof Error ? error.message : 'De fictieve testwoning kon niet worden gegenereerd.')
+    } finally {
+      setSyntheticLoading(false)
     }
   }
 
@@ -895,6 +925,22 @@ export default function FundaTekstPage() {
             <h2 className="text-sm font-semibold text-white/80 uppercase tracking-wider mb-4">
               Woning basisinfo
             </h2>
+            <div className="mb-5 rounded-xl border border-brand-gold/30 bg-brand-gold/10 p-4">
+              <p className="text-sm font-medium text-brand-gold">Snel testen met fictieve data</p>
+              <p className="mt-1 text-xs leading-relaxed text-white/55">
+                AI vult het formulier met synthetische woningdata en maakt twee fictieve woningbeelden. Dit gebruikt extra tokens en beeldgeneratie; de beelden zijn niet geschikt voor publicatie.
+              </p>
+              <button
+                type="button"
+                onClick={() => void handleGenerateSyntheticHome()}
+                disabled={syntheticLoading || !acknowledgementChecked || !costAcknowledged}
+                className="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand-gold/20 px-4 py-2 text-xs font-medium text-brand-gold border border-brand-gold/30 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {syntheticLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Genereer fictieve testwoning
+              </button>
+              {syntheticError && <p className="mt-2 text-xs text-red-300">{syntheticError}</p>}
+            </div>
             <div className="space-y-4">
               {/* Woningtype */}
               <div>
