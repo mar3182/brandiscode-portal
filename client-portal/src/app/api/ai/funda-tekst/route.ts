@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import type { FundaTekstRequest, FundaTekstResponse } from '@/lib/types'
 import { createClient } from '@/lib/supabase/server'
-import { resolveClientId, checkAiLimit, logAiUsage, limitReachedMessage } from '@/lib/ai-usage'
+import { resolveClientId, checkAiToolLimit, ensureAiBillingDraft, logAiUsage, limitReachedMessage } from '@/lib/ai-usage'
+import { getToolAccessOrThrow } from '@/lib/ai-tool-access'
 
 export const dynamic = 'force-dynamic'
 
@@ -89,17 +90,28 @@ export async function POST(req: NextRequest) {
   const model = 'gpt-4o'
   let clientId: string | null = null
 
-  if (user?.email) {
-    clientId = await resolveClientId(user.email)
-    if (clientId) {
-      const usage = await checkAiLimit(clientId)
-      if (!usage.allowed) {
-        return NextResponse.json(
-          { error: limitReachedMessage(usage.usedThisMonth, usage.limit!) },
-          { status: 429, headers: { 'Cache-Control': 'no-store' } }
-        )
-      }
-    }
+  clientId = await resolveClientId(user.email)
+  if (!clientId) {
+    return NextResponse.json(
+      { error: 'Je klanttoegang kon niet worden vastgesteld.' },
+      { status: 403, headers: { 'Cache-Control': 'no-store' } }
+    )
+  }
+
+  const access = await getToolAccessOrThrow(clientId, 'funda-tekst')
+  if (!access.allowed || !access.toolId) {
+    return NextResponse.json(
+      { error: access.error || 'Je hebt nog geen toegang tot deze AI-tool. Neem contact op met Brand is Code.' },
+      { status: 403, headers: { 'Cache-Control': 'no-store' } }
+    )
+  }
+
+  const usage = await checkAiToolLimit(clientId, access.toolId, access.monthlyTokenLimit)
+  if (!usage.allowed) {
+    return NextResponse.json(
+      { error: limitReachedMessage(usage.usedThisMonth, usage.limit ?? 0) },
+      { status: 429, headers: { 'Cache-Control': 'no-store' } }
+    )
   }
 
   try {
@@ -129,6 +141,7 @@ export async function POST(req: NextRequest) {
 
 Woningtype: ${body.woningtype}
 Adres: ${body.adres}
+Plaats: ${body.plaats}
 ${body.vraagprijs ? `Vraagprijs: ${body.vraagprijs}` : ''}
 ${body.bouwjaar ? `Bouwjaar: ${body.bouwjaar}` : ''}
 ${body.woonoppervlakte ? `Woonoppervlakte: ${body.woonoppervlakte} m²` : ''}
@@ -184,6 +197,13 @@ ${lengteInstructie}${imageNote}`
         inputTokens: completion.usage?.prompt_tokens,
         outputTokens: completion.usage?.completion_tokens,
         status: 'success',
+      })
+      await ensureAiBillingDraft({
+        clientId,
+        toolId: access.toolId,
+        accessId: access.accessId,
+        monthlyTokenLimit: access.monthlyTokenLimit,
+        userId: user.id,
       })
     }
 

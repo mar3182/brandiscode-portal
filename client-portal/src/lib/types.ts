@@ -324,7 +324,8 @@ export interface Factuur {
 
 export type FundaTekstRequest = {
   woningtype: string           // 'Vrijstaande woning' | 'Tussenwoning' | 'Hoekwoning' | 'Appartement' | 'Boerderij' | anders
-  adres: string                // bijv. "Hoogstraat 5, Tholen"
+  adres: string                // bijv. "Hoogstraat 5"
+  plaats: string               // bijv. "Tholen"
   vraagprijs?: string          // bijv. "€ 425.000 k.k."
   bouwjaar?: string
   woonoppervlakte?: string     // m²

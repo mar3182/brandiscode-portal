@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { Sparkles, Loader2, Copy, Check, RotateCcw, Upload, X, Pen, AlertTriangle, Info } from 'lucide-react'
 import type { FundaTekstRequest, FundaTekstResponse, FundaMultiResponse, MediaFormat } from '@/lib/types'
+import AiResultEvaluation from '@/components/AiResultEvaluation'
 
 const INPUT_CLASS =
   'w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-brand-blue/50 transition-all'
@@ -187,6 +188,7 @@ type PromptExtensionItem = {
 interface FormState {
   woningtype: string
   adres: string
+  plaats: string
   vraagprijs: string
   bouwjaar: string
   woonoppervlakte: string
@@ -203,6 +205,7 @@ interface FormState {
 const initialForm: FormState = {
   woningtype: 'Vrijstaande woning',
   adres: '',
+  plaats: '',
   vraagprijs: '',
   bouwjaar: '',
   woonoppervlakte: '',
@@ -220,7 +223,7 @@ export default function FundaTekstPage() {
   const [form, setForm] = useState<FormState>(initialForm)
   const [kenmerken, setKenmerken] = useState<string[]>([])
   const [nieuweKenmerk, setNieuweKenmerk] = useState('')
-  const [errors, setErrors] = useState<Partial<Record<'adres' | 'ligging', string>>>({})
+  const [errors, setErrors] = useState<Partial<Record<'adres' | 'plaats' | 'ligging', string>>>({})
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<FundaTekstResponse | null>(null)
   const [apiError, setApiError] = useState('')
@@ -240,7 +243,12 @@ export default function FundaTekstPage() {
   const [applyVerfijnToFuture, setApplyVerfijnToFuture] = useState(false)
   const [showRelevantOnly, setShowRelevantOnly] = useState(false)
   const lastRequestRef = useRef<FundaTekstRequest | null>(null)
+  const [generationKey, setGenerationKey] = useState('')
   const [usageData, setUsageData] = useState<{ usedThisMonth: number; limit: number | null; percentUsed: number | null } | null>(null)
+  const [acknowledgementChecked, setAcknowledgementChecked] = useState(false)
+  const [costAcknowledged, setCostAcknowledged] = useState(false)
+  const [acknowledgementLoading, setAcknowledgementLoading] = useState(false)
+  const [acknowledgementError, setAcknowledgementError] = useState('')
 
   useEffect(() => {
     fetch('/api/ai/usage')
@@ -248,6 +256,44 @@ export default function FundaTekstPage() {
       .then((d) => { if (d.limit) setUsageData(d) })
       .catch(() => {/* niet-kritisch */})
   }, [multiResult, result])
+
+  useEffect(() => {
+    fetch('/api/client/funda-acknowledge')
+      .then((response) => response.ok ? response.json() : null)
+      .then((data: { acknowledged?: boolean } | null) => {
+        setCostAcknowledged(data?.acknowledged === true)
+        setAcknowledgementChecked(true)
+      })
+      .catch(() => {
+        setAcknowledgementError('Het kostenakkoord kon niet worden gecontroleerd.')
+        setAcknowledgementChecked(true)
+      })
+  }, [])
+
+  async function ensureCostAcknowledged(): Promise<boolean> {
+    if (costAcknowledged) return true
+    setAcknowledgementError('Bevestig eerst het kostenakkoord voordat je de tool gebruikt.')
+    return false
+  }
+
+  async function acknowledgeCosts() {
+    setAcknowledgementLoading(true)
+    setAcknowledgementError('')
+    try {
+      const response = await fetch('/api/client/funda-acknowledge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tool_slug: 'funda-tekst' }),
+      })
+      const data = await response.json().catch(() => ({})) as { error?: string }
+      if (!response.ok) throw new Error(data.error || 'Het kostenakkoord kon niet worden opgeslagen.')
+      setCostAcknowledged(true)
+    } catch (error) {
+      setAcknowledgementError(error instanceof Error ? error.message : 'Het kostenakkoord kon niet worden opgeslagen.')
+    } finally {
+      setAcknowledgementLoading(false)
+    }
+  }
 
   useEffect(() => {
     const savedJson = localStorage.getItem(PROMPT_EXTENSION_STORAGE_KEY)
@@ -456,14 +502,16 @@ export default function FundaTekstPage() {
   }
 
   function validate(): boolean {
-    const newErrors: Partial<Record<'adres' | 'ligging', string>> = {}
+    const newErrors: Partial<Record<'adres' | 'plaats' | 'ligging', string>> = {}
     if (!form.adres.trim()) newErrors.adres = 'Adres is verplicht'
+    if (!form.plaats.trim()) newErrors.plaats = 'Plaats is verplicht'
     if (!form.ligging.trim()) newErrors.ligging = 'Ligging is verplicht'
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
   async function handleGenerate(request?: FundaTekstRequest) {
+    if (!(await ensureCostAcknowledged())) return
     const activePromptAddition = buildPromptAdditionFromList(promptExtensions)
 
     if (!request) {
@@ -471,6 +519,7 @@ export default function FundaTekstPage() {
       request = {
         woningtype: form.woningtype,
         adres: form.adres.trim(),
+        plaats: form.plaats.trim(),
         vraagprijs: form.vraagprijs.trim() || undefined,
         bouwjaar: form.bouwjaar || undefined,
         woonoppervlakte: form.woonoppervlakte || undefined,
@@ -488,6 +537,8 @@ export default function FundaTekstPage() {
     }
 
     lastRequestRef.current = request
+    const nextGenerationKey = `funda-${Date.now()}`
+    setGenerationKey(nextGenerationKey)
     setLoading(true)
     setApiError('')
     setResult(null)
@@ -656,12 +707,14 @@ export default function FundaTekstPage() {
   }
 
   async function handleGenerateAll() {
+    if (!(await ensureCostAcknowledged())) return
     if (!validate()) return
     const activePromptAddition = buildPromptAdditionFromList(promptExtensions)
 
     const request: FundaTekstRequest = {
       woningtype: form.woningtype,
       adres: form.adres.trim(),
+      plaats: form.plaats.trim(),
       vraagprijs: form.vraagprijs.trim() || undefined,
       bouwjaar: form.bouwjaar || undefined,
       woonoppervlakte: form.woonoppervlakte || undefined,
@@ -677,6 +730,8 @@ export default function FundaTekstPage() {
       prompt_addition: activePromptAddition || undefined,
     }
     lastRequestRef.current = request
+    const nextGenerationKey = `multi-${Date.now()}`
+    setGenerationKey(nextGenerationKey)
     setLoading(true)
     setApiError('')
     setResult(null)
@@ -767,6 +822,25 @@ export default function FundaTekstPage() {
         </p>
       </div>
 
+      {acknowledgementChecked && !costAcknowledged && (
+        <div className="mb-6 rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4">
+          <p className="text-sm font-medium text-amber-100">Bevestig het gebruik van de AI-tool</p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-100/70">
+            Het gebruik van deze tool valt binnen de afgesproken maandelijkse servicekosten en het beschikbare tokenbudget. Iedere generatie gebruikt tokens uit dit budget.
+          </p>
+          {acknowledgementError && <p className="mt-2 text-xs text-red-200">{acknowledgementError}</p>}
+          <button
+            type="button"
+            onClick={() => void acknowledgeCosts()}
+            disabled={acknowledgementLoading}
+            className="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand-gold/20 px-4 py-2 text-xs font-medium text-brand-gold border border-brand-gold/30 disabled:opacity-50"
+          >
+            {acknowledgementLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            Ik begrijp dit en wil de tool gebruiken
+          </button>
+        </div>
+      )}
+
       {/* Usage banner — alleen zichtbaar als er een maandlimiet is ingesteld */}
       {usageData?.limit && (
         <div className={`mb-6 rounded-2xl border p-4 flex items-start gap-3 ${
@@ -853,12 +927,29 @@ export default function FundaTekstPage() {
                 <input
                   type="text"
                   className={`${INPUT_CLASS} ${errors.adres ? 'border-red-500/60' : ''}`}
-                  placeholder="bijv. Hoogstraat 5, Tholen"
+                  placeholder="bijv. Hoogstraat 5"
                   value={form.adres}
                   onChange={(e) => updateForm('adres', e.target.value)}
                 />
                 {errors.adres && (
                   <p className="mt-1 text-xs text-red-400">{errors.adres}</p>
+                )}
+              </div>
+
+              {/* Plaats */}
+              <div>
+                <label className={LABEL_CLASS}>
+                  Plaats <span className="text-brand-gold">*</span>
+                </label>
+                <input
+                  type="text"
+                  className={`${INPUT_CLASS} ${errors.plaats ? 'border-red-500/60' : ''}`}
+                  placeholder="bijv. Tholen"
+                  value={form.plaats}
+                  onChange={(e) => updateForm('plaats', e.target.value)}
+                />
+                {errors.plaats && (
+                  <p className="mt-1 text-xs text-red-400">{errors.plaats}</p>
                 )}
               </div>
 
@@ -1421,6 +1512,14 @@ export default function FundaTekstPage() {
                   <span className="hidden sm:inline">Opnieuw</span>
                 </button>
               </div>
+              {generationKey && (
+                <AiResultEvaluation
+                  format="funda"
+                  generationKey={generationKey}
+                  text={result.tekst}
+                  inputSample={JSON.stringify(lastRequestRef.current ?? {})}
+                />
+              )}
               {/* Verfijn */}
               <div className="mt-4 pt-4 border-t border-white/10">
                 {verfijnSuccess && (
@@ -1515,6 +1614,14 @@ export default function FundaTekstPage() {
                   <span className="hidden sm:inline">Opnieuw</span>
                 </button>
               </div>
+              {generationKey && (
+                <AiResultEvaluation
+                  format={activeTab}
+                  generationKey={generationKey}
+                  text={multiResult[activeTab]}
+                  inputSample={JSON.stringify(lastRequestRef.current ?? {})}
+                />
+              )}
 
               {/* Verfijn */}
               <div className="mt-4 pt-4 border-t border-white/10">

@@ -2328,6 +2328,18 @@ function AiToolsTab({ clientId }: { clientId: string }) {
 
 function AiOverviewSubTab({ clientId }: { clientId: string }) {
   const [data, setData] = useState<any>(null)
+  const [evaluations, setEvaluations] = useState<Array<{
+    id: string
+    channel: string
+    score_factual_accuracy: number
+    score_completeness: number
+    score_leunis_style: number
+    score_channel_fit: number
+    score_activation: number
+    score_readability: number
+    free_comment: string | null
+    created_at: string
+  }>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -2342,6 +2354,11 @@ function AiOverviewSubTab({ clientId }: { clientId: string }) {
       return
     }
     setData(body)
+    const evaluationsRes = await fetch(`/api/admin/clients/${clientId}/ai-evaluations`, { cache: 'no-store' })
+    if (evaluationsRes.ok) {
+      const evaluationsBody = await evaluationsRes.json() as { evaluations?: typeof evaluations }
+      setEvaluations(evaluationsBody.evaluations ?? [])
+    }
     setLoading(false)
   }, [clientId])
 
@@ -2426,6 +2443,42 @@ function AiOverviewSubTab({ clientId }: { clientId: string }) {
           </div>
         </div>
       )}
+
+      <div className="glass-card p-4 md:p-6">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h3 className="text-sm font-semibold text-white">Klant-evaluaties</h3>
+          <span className="text-xs text-white/40">{evaluations.length} opgeslagen</span>
+        </div>
+        {evaluations.length === 0 ? (
+          <p className="text-sm text-white/45">Nog geen evaluaties ontvangen.</p>
+        ) : (
+          <div className="space-y-3">
+            {evaluations.slice(0, 10).map((evaluation) => {
+              const scores = [
+                evaluation.score_factual_accuracy,
+                evaluation.score_completeness,
+                evaluation.score_leunis_style,
+                evaluation.score_channel_fit,
+                evaluation.score_activation,
+                evaluation.score_readability,
+              ]
+              const average = scores.reduce((sum, score) => sum + score, 0) / scores.length
+              return (
+                <div key={evaluation.id} className="rounded-xl border border-white/10 bg-white/5 p-3">
+                  <div className="flex items-center justify-between gap-3 text-xs">
+                    <span className="font-medium text-white capitalize">{evaluation.channel}</span>
+                    <span className="text-brand-gold">Gemiddeld {average.toFixed(1)} / 5</span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-3 gap-1 text-[11px] text-white/50 sm:grid-cols-6">
+                    {scores.map((score, index) => <span key={index} className="rounded bg-black/10 px-1.5 py-1 text-center">{score}/5</span>)}
+                  </div>
+                  {evaluation.free_comment && <p className="mt-2 text-xs leading-relaxed text-white/70">“{evaluation.free_comment}”</p>}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -2433,7 +2486,15 @@ function AiOverviewSubTab({ clientId }: { clientId: string }) {
 function AiTestSubTab({ clientId, toolName }: { clientId: string; toolName: string }) {
   const [versions, setVersions] = useState<AiPromptVersion[]>([])
   const [versionId, setVersionId] = useState('')
-  const [input, setInput] = useState('')
+  const [testForm, setTestForm] = useState({
+    woningtype: 'Vrijstaande woning',
+    adres: '',
+    plaats: '',
+    ligging: '',
+    kenmerken: '',
+    bijzonderheden: '',
+    lengte: 'normaal',
+  })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<{
@@ -2459,8 +2520,8 @@ function AiTestSubTab({ clientId, toolName }: { clientId: string; toolName: stri
 
   async function handleTest(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    if (!input.trim()) {
-      setError('Testinvoer is verplicht.')
+    if (!testForm.adres.trim() || !testForm.plaats.trim() || !testForm.ligging.trim()) {
+      setError('Adres, plaats en ligging zijn verplicht.')
       return
     }
 
@@ -2472,7 +2533,15 @@ function AiTestSubTab({ clientId, toolName }: { clientId: string; toolName: stri
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        test_input: input,
+        test_input: JSON.stringify({
+          woningtype: testForm.woningtype,
+          adres: testForm.adres.trim(),
+          plaats: testForm.plaats.trim(),
+          ligging: testForm.ligging.trim(),
+          kenmerken: testForm.kenmerken.split(',').map((item) => item.trim()).filter(Boolean),
+          bijzonderheden: testForm.bijzonderheden.trim() || undefined,
+          lengte: testForm.lengte,
+        }),
         ...(versionId ? { prompt_version_id: versionId } : {}),
       }),
     })
@@ -2513,17 +2582,33 @@ function AiTestSubTab({ clientId, toolName }: { clientId: string; toolName: stri
           </select>
         </div>
 
-        <div>
-          <label htmlFor="test-input" className="block text-xs text-white/50 mb-1">Testinvoer</label>
-          <textarea
-            id="test-input"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            rows={6}
-            placeholder="Bijv. woningkenmerken: vrijstaande woning, 4 slaapkamers, tuin op het zuiden, Tholen..."
-            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-white/30 focus:outline-none focus:border-brand-gold/50"
-          />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-xs text-white/50">Woningtype
+            <input value={testForm.woningtype} onChange={(e) => setTestForm((current) => ({ ...current, woningtype: e.target.value }))} className="mt-1 w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" />
+          </label>
+          <label className="text-xs text-white/50">Adres *
+            <input value={testForm.adres} onChange={(e) => setTestForm((current) => ({ ...current, adres: e.target.value }))} placeholder="Hoogstraat 5" className="mt-1 w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-white/30" />
+          </label>
+          <label className="text-xs text-white/50">Plaats *
+            <input value={testForm.plaats} onChange={(e) => setTestForm((current) => ({ ...current, plaats: e.target.value }))} placeholder="Tholen" className="mt-1 w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-white/30" />
+          </label>
+          <label className="text-xs text-white/50">Ligging *
+            <input value={testForm.ligging} onChange={(e) => setTestForm((current) => ({ ...current, ligging: e.target.value }))} placeholder="Centrum, rustige straat" className="mt-1 w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-white/30" />
+          </label>
+          <label className="text-xs text-white/50">Kenmerken
+            <input value={testForm.kenmerken} onChange={(e) => setTestForm((current) => ({ ...current, kenmerken: e.target.value }))} placeholder="Garage, tuin, monument" className="mt-1 w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-white/30" />
+          </label>
+          <label className="text-xs text-white/50">Lengte
+            <select value={testForm.lengte} onChange={(e) => setTestForm((current) => ({ ...current, lengte: e.target.value }))} className="mt-1 w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm">
+              <option value="kort">Kort</option>
+              <option value="normaal">Normaal</option>
+              <option value="uitgebreid">Uitgebreid</option>
+            </select>
+          </label>
         </div>
+        <label className="block text-xs text-white/50">Bijzonderheden
+          <textarea value={testForm.bijzonderheden} onChange={(e) => setTestForm((current) => ({ ...current, bijzonderheden: e.target.value }))} rows={3} className="mt-1 w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-white/30" />
+        </label>
 
         {error ? (
           <div className="glass-card p-3 border border-red-500/40 bg-red-500/10 text-red-200 text-sm" role="alert">

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { resolveClientId, checkAiLimit } from '@/lib/ai-usage'
+import { resolveClientId, checkAiToolLimit } from '@/lib/ai-usage'
+import { getToolAccessOrThrow } from '@/lib/ai-tool-access'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +20,15 @@ export async function GET() {
     return NextResponse.json({ error: 'Geen klantaccount gevonden' }, { status: 404, headers: { 'Cache-Control': 'no-store' } })
   }
 
-  const usage = await checkAiLimit(clientId)
+  const access = await getToolAccessOrThrow(clientId, 'funda-tekst')
+  if (!access.allowed || !access.toolId) {
+    return NextResponse.json(
+      { error: access.error || 'Geen toegang tot deze AI-tool' },
+      { status: 403, headers: { 'Cache-Control': 'no-store' } }
+    )
+  }
+
+  const usage = await checkAiToolLimit(clientId, access.toolId, access.monthlyTokenLimit)
 
   return NextResponse.json(
     {

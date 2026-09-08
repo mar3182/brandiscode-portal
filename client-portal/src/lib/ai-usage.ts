@@ -9,6 +9,53 @@
  */
 import { createAdminClient } from '@/lib/supabase/admin'
 
+export async function ensureAiBillingDraft(params: {
+  clientId: string
+  toolId: string
+  accessId: string | null
+  monthlyTokenLimit: number | null
+  userId: string
+}): Promise<void> {
+  const admin = createAdminClient()
+  const now = new Date()
+  const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+  const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0))
+  const billingPeriodStart = periodStart.toISOString().slice(0, 10)
+  const billingPeriodEnd = periodEnd.toISOString().slice(0, 10)
+
+  const { data: existing } = await admin
+    .from('ai_billing')
+    .select('id')
+    .eq('client_id', params.clientId)
+    .eq('tool_id', params.toolId)
+    .eq('billing_period_start', billingPeriodStart)
+    .maybeSingle()
+
+  if (existing?.id) return
+
+  const { error } = await admin.from('ai_billing').insert({
+    client_id: params.clientId,
+    tool_id: params.toolId,
+    access_id: params.accessId,
+    billing_period_start: billingPeriodStart,
+    billing_period_end: billingPeriodEnd,
+    monthly_token_limit: params.monthlyTokenLimit ?? 500000,
+    tokens_used: 0,
+    overage_tokens: 0,
+    base_price_eur: 49,
+    overage_price_per_1k_tokens: 0.01,
+    overage_cost_eur: 0,
+    total_cost_eur: 49,
+    payment_status: 'pending',
+    triggered_by: params.userId,
+    triggered_at: now.toISOString(),
+  })
+
+  if (error && error.code !== '23505') {
+    console.warn('ai_billing draft aanmaken mislukt:', error.message)
+  }
+}
+
 export interface UsageStatus {
   allowed: boolean
   clientId: string
@@ -16,6 +63,41 @@ export interface UsageStatus {
   limit: number | null
   /** 0-100, null als er geen limiet is */
   percentUsed: number | null
+}
+
+export async function checkAiToolLimit(
+  clientId: string,
+  toolId: string,
+  monthlyTokenLimit: number | null
+): Promise<UsageStatus> {
+  const admin = createAdminClient()
+  const limit = monthlyTokenLimit && monthlyTokenLimit > 0 ? monthlyTokenLimit : null
+  const startOfMonth = new Date()
+  startOfMonth.setDate(1)
+  const usageDate = startOfMonth.toISOString().slice(0, 10)
+
+  const { data: usageRows, error } = await admin
+    .from('ai_usage_daily')
+    .select('tokens_used')
+    .eq('client_id', clientId)
+    .eq('tool_id', toolId)
+    .gte('usage_date', usageDate)
+
+  if (error) {
+    console.error('ai_usage_daily lookup failed:', error.message)
+    return { allowed: false, clientId, usedThisMonth: 0, limit, percentUsed: null }
+  }
+
+  const usedThisMonth = (usageRows ?? []).reduce((total, row) => total + (row.tokens_used ?? 0), 0)
+  const percentUsed = limit ? Math.round((usedThisMonth / limit) * 100) : null
+
+  return {
+    allowed: !limit || usedThisMonth < limit,
+    clientId,
+    usedThisMonth,
+    limit,
+    percentUsed,
+  }
 }
 
 /** Zoek de client_id op voor een ingelogd emailadres */
@@ -106,6 +188,38 @@ export async function logAiUsage(params: {
     // Niet-kritisch: log maar blokkeer de response niet
     console.warn('ai_usage_events insert mislukt:', error.message)
   }
+
+  const { data: tool } = await admin
+    .from('ai_tools')
+    .select('id')
+    .eq('slug', params.toolName)
+    .maybeSingle()
+
+  const tokensUsed = (params.inputTokens ?? 0) + (params.outputTokens ?? 0)
+  if (!tool?.id || params.status !== 'success' || tokensUsed <= 0) return
+
+  const usageDate = new Date().toISOString().slice(0, 10)
+  const { data: existing } = await admin
+    .from('ai_usage_daily')
+    .select('id, tokens_used, request_count')
+    .eq('client_id', params.clientId)
+    .eq('tool_id', tool.id)
+    .eq('usage_date', usageDate)
+    .maybeSingle()
+
+  const dailyPayload = {
+    client_id: params.clientId,
+    tool_id: tool.id,
+    usage_date: usageDate,
+    tokens_used: (existing?.tokens_used ?? 0) + tokensUsed,
+    request_count: (existing?.request_count ?? 0) + 1,
+  }
+
+  const { error: dailyError } = existing?.id
+    ? await admin.from('ai_usage_daily').update(dailyPayload).eq('id', existing.id)
+    : await admin.from('ai_usage_daily').insert(dailyPayload)
+
+  if (dailyError) console.warn('ai_usage_daily insert mislukt:', dailyError.message)
 }
 
 /** Nederlandse foutmelding bij het bereiken van de maandlimiet */
