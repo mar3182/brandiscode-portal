@@ -77,7 +77,6 @@ export default function Sidebar({ client }: SidebarProps) {
     { name: 'Projectstatus', href: `${clientBasePath}/dashboard/projecten`, icon: BarChart3 },
     { name: 'Bedrijfsgegevens', href: `${clientBasePath}/dashboard/bedrijfsgegevens`, icon: Building2 },
     { name: 'Facturen', href: `${clientBasePath}/dashboard/facturen`, icon: Receipt, badge: openFacturenCount, badgeClass: 'bg-red-500/20 text-red-300' },
-    { name: 'Funda-teksten', href: `${clientBasePath}/dashboard/funda-tekst`, icon: Sparkles },
     { name: 'AI Tools', href: `${clientBasePath}/dashboard/ai-tools`, icon: Sparkles },
     { name: 'Feedback', href: `${clientBasePath}/dashboard/feedback`, icon: MessageSquare },
     { name: 'Team', href: `${clientBasePath}/dashboard/team`, icon: Users },

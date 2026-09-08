@@ -878,7 +878,7 @@ export default function FundaTekstPage() {
           <div className="p-2 rounded-xl bg-brand-blue/20 border border-brand-blue/30">
             <Sparkles className="w-5 h-5 text-brand-blue" />
           </div>
-          <h1 className="text-2xl font-bold text-white">Funda-tekst Generator</h1>
+          <h1 className="text-2xl font-bold text-white">Woningbeschrijvingen</h1>
         </div>
         <p className="text-white/50 text-sm ml-14">
           Genereer professionele woningbeschrijvingen in de stijl van Leunis Makelaars
@@ -1551,7 +1551,7 @@ export default function FundaTekstPage() {
               className="py-4 px-4 rounded-2xl bg-brand-blue text-white font-semibold text-sm flex items-center justify-center gap-2 hover:bg-brand-blue/90 disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-lg shadow-brand-blue/20"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              Funda tekst
+              Woningbeschrijving
             </button>
             <button
               type="button"
@@ -1602,7 +1602,7 @@ export default function FundaTekstPage() {
               </div>
               <p className="text-white/30 text-sm">Jouw gegenereerde tekst verschijnt hier...</p>
               <p className="text-white/20 text-xs mt-2">
-                Klik op &ldquo;Funda tekst&rdquo; of &ldquo;Alle formats&rdquo;
+                Klik op &ldquo;Woningbeschrijving&rdquo; of &ldquo;Alle formats&rdquo;
               </p>
             </div>
           )}
@@ -1611,7 +1611,7 @@ export default function FundaTekstPage() {
           {result && !loading && !multiResult && (
             <div className="glass-card p-6 rounded-2xl">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-white/70">Funda tekst</h3>
+                <h3 className="text-sm font-semibold text-white/70">Woningbeschrijving</h3>
                 <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-white/40">
                   ~{result.woorden} woorden
                 </span>

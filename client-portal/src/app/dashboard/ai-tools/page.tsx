@@ -129,7 +129,7 @@ export default function AiToolsPage() {
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-white group-hover:text-brand-orange transition-colors">{tool.name}</h3>
+                  <h3 className="text-lg font-semibold text-white group-hover:text-brand-orange transition-colors">{tool.slug === 'funda-tekst' ? 'Woningbeschrijvingen' : tool.name}</h3>
                   <p className="text-xs text-white/40 mt-1">{tool.slug}</p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
@@ -184,7 +184,7 @@ export default function AiToolsPage() {
           <div className="flex items-start gap-4">
             <Sparkles className="text-brand-orange shrink-0 mt-1" size={24} />
             <div>
-              <h4 className="text-white font-semibold mb-1">Funda-tekst Generator</h4>
+              <h4 className="text-white font-semibold mb-1">Woningbeschrijvingen</h4>
               <p className="text-white/60 text-sm mb-3">Genereer professionele woningbeschrijvingen voor Funda, Instagram, Facebook en brochures in slechts enkele seconden.</p>
               <Link
                 href={`${basePath}/funda-tekst`}

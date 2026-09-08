@@ -2269,7 +2269,7 @@ const AI_SUB_TABS: { id: AiToolsSubTab; label: string }[] = [
 ]
 
 const AI_TOOL_NAMES: { value: string; label: string }[] = [
-  { value: 'funda-tekst', label: 'Funda-tekst' },
+  { value: 'funda-tekst', label: 'Woningbeschrijvingen' },
   { value: 'funda-multi', label: 'Funda-multi (4 kanalen)' },
   { value: 'verfijn-tekst', label: 'Verfijn-tekst' },
 ]

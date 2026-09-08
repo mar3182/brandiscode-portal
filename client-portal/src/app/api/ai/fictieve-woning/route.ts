@@ -23,8 +23,21 @@ function getOpenAI(): OpenAI {
   throw new Error('Geen AI-provider geconfigureerd')
 }
 
-function createFallbackImage(label: string, accent: string): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><rect width="1024" height="1024" fill="#e8eef2"/><rect y="570" width="1024" height="454" fill="#91a98d"/><circle cx="820" cy="170" r="92" fill="#f4cf7b"/><path d="M145 590 512 285l367 305v280H145Z" fill="#d8a67c"/><path d="m105 600 407-345 407 345-34 40-373-315-373 315Z" fill="${accent}"/><rect x="420" y="650" width="180" height="220" rx="8" fill="#654d46"/><g fill="#b7d8df"><rect x="230" y="650" width="120" height="105"/><rect x="674" y="650" width="120" height="105"/></g><g fill="#fff" opacity=".7"><path d="M290 650h-10v105h10zM230 700h120v10H230zM734 650h-10v105h10zM674 700h120v10H674z"/></g><text x="512" y="955" text-anchor="middle" font-family="sans-serif" font-size="28" fill="#23333b">${label}</text></svg>`
+function createFallbackImage(label: string, accent: string, variant: number): string {
+  const scenes = [
+    { sky: '#e8eef2', ground: '#91a98d', sun: '#f4cf7b', body: '#d8a67c' },
+    { sky: '#dbe8f2', ground: '#7896a1', sun: '#f6c36b', body: '#c9c3b4' },
+    { sky: '#f0e4d2', ground: '#9caf82', sun: '#e8a866', body: '#b9c6c8' },
+    { sky: '#d9e1ec', ground: '#7c967d', sun: '#f5d98b', body: '#d1ae91' },
+  ]
+  const scene = scenes[variant % scenes.length]
+  const building = variant % 2 === 0
+    ? `<path d="M145 590 512 285l367 305v280H145Z" fill="${scene.body}"/><path d="m105 600 407-345 407 345-34 40-373-315-373 315Z" fill="${accent}"/>`
+    : `<rect x="155" y="440" width="714" height="430" rx="18" fill="${scene.body}"/><rect x="125" y="400" width="774" height="58" rx="12" fill="${accent}"/>`
+  const windows = variant % 2 === 0
+    ? '<rect x="230" y="650" width="120" height="105"/><rect x="674" y="650" width="120" height="105"/>'
+    : '<rect x="225" y="570" width="130" height="115"/><rect x="447" y="570" width="130" height="115"/><rect x="669" y="570" width="130" height="115"/>'
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><rect width="1024" height="1024" fill="${scene.sky}"/><rect y="570" width="1024" height="454" fill="${scene.ground}"/><circle cx="820" cy="170" r="92" fill="${scene.sun}"/>${building}<rect x="420" y="650" width="180" height="220" rx="8" fill="#654d46"/><g fill="#b7d8df">${windows}</g><g fill="#fff" opacity=".7"><path d="M290 650h-10v105h10zM230 700h120v10H230zM734 650h-10v105h10zM674 700h120v10H674z"/></g><text x="512" y="955" text-anchor="middle" font-family="sans-serif" font-size="28" fill="#23333b">${label}</text></svg>`
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
 }
 
@@ -88,7 +101,7 @@ function normalizeSyntheticHome(raw: unknown, fallback: SyntheticProfile): Recor
     ligging: asText(source.ligging, fallback.ligging),
     kenmerken: kenmerken.length > 0 ? kenmerken : fallback.kenmerken,
     staat: asText(source.staat, fallback.staat),
-    bijzonderheden: asText(source.bijzonderheden, 'Alle woninggegevens in deze test zijn fictief.'),
+    bijzonderheden: asText(source.bijzonderheden, 'Ruime leefruimtes en veel natuurlijke lichtinval.'),
     lengte: asText(source.lengte, 'normaal'),
   }
 }
@@ -117,7 +130,8 @@ export async function POST() {
 
   try {
     const variationSeed = crypto.randomUUID()
-    const fallbackProfile = SYNTHETIC_PROFILES[Math.floor(Math.random() * SYNTHETIC_PROFILES.length)]
+    const fallbackIndex = Math.floor(Math.random() * SYNTHETIC_PROFILES.length)
+    const fallbackProfile = SYNTHETIC_PROFILES[fallbackIndex]
     const completion = await openai.chat.completions.create({
       model,
       response_format: { type: 'json_object' },
@@ -130,7 +144,7 @@ export async function POST() {
         },
         {
           role: 'user',
-          content: `Maak een nieuwe, gevarieerde fictieve testwoning in Zeeland die geschikt is om een Funda-, Instagram-, Facebook- en brochuretekst te testen. Kies lengte normaal. Zet in bijzonderheden expliciet dat alle gegevens fictief zijn. Gebruik deze variatiecode ${variationSeed} en dit profiel als richting, maar neem niet letterlijk steeds dezelfde waarden over: ${JSON.stringify(fallbackProfile)}.`,
+          content: `Maak een nieuwe, gevarieerde synthetische testwoning in Zeeland die geschikt is om een Funda-, Instagram-, Facebook- en brochuretekst te testen. Kies lengte normaal. De interface toont zelf dat dit testdata is; zet geen woorden als fictief, synthetisch of demo in de woningvelden. Gebruik deze variatiecode ${variationSeed} en dit profiel als richting, maar neem niet letterlijk steeds dezelfde waarden over: ${JSON.stringify(fallbackProfile)}.`,
         },
       ],
     })
@@ -165,8 +179,8 @@ export async function POST() {
     if (images.length === 0) {
       imageSource = 'demo-fallback'
       images = [
-        createFallbackImage('Fictief demo-beeld 1', '#6e8792'),
-        createFallbackImage('Fictief demo-beeld 2', '#806b5e'),
+        createFallbackImage(`${fallbackProfile.plaats} - beeld 1`, '#6e8792', fallbackIndex),
+        createFallbackImage(`${fallbackProfile.plaats} - beeld 2`, '#806b5e', fallbackIndex + 1),
       ]
     }
 
