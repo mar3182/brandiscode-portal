@@ -23,6 +23,11 @@ function getOpenAI(): OpenAI {
   throw new Error('Geen AI-provider geconfigureerd')
 }
 
+function createFallbackImage(label: string, accent: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><rect width="1024" height="1024" fill="#e8eef2"/><rect y="570" width="1024" height="454" fill="#91a98d"/><circle cx="820" cy="170" r="92" fill="#f4cf7b"/><path d="M145 590 512 285l367 305v280H145Z" fill="#d8a67c"/><path d="m105 600 407-345 407 345-34 40-373-315-373 315Z" fill="${accent}"/><rect x="420" y="650" width="180" height="220" rx="8" fill="#654d46"/><g fill="#b7d8df"><rect x="230" y="650" width="120" height="105"/><rect x="674" y="650" width="120" height="105"/></g><g fill="#fff" opacity=".7"><path d="M290 650h-10v105h10zM230 700h120v10H230zM734 650h-10v105h10zM674 700h120v10H674z"/></g><text x="512" y="955" text-anchor="middle" font-family="sans-serif" font-size="28" fill="#23333b">${label}</text></svg>`
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
+}
+
 export async function POST() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -70,20 +75,36 @@ export async function POST() {
       throw new Error('De fictieve woningdata is onvolledig')
     }
 
-    const imagePrompt = `Create a realistic but entirely fictional real-estate listing photo of a ${String(data.woningtype)} in a Dutch Zeeland village. No people, no readable signs, no logos, no exact real-world landmark, no text. Warm daylight, professional property photography, ${String(data.bijzonderheden)}.`
-    const imageResult = await openai.images.generate({
-      model: 'gpt-image-1',
-      prompt: imagePrompt,
-      size: '1024x1024',
-      quality: 'low',
-      n: 2,
-    })
+    let images: string[] = []
+    let imageSource: 'openai' | 'demo-fallback' = 'openai'
+    if (process.env.OPENAI_API_KEY) {
+      try {
+        const imagePrompt = `Create a realistic but entirely fictional real-estate listing photo of a ${String(data.woningtype)} in a Dutch Zeeland village. No people, no readable signs, no logos, no exact real-world landmark, no text. Warm daylight, professional property photography, ${String(data.bijzonderheden)}.`
+        const imageResult = await openai.images.generate({
+          model: 'gpt-image-1',
+          prompt: imagePrompt,
+          size: '1024x1024',
+          quality: 'low',
+          n: 2,
+        })
+        images = (imageResult.data ?? [])
+          .map((image) => image.b64_json ? `data:image/png;base64,${image.b64_json}` : '')
+          .filter(Boolean)
+        if (images.length === 0) throw new Error('Geen beelden ontvangen')
+      } catch (imageError) {
+        console.warn('OpenAI image generation unavailable, using demo fallback:', imageError)
+        imageSource = 'demo-fallback'
+        images = []
+      }
+    }
 
-    const images = (imageResult.data ?? [])
-      .map((image) => image.b64_json ? `data:image/png;base64,${image.b64_json}` : '')
-      .filter(Boolean)
-
-    if (images.length === 0) throw new Error('Er konden geen fictieve woningafbeeldingen worden gemaakt')
+    if (images.length === 0) {
+      imageSource = 'demo-fallback'
+      images = [
+        createFallbackImage('Fictief demo-beeld 1', '#6e8792'),
+        createFallbackImage('Fictief demo-beeld 2', '#806b5e'),
+      ]
+    }
 
     await logAiUsage({
       clientId,
@@ -95,7 +116,7 @@ export async function POST() {
       status: 'success',
     })
 
-    return response({ data, images, synthetic: true })
+    return response({ data, images, image_source: imageSource, synthetic: true })
   } catch (error) {
     console.error('POST /api/ai/fictieve-woning error:', error)
     return response({ error: 'De fictieve testwoning kon niet worden gegenereerd.' }, 500)

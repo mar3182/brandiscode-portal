@@ -928,7 +928,7 @@ export default function FundaTekstPage() {
             <div className="mb-5 rounded-xl border border-brand-gold/30 bg-brand-gold/10 p-4">
               <p className="text-sm font-medium text-brand-gold">Snel testen met fictieve data</p>
               <p className="mt-1 text-xs leading-relaxed text-white/55">
-                AI vult het formulier met synthetische woningdata en maakt twee fictieve woningbeelden. Dit gebruikt extra tokens en beeldgeneratie; de beelden zijn niet geschikt voor publicatie.
+                AI vult het formulier met synthetische woningdata en voegt twee fictieve testbeelden toe. Dit gebruikt extra tokens; met een OpenAI-imageprovider worden de beelden ook door AI gemaakt. De beelden zijn niet geschikt voor publicatie.
               </p>
               <button
                 type="button"
