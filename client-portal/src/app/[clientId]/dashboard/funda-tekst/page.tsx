@@ -652,12 +652,13 @@ export default function FundaTekstPage() {
     })
   }
 
-  const MAX_IMAGE_BYTES = 550 * 1024
+  const MAX_IMAGE_BYTES = 300 * 1024
   const COMPRESSION_STEPS: Array<{ maxDim: number; quality: number }> = [
-    { maxDim: 1280, quality: 0.65 },
-    { maxDim: 1024, quality: 0.55 },
-    { maxDim: 800, quality: 0.45 },
-    { maxDim: 640, quality: 0.4 },
+    { maxDim: 1280, quality: 0.6 },
+    { maxDim: 1024, quality: 0.5 },
+    { maxDim: 800, quality: 0.4 },
+    { maxDim: 640, quality: 0.35 },
+    { maxDim: 480, quality: 0.3 },
   ]
 
   async function convertToJpeg(file: File): Promise<File> {
