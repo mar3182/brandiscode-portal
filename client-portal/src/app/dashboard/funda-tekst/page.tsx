@@ -573,6 +573,17 @@ export default function FundaTekstPage() {
     return Object.keys(newErrors).length === 0
   }
 
+  const MAX_REQUEST_BYTES = 4 * 1024 * 1024
+
+  function guardPayloadSize(request: FundaTekstRequest): boolean {
+    const size = new Blob([JSON.stringify(request)]).size
+    if (size > MAX_REQUEST_BYTES) {
+      setApiError('De opgegeven foto\'s zijn samen te groot om te versturen. Verwijder een foto of upload kleinere afbeeldingen.')
+      return false
+    }
+    return true
+  }
+
   async function handleGenerate(request?: FundaTekstRequest) {
     if (!(await ensureCostAcknowledged())) return
     const activePromptAddition = buildPromptAdditionFromList(promptExtensions)
@@ -598,6 +609,8 @@ export default function FundaTekstPage() {
         prompt_addition: activePromptAddition || undefined,
       }
     }
+
+    if (!guardPayloadSize(request)) return
 
     lastRequestRef.current = request
     const nextGenerationKey = `funda-${Date.now()}`
@@ -671,7 +684,7 @@ export default function FundaTekstPage() {
     const canvas = document.createElement('canvas')
     const sourceWidth = image.naturalWidth || image.width
     const sourceHeight = image.naturalHeight || image.height
-    const scale = Math.min(1, 1600 / Math.max(sourceWidth, sourceHeight))
+    const scale = Math.min(1, 1280 / Math.max(sourceWidth, sourceHeight))
     canvas.width = Math.max(1, Math.round(sourceWidth * scale))
     canvas.height = Math.max(1, Math.round(sourceHeight * scale))
 
@@ -689,7 +702,7 @@ export default function FundaTekstPage() {
           else reject(new Error('Conversie naar JPEG is mislukt'))
         },
         'image/jpeg',
-        0.72
+        0.65
       )
     })
 
@@ -800,6 +813,8 @@ export default function FundaTekstPage() {
       images: images.length > 0 ? images : undefined,
       prompt_addition: activePromptAddition || undefined,
     }
+    if (!guardPayloadSize(request)) return
+
     lastRequestRef.current = request
     const nextGenerationKey = `multi-${Date.now()}`
     setGenerationKey(nextGenerationKey)
