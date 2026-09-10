@@ -679,35 +679,54 @@ export default function FundaTekstPage() {
     })
   }
 
+  const MAX_IMAGE_BYTES = 550 * 1024
+  const COMPRESSION_STEPS: Array<{ maxDim: number; quality: number }> = [
+    { maxDim: 1280, quality: 0.65 },
+    { maxDim: 1024, quality: 0.55 },
+    { maxDim: 800, quality: 0.45 },
+    { maxDim: 640, quality: 0.4 },
+  ]
+
   async function convertToJpeg(file: File): Promise<File> {
     const image = await loadImageFromFile(file)
-    const canvas = document.createElement('canvas')
     const sourceWidth = image.naturalWidth || image.width
     const sourceHeight = image.naturalHeight || image.height
-    const scale = Math.min(1, 1280 / Math.max(sourceWidth, sourceHeight))
-    canvas.width = Math.max(1, Math.round(sourceWidth * scale))
-    canvas.height = Math.max(1, Math.round(sourceHeight * scale))
 
-    const ctx = canvas.getContext('2d')
-    if (!ctx) {
-      throw new Error('Canvas context is niet beschikbaar')
+    let bestBlob: Blob | null = null
+    for (const step of COMPRESSION_STEPS) {
+      const canvas = document.createElement('canvas')
+      const scale = Math.min(1, step.maxDim / Math.max(sourceWidth, sourceHeight))
+      canvas.width = Math.max(1, Math.round(sourceWidth * scale))
+      canvas.height = Math.max(1, Math.round(sourceHeight * scale))
+
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        throw new Error('Canvas context is niet beschikbaar')
+      }
+
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
+
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (result) => {
+            if (result) resolve(result)
+            else reject(new Error('Conversie naar JPEG is mislukt'))
+          },
+          'image/jpeg',
+          step.quality
+        )
+      })
+
+      bestBlob = blob
+      if (blob.size <= MAX_IMAGE_BYTES) break
     }
 
-    ctx.drawImage(image, 0, 0)
-
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
-        (result) => {
-          if (result) resolve(result)
-          else reject(new Error('Conversie naar JPEG is mislukt'))
-        },
-        'image/jpeg',
-        0.65
-      )
-    })
+    if (!bestBlob) {
+      throw new Error('Conversie naar JPEG is mislukt')
+    }
 
     const basename = file.name.replace(/\.[^.]+$/, '')
-    return new File([blob], `${basename}.jpg`, { type: 'image/jpeg' })
+    return new File([bestBlob], `${basename}.jpg`, { type: 'image/jpeg' })
   }
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
