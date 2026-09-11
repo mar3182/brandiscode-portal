@@ -93,9 +93,9 @@ type SyntheticProfile = {
   vraagprijs: string
 }
 
-const THOLEN_PLACES = [
-  'Tholen', 'Sint-Annaland', 'Sint-Philipsland', 'Poortvliet', 'Nieuwvossemeer',
-  'Oud-Vossemeer', 'IJzendijke', 'Eisden', 'Weert', 'Schoondijk', 'Biezen', 'Rijswijk',
+const THOLEN_MUNICIPALITY_KERNS = [
+  'Tholen', 'Poortvliet', 'Scherpenisse', 'Sint-Maartensdijk',
+  'Stavenisse', 'Sint-Annaland', 'Oud-Vossemeer', 'Sint-Philipsland', 'Anna Jacobapolder',
 ]
 
 const SYNTHETIC_PROFILES: SyntheticProfile[] = [
@@ -112,24 +112,36 @@ const SYNTHETIC_PROFILES: SyntheticProfile[] = [
     ligging: 'In de historische binnenstad van Tholen, nabij markt en haven', kenmerken: ['Monument', 'Balkenplafond', 'Glas-in-loodramen'], staat: 'Gerenoveerd', bouwjaar: '1849', woonoppervlakte: '142', perceeloppervlakte: '98', kamers: '5', slaapkamers: '3', vraagprijs: '€ 489.000 k.k.',
   },
   {
-    adres: 'Dijkgraafstraat 8', plaats: 'IJzendijke', woningtype: 'Appartement',
-    ligging: 'Aan de waterkant met uitzicht over de Braasse plas', kenmerken: ['Balkon', 'Inpandige berging', 'Dubbele beglazing'], staat: 'Goed onderhouden', bouwjaar: '2012', woonoppervlakte: '86', perceeloppervlakte: 'n.v.t.', kamers: '3', slaapkamers: '2', vraagprijs: '€ 319.000 k.k.',
+    adres: 'Havenstraat 8', plaats: 'Poortvliet', woningtype: 'Appartement',
+    ligging: 'Rustig gelegen met zicht op de dorpskern en de polders', kenmerken: ['Balkon', 'Inpandige berging', 'Dubbele beglazing'], staat: 'Goed onderhouden', bouwjaar: '2012', woonoppervlakte: '86', perceeloppervlakte: 'n.v.t.', kamers: '3', slaapkamers: '2', vraagprijs: '€ 319.000 k.k.',
   },
   {
     adres: 'Kerkweg 22', plaats: 'Sint-Philipsland', woningtype: '2-onder-1-kapwoning',
     ligging: 'Rustige straat nabij dorpskern en basisschool', kenmerken: ['Tuin op het westen', 'Vloerverwarming', 'Badkamer vernieuwd'], staat: 'Instapklaar', bouwjaar: '1994', woonoppervlakte: '132', perceeloppervlakte: '298', kamers: '5', slaapkamers: '4', vraagprijs: '€ 449.000 k.k.',
   },
   {
-    adres: 'Bosstraat 15', plaats: 'Weert', woningtype: 'Bungalow',
+    adres: 'Bosstraat 15', plaats: 'Sint-Annaland', woningtype: 'Bungalow',
     ligging: 'Landelijk gelegen aan de rand van het dorp met uitzicht over de polder', kenmerken: ['Vrijstaande schuur', 'Zonnepanelen', 'Open keuken'], staat: 'Goed onderhouden', bouwjaar: '1985', woonoppervlakte: '105', perceeloppervlakte: '450', kamers: '4', slaapkamers: '3', vraagprijs: '€ 365.000 k.k.',
   },
   {
-    adres: 'Havenzicht 11', plaats: 'Schoondijk', woningtype: 'Vrijstaande woning',
-    ligging: 'Aan de waterweg met eigen aanlegsteek', kenmerken: ['Garage', 'Tuin op het zuiden', 'Zonnepanelen', 'Badkamer vernieuwd'], staat: 'Instapklaar', bouwjaar: '2015', woonoppervlakte: '168', perceeloppervlakte: '520', kamers: '6', slaapkamers: '4', vraagprijs: '€ 525.000 k.k.',
+    adres: 'Dorpsstraat 33', plaats: 'Scherpenisse', woningtype: 'Vrijstaande woning',
+    ligging: 'Groene omgeving nabij het Scherpenissemeer', kenmerken: ['Garage', 'Tuin op het zuiden', 'Zonnepanelen', 'Badkamer vernieuwd'], staat: 'Instapklaar', bouwjaar: '2015', woonoppervlakte: '168', perceeloppervlakte: '520', kamers: '6', slaapkamers: '4', vraagprijs: '€ 525.000 k.k.',
   },
   {
-    adres: 'Biezenweg 7', plaats: 'Biezen', woningtype: 'Tussenwoning',
-    ligging: 'Groene omgeving nabij natuurgebied de Biezen', kenmerken: ['Dakkapel', 'Vloerverwarming', 'Inpandige berging'], staat: 'Goed onderhouden', bouwjaar: '2001', woonoppervlakte: '115', perceeloppervlakte: '210', kamers: '4', slaapkamers: '3', vraagprijs: '€ 345.000 k.k.',
+    adres: 'Molenweg 7', plaats: 'Sint-Maartensdijk', woningtype: 'Tussenwoning',
+    ligging: 'Karaktervol dorp met historische molen en gezellige dorpskern', kenmerken: ['Dakkapel', 'Vloerverwarming', 'Inpandige berging'], staat: 'Goed onderhouden', bouwjaar: '2001', woonoppervlakte: '115', perceeloppervlakte: '210', kamers: '4', slaapkamers: '3', vraagprijs: '€ 345.000 k.k.',
+  },
+  {
+    adres: 'Stavenisseweg 12', plaats: 'Stavenisse', woningtype: '2-onder-1-kapwoning',
+    ligging: 'Rustige ligging aan de rand van het dorp', kenmerken: ['Tuin op het westen', 'Zonnepanelen', 'Dubbele beglazing'], staat: 'Gerenoveerd', bouwjaar: '2008', woonoppervlakte: '128', perceeloppervlakte: '245', kamers: '5', slaapkamers: '3', vraagprijs: '€ 398.000 k.k.',
+  },
+  {
+    adres: 'Anna Jacobapolder 18', plaats: 'Anna Jacobapolder', woningtype: 'Vrijstaande woning',
+    ligging: 'Landelijk gelegen met uitzicht over de polder', kenmerken: ['Vrijstaande schuur', 'Zonnepanelen', 'Open keuken', 'Laadpaal'], staat: 'Instapklaar', bouwjaar: '2020', woonoppervlakte: '175', perceeloppervlakte: '680', kamers: '6', slaapkamers: '4', vraagprijs: '€ 595.000 k.k.',
+  },
+  {
+    adres: 'Oud-Vossemeer 45', plaats: 'Oud-Vossemeer', woningtype: 'Appartement',
+    ligging: 'Nabij het centrum en wandelroutes door de natuur', kenmerken: ['Balkon', 'Inpandige berging', 'Airco'], staat: 'Goed onderhouden', bouwjaar: '2016', woonoppervlakte: '92', perceeloppervlakte: 'n.v.t.', kamers: '3', slaapkamers: '2', vraagprijs: '€ 289.000 k.k.',
   },
 ]
 
