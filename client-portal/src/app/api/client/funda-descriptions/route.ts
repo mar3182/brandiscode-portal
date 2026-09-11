@@ -8,6 +8,10 @@ import { resolveClientId } from '@/lib/ai-usage'
 
 export const dynamic = 'force-dynamic'
 
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate',
+}
+
 interface ApiResponse {
   error?: string
   descriptions?: Array<Record<string, unknown>>
@@ -149,7 +153,7 @@ export async function GET(req: NextRequest) {
 
     return response({
       descriptions: data,
-      total: count,
+      total: count ?? 0,
       page,
       limit,
       totalPages: Math.ceil((count || 0) / limit),

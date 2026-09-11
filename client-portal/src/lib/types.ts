@@ -339,6 +339,7 @@ export type FundaTekstRequest = {
   lengte: 'kort' | 'normaal' | 'uitgebreid'  // kort ~200w, normaal ~400w, uitgebreid ~600w
   images?: string[]            // base64 data URLs van foto's / plattegrond (max 4)
   prompt_addition?: string     // optionele, veilige uitbreidingsinstructie van gebruiker (basisprompt blijft leidend)
+  generation_key?: string      // optionele key voor het koppelen van gerelateerde generaties
 }
 
 export type FundaTekstResponse = {
