@@ -239,7 +239,7 @@ ${lengteInstructie}${imageNote}`
           images: body.images,
           generation_key: body.generation_key,
           token_count: (completion.usage?.prompt_tokens ?? 0) + (completion.usage?.completion_tokens ?? 0),
-          cost_eur: Number(((completion.usage?.prompt_tokens ?? 0 + completion.usage?.completion_tokens ?? 0) / 1000000 * 0.03).toFixed(4)),
+          cost_eur: Number((((completion.usage?.prompt_tokens ?? 0) + (completion.usage?.completion_tokens ?? 0)? 0)) / 1000000 * 0.03).toFixed(4)),
         })
       } catch (saveError) {
         console.warn('Failed to save funda_description (non-critical):', saveError)
