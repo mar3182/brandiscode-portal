@@ -215,6 +215,54 @@ Geef je antwoord als JSON: { "funda": "...", "instagram": "...", "facebook": "..
         monthlyTokenLimit: access.monthlyTokenLimit,
         userId: user.id,
       })
+      
+      // Save all 4 media formats to funda_descriptions
+      try {
+        const admin = createClient()
+        const totalTokens = (completion.usage?.prompt_tokens ?? 0) + (completion.usage?.completion_tokens ?? 0)
+        const totalCost = Number((totalTokens / 1000000 * 0.03).toFixed(4))
+        
+        // Save each media format separately
+        const mediaFormats: Array<{format: string, text: string}> = [
+          { format: 'funda', text: parsed.funda },
+          { format: 'instagram', text: parsed.instagram },
+          { format: 'facebook', text: parsed.facebook },
+          { format: 'brochure', text: parsed.brochure },
+        ]
+        
+        for (const { format, text } of mediaFormats) {
+          await admin.from('funda_descriptions').insert({
+            client_id: clientId,
+            tool_id: access.toolId,
+            access_id: access.accessId,
+            form_data: {
+              woningtype: body.woningtype,
+              adres: body.adres,
+              plaats: body.plaats,
+              vraagprijs: body.vraagprijs,
+              bouwjaar: body.bouwjaar,
+              woonoppervlakte: body.woonoppervlakte,
+              perceeloppervlakte: body.perceeloppervlakte,
+              kamers: body.kamers,
+              slaapkamers: body.slaapkamers,
+              ligging: body.ligging,
+              kenmerken: body.kenmerken,
+              staat: body.staat,
+              bijzonderheden: body.bijzonderheden,
+              lengte: body.lengte,
+            },
+            generated_text: text,
+            media_format: format,
+            source_type: 'manual',
+            images: body.images,
+            generation_key: body.generation_key,
+            token_count: Math.floor(totalTokens / 4), // Divide tokens across 4 formats
+            cost_eur: Number((totalCost / 4).toFixed(4)),
+          })
+        }
+      } catch (saveError) {
+        console.warn('Failed to save funda_descriptions (non-critical):', saveError)
+      }
     }
 
     return NextResponse.json(parsed, { headers: { 'Cache-Control': 'no-store' } })

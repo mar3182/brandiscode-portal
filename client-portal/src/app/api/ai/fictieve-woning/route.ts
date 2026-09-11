@@ -262,6 +262,44 @@ export async function POST() {
       status: 'success',
     })
 
+    // Save synthetic home data to funda_descriptions with labels
+    try {
+      const admin = createClient()
+      const totalTokens = (completion.usage?.prompt_tokens ?? 0) + (completion.usage?.completion_tokens ?? 0)
+      
+      await admin.from('funda_descriptions').insert({
+        client_id: clientId,
+        tool_id: access.toolId,
+        access_id: access.accessId,
+        form_data: {
+          woningtype: data.woningtype,
+          adres: data.adres,
+          plaats: data.plaats,
+          vraagprijs: data.vraagprijs,
+          bouwjaar: data.bouwjaar,
+          woonoppervlakte: data.woonoppervlakte,
+          perceeloppervlakte: data.perceeloppervlakte,
+          kamers: data.kamers,
+          slaapkamers: data.slaapkamers,
+          ligging: data.ligging,
+          kenmerken: data.kenmerken,
+          staat: data.staat,
+          bijzonderheden: data.bijzonderheden,
+          lengte: data.lengte,
+        },
+        generated_text: JSON.stringify(data),
+        media_format: 'funda',
+        source_type: 'synthetic',
+        synthetic_label: '[FICTIEVE WONING - TESTDATA]',
+        images: images,
+        token_count: totalTokens,
+        cost_eur: Number((totalTokens / 1000000 * 0.01).toFixed(4)), // Lower cost for synthetic
+        is_synthetic: true,
+      })
+    } catch (saveError) {
+      console.warn('Failed to save synthetic funda_description (non-critical):', saveError)
+    }
+
     return response({ data, images, image_source: imageSource, synthetic: true })
   } catch (error) {
     console.error('POST /api/ai/fictieve-woning error:', error)

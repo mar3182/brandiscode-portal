@@ -208,6 +208,44 @@ ${lengteInstructie}${imageNote}`
     }
 
     const response: FundaTekstResponse = { tekst, woorden }
+    
+    // Save generated description to funda_descriptions table
+    if (clientId && access.toolId) {
+      try {
+        const admin = createClient()
+        await admin.from('funda_descriptions').insert({
+          client_id: clientId,
+          tool_id: access.toolId,
+          access_id: access.accessId,
+          form_data: {
+            woningtype: body.woningtype,
+            adres: body.adres,
+            plaats: body.plaats,
+            vraagprijs: body.vraagprijs,
+            bouwjaar: body.bouwjaar,
+            woonoppervlakte: body.woonoppervlakte,
+            perceeloppervlakte: body.perceeloppervlakte,
+            kamers: body.kamers,
+            slaapkamers: body.slaapkamers,
+            ligging: body.ligging,
+            kenmerken: body.kenmerken,
+            staat: body.staat,
+            bijzonderheden: body.bijzonderheden,
+            lengte: body.lengte,
+          },
+          generated_text: tekst,
+          media_format: 'funda',
+          source_type: 'manual',
+          images: body.images,
+          generation_key: body.generation_key,
+          token_count: (completion.usage?.prompt_tokens ?? 0) + (completion.usage?.completion_tokens ?? 0),
+          cost_eur: Number(((completion.usage?.prompt_tokens ?? 0 + completion.usage?.completion_tokens ?? 0) / 1000000 * 0.03).toFixed(4)),
+        })
+      } catch (saveError) {
+        console.warn('Failed to save funda_description (non-critical):', saveError)
+      }
+    }
+    
     return NextResponse.json(response, { headers: { 'Cache-Control': 'no-store' } })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
