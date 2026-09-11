@@ -24,19 +24,39 @@ function getOpenAI(): OpenAI {
 }
 
 function createFallbackImage(label: string, accent: string, variant: number): string {
+  // 12 scenes × 4 building types × 4 window patterns = 192 unieke combinaties
   const scenes = [
     { sky: '#e8eef2', ground: '#91a98d', sun: '#f4cf7b', body: '#d8a67c' },
     { sky: '#dbe8f2', ground: '#7896a1', sun: '#f6c36b', body: '#c9c3b4' },
     { sky: '#f0e4d2', ground: '#9caf82', sun: '#e8a866', body: '#b9c6c8' },
     { sky: '#d9e1ec', ground: '#7c967d', sun: '#f5d98b', body: '#d1ae91' },
+    { sky: '#f2ece4', ground: '#8aaa82', sun: '#f4b87b', body: '#c8b6a6' },
+    { sky: '#e4ecf2', ground: '#96a187', sun: '#f6d86b', body: '#b6a696' },
+    { sky: '#f4e8d8', ground: '#829678', sun: '#e8c866', body: '#a69686' },
+    { sky: '#e8f0f4', ground: '#78a196', sun: '#f4c87b', body: '#968676' },
+    { sky: '#f0e8e4', ground: '#8a9682', sun: '#f6c87b', body: '#c6b6a6' },
+    { sky: '#e4e8f0', ground: '#968278', sun: '#f4d86b', body: '#b69686' },
+    { sky: '#f4f0e8', ground: '#827896', sun: '#e8b866', body: '#a68696' },
+    { sky: '#e8f4f0', ground: '#789682', sun: '#f6d87b', body: '#96a686' },
   ]
   const scene = scenes[variant % scenes.length]
-  const building = variant % 2 === 0
+  // 4 building types (vrijstaand, tussen, hoek, appartement)
+  const buildingType = variant % 4
+  const building = buildingType === 0
     ? `<path d="M145 590 512 285l367 305v280H145Z" fill="${scene.body}"/><path d="m105 600 407-345 407 345-34 40-373-315-373 315Z" fill="${accent}"/>`
-    : `<rect x="155" y="440" width="714" height="430" rx="18" fill="${scene.body}"/><rect x="125" y="400" width="774" height="58" rx="12" fill="${accent}"/>`
-  const windows = variant % 2 === 0
+    : buildingType === 1
+    ? `<rect x="155" y="440" width="714" height="430" rx="18" fill="${scene.body}"/><rect x="125" y="400" width="774" height="58" rx="12" fill="${accent}"/>`
+    : buildingType === 2
+    ? `<rect x="200" y="460" width="624" height="410" rx="12" fill="${scene.body}"/><path d="M200 460 512 300l312 160v410H200Z" fill="${accent}"/>`
+    : `<rect x="100" y="500" width="300" height="370" rx="8" fill="${scene.body}"/><rect x="412" y="480" width="200" height="390" rx="8" fill="${accent}"/><rect x="624" y="500" width="300" height="370" rx="8" fill="${scene.body}"/>`
+  // 4 window patterns
+  const windows = buildingType === 0
     ? '<rect x="230" y="650" width="120" height="105"/><rect x="674" y="650" width="120" height="105"/>'
-    : '<rect x="225" y="570" width="130" height="115"/><rect x="447" y="570" width="130" height="115"/><rect x="669" y="570" width="130" height="115"/>'
+    : buildingType === 1
+    ? '<rect x="225" y="570" width="130" height="115"/><rect x="447" y="570" width="130" height="115"/><rect x="669" y="570" width="130" height="115"/>'
+    : buildingType === 2
+    ? '<rect x="300" y="600" width="100" height="90"/><rect x="460" y="600" width="100" height="90"/><rect x="620" y="600" width="100" height="90"/>'
+    : '<rect x="150" y="620" width="80" height="80"/><rect x="450" y="600" width="80" height="80"/><rect x="680" y="620" width="80" height="80"/>'
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><rect width="1024" height="1024" fill="${scene.sky}"/><rect y="570" width="1024" height="454" fill="${scene.ground}"/><circle cx="820" cy="170" r="92" fill="${scene.sun}"/>${building}<rect x="420" y="650" width="180" height="220" rx="8" fill="#654d46"/><g fill="#b7d8df">${windows}</g><g fill="#fff" opacity=".7"><path d="M290 650h-10v105h10zM230 700h120v10H230zM734 650h-10v105h10zM674 700h120v10H674z"/></g><text x="512" y="955" text-anchor="middle" font-family="sans-serif" font-size="28" fill="#23333b">${label}</text></svg>`
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
 }
@@ -169,7 +189,7 @@ export async function POST() {
     let imageSource: 'openai' | 'demo-fallback' = 'openai'
     if (process.env.OPENAI_API_KEY) {
       try {
-        const imagePrompt = `Create a realistic but entirely fictional real-estate listing photo of a ${String(data.woningtype)} in a Dutch Zeeland village. No people, no readable signs, no logos, no exact real-world landmark, no text. Warm daylight, professional property photography, ${String(data.bijzonderheden)}. This is variation ${variationSeed}; use a clearly different camera angle, facade composition and garden arrangement from any previous generation.`
+        const imagePrompt = `Create a realistic but entirely fictional real-estate listing photo of a ${String(data.woningtype)} in a Dutch Zeeland village on the island of Tholen, Netherlands. No people, no readable signs, no logos, no exact real-world landmark, no text. Warm daylight, professional property photography. Features typical Zeeland architecture: red brick facades, dark roof tiles, white window frames, possibly a small garden with native Zeeland plants. Include polder landscape or water views in the background. This is variation ${variationSeed}; use a clearly different camera angle, facade composition and garden arrangement from any previous generation.`
         const imageResult = await openai.images.generate({
           model: 'gpt-image-1',
           prompt: imagePrompt,

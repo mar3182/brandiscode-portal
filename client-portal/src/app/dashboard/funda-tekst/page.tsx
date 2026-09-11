@@ -311,13 +311,35 @@ export default function FundaTekstPage() {
     try {
       const response = await fetch('/api/ai/fictieve-woning', { method: 'POST' })
       const body = await response.json().catch(() => ({})) as Partial<SyntheticHomeResponse> & { error?: string }
-      if (!response.ok || !body.data || !body.images?.length) {
+      if (!response.ok || !body.data) {
         throw new Error(body.error || 'De fictieve testwoning kon niet worden gegenereerd.')
       }
+
       setForm((current) => ({ ...current, ...body.data }))
       setKenmerken(body.data.kenmerken)
-      setImages(body.images)
-      setImageNames(body.images.map((_, index) => `Fictieve AI-woning ${index + 1}`))
+
+      // Compress AI-gegenereerde images met dezelfde pipeline als user-uploads
+      const compressedImages: string[] = []
+      if (body.images?.length) {
+        for (const imageDataUrl of body.images) {
+          try {
+            const res = await fetch(imageDataUrl)
+            if (!res.ok) continue
+            const blob = await res.blob()
+            const file = new File([blob], `synthetic-${Date.now()}.jpg`, { type: 'image/jpeg' })
+            const compressed = await convertToJpeg(file)
+            const base64 = await fileToBase64(compressed)
+            compressedImages.push(base64)
+          } catch {
+            // Fallback: gebruik originele image (zonder compressie)
+          }
+        }
+      }
+
+      setImages(compressedImages.length > 0 ? compressedImages : (body.images ?? []))
+      setImageNames(compressedImages.length > 0
+        ? compressedImages.map((_, index) => `Fictieve AI-woning ${index + 1}`)
+        : (body.images ?? []).map((_, index) => `Fictieve AI-woning ${index + 1}`))
       setImageError('')
       setApiError('')
       const usageResponse = await fetch('/api/ai/usage', { cache: 'no-store' })
