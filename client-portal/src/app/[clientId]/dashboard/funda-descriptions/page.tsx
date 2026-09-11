@@ -228,7 +228,7 @@ export default function FundaDescriptionsPage() {
                     {desc.is_synthetic ? '🏠 Fictief' : '📝 Handmatig'}
                   </span>
                   <span className="px-3 py-1 rounded-full text-xs font-medium bg-white/10 text-white/70">
-                    {MEDIA_FORMAT_LABELS[desc.media_format] || desc.media_format}
+                    {MEDIA_FORMAT_LABELS[desc.media_format] || String(desc.media_format)}
                   </span>
                   <span className="text-xs text-white/40">
                     {format(new Date(desc.created_at), 'd MMM yyyy, HH:mm', { locale: nl })}
@@ -236,9 +236,9 @@ export default function FundaDescriptionsPage() {
                 </div>
 
                 {/* Address info */}
-                {desc.form_data?.adres && (
+                {desc.form_data && (desc.form_data as Record<string, string>).adres && (
                   <h3 className="text-lg font-semibold text-white mb-1">
-                    {desc.form_data.adres}{(desc.form_data as { plaats?: string })?.plaats ? `, ${(desc.form_data as { plaats?: string }).plaats}` : ''}
+                    {(desc.form_data as Record<string, string>).adres}{(desc.form_data as { plaats?: string }).plaats ? `, ${(desc.form_data as { plaats?: string }).plaats}` : ''}
                   </h3>
                 )}
 
