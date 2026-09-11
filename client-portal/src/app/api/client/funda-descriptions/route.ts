@@ -8,9 +8,18 @@ import { resolveClientId } from '@/lib/ai-usage'
 
 export const dynamic = 'force-dynamic'
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const
+interface ApiResponse {
+  error?: string
+  descriptions?: Array<Record<string, unknown>>
+  total?: number
+  page?: number
+  limit?: number
+  totalPages?: number
+  id?: string
+  message?: string
+}
 
-function response(payload: unknown, status = 200) {
+function response(payload: ApiResponse, status = 200) {
   return NextResponse.json(payload, { status, headers: NO_STORE_HEADERS })
 }
 
