@@ -141,7 +141,8 @@ function normalizeSyntheticHome(raw: unknown, fallback: SyntheticProfile): Recor
 
   return {
     woningtype: asText(source.woningtype, fallback.woningtype),
-    // Forceer de plaats vanuit het fallback profiel (alleen dorpen op het eiland Tholen)
+    // Forceer de adres en plaats vanuit het fallback profiel (alleen dorpen op het eiland Tholen)
+    adres: fallback.adres,
     plaats: fallback.plaats,
     vraagprijs: asText(source.vraagprijs, fallback.vraagprijs),
     bouwjaar: asText(source.bouwjaar, fallback.bouwjaar),
