@@ -93,22 +93,43 @@ type SyntheticProfile = {
   vraagprijs: string
 }
 
+const THOLEN_PLACES = [
+  'Tholen', 'Sint-Annaland', 'Sint-Philipsland', 'Poortvliet', 'Nieuwvossemeer',
+  'Oud-Vossemeer', 'IJzendijke', 'Eisden', 'Weert', 'Schoondijk', 'Biezen', 'Rijswijk',
+]
+
 const SYNTHETIC_PROFILES: SyntheticProfile[] = [
   {
     adres: 'Zeedistelstraat 14', plaats: 'Tholen', woningtype: 'Tussenwoning',
     ligging: 'Rustige woonwijk op loopafstand van het centrum van Tholen', kenmerken: ['Tuin op het zuiden', 'Dakkapel', 'Vloerverwarming'], staat: 'Goed onderhouden', bouwjaar: '2018', woonoppervlakte: '118', perceeloppervlakte: '174', kamers: '5', slaapkamers: '3', vraagprijs: '€ 389.000 k.k.',
   },
   {
-    adres: 'Kreekzicht 7', plaats: 'Sint-Annaland', woningtype: 'Vrijstaande woning',
-    ligging: 'Aan de rand van het dorp met vrij uitzicht over het landschap', kenmerken: ['Garage', 'Zonnepanelen', 'Open keuken'], staat: 'Instapklaar', bouwjaar: '2006', woonoppervlakte: '156', perceeloppervlakte: '612', kamers: '6', slaapkamers: '4', vraagprijs: '€ 575.000 k.k.',
+    adres: 'Schuttershof 4', plaats: 'Tholen', woningtype: 'Vrijstaande woning',
+    ligging: 'Kindvriendelijke woonwijk aan de rand van het centrum', kenmerken: ['Garage', 'Zonnepanelen', 'Tuin op het zuiden'], staat: 'Instapklaar', bouwjaar: '2006', woonoppervlakte: '156', perceeloppervlakte: '612', kamers: '6', slaapkamers: '4', vraagprijs: '€ 575.000 k.k.',
   },
   {
-    adres: 'Appelgaard 22', plaats: 'Oud-Vossemeer', woningtype: '2-onder-1-kapwoning',
-    ligging: 'Groene, kindvriendelijke straat nabij voorzieningen en wandelroutes', kenmerken: ['Garage', 'Tuin op het westen', 'Badkamer vernieuwd'], staat: 'Gerenoveerd', bouwjaar: '1994', woonoppervlakte: '132', perceeloppervlakte: '298', kamers: '5', slaapkamers: '4', vraagprijs: '€ 449.000 k.k.',
+    adres: 'Hoogstraat 5', plaats: 'Tholen', woningtype: 'Woning',
+    ligging: 'In de historische binnenstad van Tholen, nabij markt en haven', kenmerken: ['Monument', 'Balkenplafond', 'Glas-in-loodramen'], staat: 'Gerenoveerd', bouwjaar: '1849', woonoppervlakte: '142', perceeloppervlakte: '98', kamers: '5', slaapkamers: '3', vraagprijs: '€ 489.000 k.k.',
   },
   {
-    adres: 'Windroos 3', plaats: 'Poortvliet', woningtype: 'Appartement',
-    ligging: 'Rustig gelegen met zicht op de dorpskern en de polders', kenmerken: ['Balkon', 'Inpandige berging', 'Dubbele beglazing'], staat: 'Goed onderhouden', bouwjaar: '2012', woonoppervlakte: '86', perceeloppervlakte: 'n.v.t.', kamers: '3', slaapkamers: '2', vraagprijs: '€ 319.000 k.k.',
+    adres: 'Dijkgraafstraat 8', plaats: 'IJzendijke', woningtype: 'Appartement',
+    ligging: 'Aan de waterkant met uitzicht over de Braasse plas', kenmerken: ['Balkon', 'Inpandige berging', 'Dubbele beglazing'], staat: 'Goed onderhouden', bouwjaar: '2012', woonoppervlakte: '86', perceeloppervlakte: 'n.v.t.', kamers: '3', slaapkamers: '2', vraagprijs: '€ 319.000 k.k.',
+  },
+  {
+    adres: 'Kerkweg 22', plaats: 'Sint-Philipsland', woningtype: '2-onder-1-kapwoning',
+    ligging: 'Rustige straat nabij dorpskern en basisschool', kenmerken: ['Tuin op het westen', 'Vloerverwarming', 'Badkamer vernieuwd'], staat: 'Instapklaar', bouwjaar: '1994', woonoppervlakte: '132', perceeloppervlakte: '298', kamers: '5', slaapkamers: '4', vraagprijs: '€ 449.000 k.k.',
+  },
+  {
+    adres: 'Bosstraat 15', plaats: 'Weert', woningtype: 'Bungalow',
+    ligging: 'Landelijk gelegen aan de rand van het dorp met uitzicht over de polder', kenmerken: ['Vrijstaande schuur', 'Zonnepanelen', 'Open keuken'], staat: 'Goed onderhouden', bouwjaar: '1985', woonoppervlakte: '105', perceeloppervlakte: '450', kamers: '4', slaapkamers: '3', vraagprijs: '€ 365.000 k.k.',
+  },
+  {
+    adres: 'Havenzicht 11', plaats: 'Schoondijk', woningtype: 'Vrijstaande woning',
+    ligging: 'Aan de waterweg met eigen aanlegsteek', kenmerken: ['Garage', 'Tuin op het zuiden', 'Zonnepanelen', 'Badkamer vernieuwd'], staat: 'Instapklaar', bouwjaar: '2015', woonoppervlakte: '168', perceeloppervlakte: '520', kamers: '6', slaapkamers: '4', vraagprijs: '€ 525.000 k.k.',
+  },
+  {
+    adres: 'Biezenweg 7', plaats: 'Biezen', woningtype: 'Tussenwoning',
+    ligging: 'Groene omgeving nabij natuurgebied de Biezen', kenmerken: ['Dakkapel', 'Vloerverwarming', 'Inpandige berging'], staat: 'Goed onderhouden', bouwjaar: '2001', woonoppervlakte: '115', perceeloppervlakte: '210', kamers: '4', slaapkamers: '3', vraagprijs: '€ 345.000 k.k.',
   },
 ]
 
@@ -164,6 +185,10 @@ export async function POST() {
     const variationNumber = Number.parseInt(variationSeed.replace(/-/g, '').slice(0, 8), 16)
     const fallbackIndex = variationNumber % SYNTHETIC_PROFILES.length
     const fallbackProfile = SYNTHETIC_PROFILES[fallbackIndex]
+    
+    // Forceer de plaats vanuit het profiel (alleen dorpen op het eiland Tholen)
+    const forcedPlace = fallbackProfile.plaats
+    
     const completion = await openai.chat.completions.create({
       model,
       response_format: { type: 'json_object' },
@@ -172,11 +197,11 @@ export async function POST() {
       messages: [
         {
           role: 'system',
-          content: 'Je maakt synthetische, duidelijk fictieve Nederlandse woningdata voor een demo. Gebruik geen bestaande personen, echte prijzen of herkenbare adressen. Geef alleen geldig JSON terug met de velden woningtype, adres, plaats, vraagprijs, bouwjaar, woonoppervlakte, perceeloppervlakte, kamers, slaapkamers, ligging, kenmerken (array), staat, bijzonderheden en lengte. Gebruik een geloofwaardige maar fictieve straatnaam en plaats.',
+          content: 'Je maakt synthetische, duidelijk fictieve Nederlandse woningdata voor een demo. Gebruik GEEN bestaande personen, echte prijzen of herkenbare adressen. Geef alleen geldig JSON terug met de velden woningtype, adres, plaats, vraagprijs, bouwjaar, woonoppervlakte, perceeloppervlakte, kamers, slaapkamers, ligging, kenmerken (array), staat, bijzonderheden en lengte. Gebruik een geloofwaardige maar fictieve straatnaam.\n\nSTRIKTE REGEL: De "plaats" veld in de JSON MOET exact overeenkomen met de "place" parameter die ik je geef. Gebruik GEEN andere plaatsen.',
         },
         {
           role: 'user',
-          content: `Maak een nieuwe, gevarieerde synthetische testwoning in Zeeland die geschikt is om een Funda-, Instagram-, Facebook- en brochuretekst te testen. Kies lengte normaal. De interface toont zelf dat dit testdata is; zet geen woorden als fictief, synthetisch of demo in de woningvelden. Gebruik deze variatiecode ${variationSeed} en dit profiel als richting, maar neem niet letterlijk steeds dezelfde waarden over: ${JSON.stringify(fallbackProfile)}.`,
+          content: `Maak een nieuwe, gevarieerde synthetische testwoning die geschikt is om een Funda-, Instagram-, Facebook- en brochuretekst te testen. Kies lengte normaal.\n\nJE PLAATS VELD MOET EXACT DIT ZIJN: ${forcedPlace}\n\nGebruik GEEN andere plaatsen. De interface toont zelf dat dit testdata is; zet geen woorden als fictief, synthetisch of demo in de woningvelden. Gebruik deze variatiecode ${variationSeed} en dit profiel als richting, maar neem niet letterlijk steeds dezelfde waarden over behalve de plaats: ${JSON.stringify(fallbackProfile)}.`,
         },
       ],
     })
